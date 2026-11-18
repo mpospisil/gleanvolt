@@ -779,6 +779,6 @@
     <value>{0} není zdroj počasí.</value>
   </data>
   <data name="Config_SetupBadWeatherSource" xml:space="preserve">
-    <value>Weather:Source ('{0}') musí být NotProvided, OpenWeather nebo External.</value>
+    <value>Weather:Source ('{0}') musí být NotProvided nebo External: OpenWeatherMap teď dodává plugin OpenWeather, vybraný jako External.</value>
   </data>
 </root>

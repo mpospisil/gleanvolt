@@ -263,12 +263,9 @@ services:
       Solcast__ApiKey: ${SOLCAST_API_KEY:-}
       Solcast__ResourceId: ${SOLCAST_RESOURCE_ID:-}
 
-      # The weather each charging session ran in (issue #96). Entirely optional: with no key, or a site
-      # with no coordinates, the controller makes no weather calls at all and sessions are recorded
-      # without it. Two calls per session, so any free OpenWeatherMap plan covers it. Which site it asks
-      # about is PV_LATITUDE/PV_LONGITUDE above -- where the array is is a fact about the array.
-      Weather__ApiKey: ${WEATHER_API_KEY:-}
-      # Or from the OpenWeather plugin below (#424, #426): choose "External" under Settings -> Weather.
+      # The weather each charging session ran in comes from an external provider since #425, such as
+      # the OpenWeather plugin below: choose "External" under Settings -> Weather. Nothing to set here;
+      # WEATHER_API_KEY goes to the plugin now, not to the controller.
 
       # Deploying must not start writing to an inverter or charger. Charge control needs no flag for
       # that: the service always boots in mode Off and takes control only when a mode is selected
@@ -348,8 +345,8 @@ services:
       Gleanvolt__PageUrl: http://localhost:${OPENWEATHER_PORT:-8096}/
       # Who may show the page in a frame. Unset: Gleanvolt on this machine at any name, on WEB_PORT.
       Gleanvolt__FrameAncestors: ${OPENWEATHER_FRAME_ANCESTORS:-}
-      # Optional: a key entered on the plugin's page wins over it. WEATHER_API_KEY, the built-in's, is the
-      # fallback, so an installation moving to the plugin brings its key along.
+      # Optional: a key entered on the plugin's page wins over it. WEATHER_API_KEY, the removed built-in's
+      # (#425), is the fallback, so an installation moving to the plugin brings its key along.
       OpenWeather__ApiKey: ${OPENWEATHER_API_KEY:-${WEATHER_API_KEY:-}}
     volumes:
       # The OpenWeatherMap key and the page's own keys. Owned by uid 1654, mode 700: the deploy scripts

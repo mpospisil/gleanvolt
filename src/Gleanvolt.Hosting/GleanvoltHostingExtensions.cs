@@ -29,7 +29,6 @@ using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Infrastructure.Monitoring;
 using Gleanvolt.Infrastructure.Secrets;
 using Gleanvolt.Infrastructure.Sessions;
-using Gleanvolt.Infrastructure.OpenWeather;
 using Gleanvolt.Hosting.Weather;
 using Gleanvolt.Infrastructure.Solcast;
 using Gleanvolt.Api;
@@ -426,32 +425,12 @@ public static class GleanvoltHostingExtensions
         services.AddHostedService<SolarForecastRefreshWorker>();
         services.AddSingleton<ISolcastAccountEditor, SolcastAccountEditor>();
 
-        // The weather a session ran in (issue #96). Off unless a key and the site's coordinates are
-        // configured, and secret on the same terms as Solcast: Weather:ApiKey / Weather__ApiKey.
-        // No refresh worker -- it is asked twice per charging session and never on a control path.
+        // The weather a session ran in (issue #96), from an external provider since #425: the OpenWeather
+        // plugin, or another. No refresh worker -- it is asked twice per charging session and never on a
+        // control path.
         services.Configure<WeatherOptions>(configuration.GetSection(WeatherOptions.SectionName));
 
-        services.AddHttpClient(OpenWeatherMapService.HttpClientName, (provider, client) =>
-        {
-            var options = provider.GetRequiredService<IOptions<WeatherOptions>>().Value;
-            if (!string.IsNullOrWhiteSpace(options.BaseUrl))
-            {
-                client.BaseAddress = new Uri(options.BaseUrl, UriKind.Absolute);
-            }
-
-            // The service bounds each call itself; this is the backstop for a connection that never
-            // gets as far as a response.
-            client.Timeout = options.RequestTimeout;
-        });
-
-        // The key itself can also be saved on Settings, which wins over Weather__ApiKey and is read on
-        // every call -- the same arrangement as the Solcast account.
-        services.AddSingleton<WeatherKeyStore>();
-        services.AddSingleton<OpenWeatherMapService>();
-        services.AddSingleton<IWeatherKeyEditor, WeatherKeyEditor>();
-
-        // Where the weather comes from (#424): none, OpenWeatherMap, or an external provider publishing on
-        // its hub. Chosen on Settings and applied without a restart; every reader gets the selected one.
+        // Where the weather comes from (#424): none, or an external provider publishing on its hub. Chosen on Settings and applied without a restart; every reader gets the selected one.
         // Choosing External is what turns the hub on, as for the tariff and the solar forecast.
         services.AddSingleton<WeatherSourceSelection>();
         services.AddSingleton<IWeatherSourceSelection>(provider => provider.GetRequiredService<WeatherSourceSelection>());

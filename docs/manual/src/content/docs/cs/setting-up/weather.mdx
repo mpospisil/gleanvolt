@@ -1,6 +1,6 @@
 ---
 title: Počasí
-description: Zaznamenávejte počasí během každého nabíjení z OpenWeatherMap nebo z vlastního zdroje.
+description: Zaznamenávejte počasí během každého nabíjení z OpenWeatherMap přes plugin OpenWeather.
 ---
 
 import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -18,16 +18,14 @@ Otevřete **Nastavení** a najděte **Počasí** (nebo krok průvodce **Doplňky
 vyberte:
 
 - **Bez počasí**: počasí se nezaznamenává.
-- **OpenWeather**: Gleanvolt se ptá OpenWeatherMap sám, s bezplatným klíčem, který zadáte tady.
-- **Externí**: počasí Gleanvoltu posílá samostatný program, například plugin OpenWeather.
+- **Externí**: počasí Gleanvoltu posílá samostatný program. Hotovým zdrojem je plugin OpenWeather, který
+  vychází s Gleanvoltem: čte počasí z OpenWeatherMap.
 
 Klikněte na **Uložit**. Restart není potřeba.
 
-Pokud jste klíč OpenWeatherMap měli zadaný už dřív, než tato volba vznikla, je vybráno **OpenWeather**.
+## Záznam počasí přes plugin OpenWeather
 
-## OpenWeather
-
-### Získání klíče
+### Získání klíče OpenWeatherMap
 
 <Steps>
 
@@ -37,48 +35,41 @@ Pokud jste klíč OpenWeatherMap měli zadaný už dřív, než tato volba vznik
 
 </Steps>
 
-### Zadání do Gleanvoltu
-
-<Steps>
-
-1. V části **Počasí** vyberte **OpenWeather**.
-
-2. Vložte klíč do pole **Klíč API**.
-
-3. Klikněte na **Uložit a ověřit**. Tím se zároveň uloží **OpenWeather** jako zdroj.
-
-</Steps>
-
-![Sekce počasí v Nastavení s vybraným OpenWeather a uloženým klíčem API.](../../../../assets/screenshots/settings-weather.png)
-
 :::note[Nový klíč může začít fungovat až za pár hodin]
 OpenWeatherMap někdy nový klíč chvíli zapíná. Pokud ověření hned po vytvoření selže, klíč zůstane
 uložený a začne fungovat sám.
 :::
 
-Gleanvolt se ptá na počasí dvakrát za nabíjení, s velkou rezervou v rámci bezplatného plánu.
-
-## Externí zdroj
-
-Externí zdroj je program, který běží vedle Gleanvoltu a posílá mu počasí. Jedním z nich je plugin
-OpenWeather: čte OpenWeatherMap stejně, jen má pro klíč vlastní stránku.
+### Připojení pluginu
 
 <Steps>
 
 1. V části **Počasí** vyberte **Externí** a klikněte na **Uložit**.
 
-2. Spusťte zdroj s tokenem pro externí zdroje z **Nastavení → Externí zdroje dat**. Pro plugin
-   OpenWeather viz [Spuštění pluginu OpenWeather](#spuštění-pluginu-openweather) níže.
+2. Spusťte plugin s tokenem pro externí zdroje z **Nastavení → Externí zdroje dat**: viz
+   [Spuštění pluginu OpenWeather](#spuštění-pluginu-openweather) níže.
 
-3. Jakmile se připojí, objeví se v části **Počasí** jeho vlastní stránka. U pluginu OpenWeather na ní
-   zadejte klíč OpenWeatherMap a klikněte na **Uložit a ověřit**.
+3. Jakmile se připojí, objeví se v části **Počasí** jeho vlastní stránka. Zadejte na ní klíč
+   OpenWeatherMap a klikněte na **Uložit a ověřit**.
 
 </Steps>
 
 ![Sekce počasí v Nastavení s připojeným pluginem OpenWeather a jeho stránkou.](../../../../assets/screenshots/settings-weather-external.png)
 
-Gleanvolt se zdroje zeptá, když nabíjení začne a když skončí. Pokud zdroj neběží nebo do 15 sekund
+Gleanvolt se pluginu zeptá, když nabíjení začne a když skončí, a plugin se ptá OpenWeatherMap nejvýš
+jednou za 10 minut, s velkou rezervou v rámci bezplatného plánu. Pokud plugin neběží nebo do 15 sekund
 neodpoví, nabíjení se zaznamená bez počasí. Na ničem jiném to nic nemění.
+
+## Pokud jste dřív používali OpenWeather v Gleanvoltu
+
+Gleanvolt se dřív ptal OpenWeatherMap sám, s klíčem zadaným v části **Počasí**. To skončilo: počasí
+z OpenWeatherMap teď přichází jen přes plugin OpenWeather. Po aktualizaci Gleanvolt sám vybere
+**Externí** a v části **Počasí** to oznámí, dokud se plugin nepřipojí:
+
+![Sekce počasí v Nastavení po aktualizaci s oznámením, že počasí teď dodává plugin OpenWeather.](../../../../assets/screenshots/settings-weather.png)
+
+Klíč uložený v Gleanvoltu se nezachoval. Spusťte plugin podle návodu níže a klíč zadejte znovu na jeho
+stránce. Do té doby se nabíjení zaznamenává bez počasí.
 
 ## Spuštění pluginu OpenWeather
 

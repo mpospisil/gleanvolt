@@ -26,7 +26,7 @@ public interface IWeatherService
     /// Where the weather comes from (#424). A service that is one provider says which by being configured
     /// or not; the one the host registers follows the choice on Settings.
     /// </summary>
-    WeatherSource Source => IsConfigured ? WeatherSource.OpenWeather : WeatherSource.NotProvided;
+    WeatherSource Source => IsConfigured ? WeatherSource.External : WeatherSource.NotProvided;
 
     /// <summary>
     /// The current conditions, or <c>null</c> when the service is unconfigured or the fetch failed for

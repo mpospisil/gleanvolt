@@ -140,7 +140,7 @@ public class SetupStatusEvaluatorTests
             ("Solcast:ResourceId", "abcd-1234"),
             ("Ev:Vehicles:0:Id", "car"),
             ("HomeAssistant:Enabled", "true"),
-            ("Weather:ApiKey", "weather"));
+            ("Weather:Source", "External"));
 
         Assert.Equal([OptionalSetting.Tariff], configured.MissingOptional);
     }

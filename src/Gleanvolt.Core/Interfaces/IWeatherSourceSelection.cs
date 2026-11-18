@@ -12,10 +12,11 @@ public interface IWeatherSourceSelection
     WeatherSource Selected { get; }
 
     /// <summary>
-    /// Whether <see cref="Selected"/> was chosen (on Settings, in the wizard or in the configuration), as
-    /// opposed to worked out from whether an OpenWeatherMap key is configured.
+    /// True when this installation used the built-in OpenWeather, which #425 removed, and no weather
+    /// provider has connected since: Settings tells the owner that the weather now comes from the
+    /// OpenWeather plugin and that its key is entered on the plugin's page.
     /// </summary>
-    bool IsChosen { get; }
+    bool BuiltInRetired { get; }
 
     /// <summary>
     /// Saves <paramref name="source"/> for the next start and uses it from now on. Refused, with nothing
@@ -23,6 +24,6 @@ public interface IWeatherSourceSelection
     /// </summary>
     SettingsSaveResult Select(WeatherSource source);
 
-    /// <summary>Raised after the source in use changes.</summary>
+    /// <summary>Raised after the source in use changes, or the notice about the built-in goes.</summary>
     event Action? Changed;
 }

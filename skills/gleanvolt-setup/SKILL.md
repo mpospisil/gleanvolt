@@ -30,7 +30,7 @@ is out of date. Czech manual: replace `/en/` with `/cs/` in any link.
 - **The web UI password is never yours.** The user types it into `set-password` in their own terminal,
   and that command prints the recovery key there. Never ask for either. Don't let anyone paste them into
   the chat.
-- **The Solcast and OpenWeatherMap keys only with the user's agreement.** Ask whether they want to give
+- **The Solcast key only with the user's agreement.** Ask whether they want to give
   them to you. Say that a key typed into the chat stays in the conversation history and passes through
   the AI service, and that the alternative is to paste it on **Settings** in the browser afterwards. If
   they decline, leave the key out of the file.
@@ -91,7 +91,7 @@ Ask in one go, and explain why each is needed:
 | **Usable capacity of the home battery (kWh)** | the Forecasted and Targeted modes plan with it | from the data sheet or the inverter app |
 | **A name for the site** (optional) | shown in the UI | e.g. "Home" |
 | **Solcast** (optional) | the solar forecast those two modes plan with | Does the user have a free [Solcast](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/solar-forecast/) account? Its **API key** and **Rooftop site resource id**, if they agree to give them to you (Rules). |
-| **OpenWeatherMap** (optional) | records the weather during each charge | Its **API key**, on the same terms. See [Weather](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/weather/). |
+| **Weather** (optional) | records the weather during each charge | Only whether they want it. It comes from the OpenWeather plugin, which takes its own key on its own page, later. See [Weather](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/weather/). |
 
 ## 3. Find the devices
 
@@ -145,7 +145,7 @@ cat > ~/gleanvolt-site.json <<'EOF'
   "Controller": { "TimeZone": "Europe/Prague" },
   "ChargeControl": { "Forecast": { "BatteryCapacityKWh": 9 } },
   "Solcast": { "ApiKey": "…", "ResourceId": "…" },
-  "Weather": { "Source": "OpenWeather", "ApiKey": "…" }
+  "Weather": { "Source": "External" }
 }
 EOF
 ```
@@ -153,8 +153,8 @@ EOF
 - `Driver`, `Host`, `Port`, `UnitId` come from the device's search result. If it has a `topology`
   (a Huawei inverter behind an EMMA), add `"Topology": "emma"` to the inverter.
 - `Id` is lowercase letters, digits, `-` or `_`.
-- `Weather:Source` is `OpenWeather` with a key, or `NotProvided` when the user doesn't want the weather.
-  `External` (a weather plugin) is for later, on Settings; don't set it here.
+- `Weather:Source` is `External` when the user wants the weather, or `NotProvided` when not. Gleanvolt
+  has no weather key: the OpenWeather plugin is started and given its key afterwards (below).
 - Leave out what the user didn't give: the `Solcast` and `Weather` blocks, the battery, the name. Never
   write an empty placeholder: an empty value means "remove the saved one".
 - Every key the file may hold: `/opt/gleanvolt/Gleanvolt.Worker setup --print-schema`. Anything else is
@@ -266,7 +266,10 @@ Everything else: [Troubleshooting](https://mpospisil.github.io/gleanvolt/latest/
 
 - **The car:** battery size, phases, currents, and where its battery level comes from. See
   [Your car and its battery level](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/car/).
-- Any Solcast or OpenWeatherMap key the user kept to themselves.
+- Any Solcast key the user kept to themselves.
+- **The weather,** if wanted: the OpenWeather plugin, started with the provider token, and its
+  OpenWeatherMap key entered on its page under **Settings → Weather**. See
+  [Run the OpenWeather plugin](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/weather/#run-the-openweather-plugin).
 - Optionally, the [grid tariff](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/grid-tariff/).
 
 ## 7. The browser wizard (NAS, or no shell)

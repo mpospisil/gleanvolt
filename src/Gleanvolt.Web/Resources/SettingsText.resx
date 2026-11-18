@@ -798,43 +798,7 @@
     <value>the weather</value>
   </data>
   <data name="WeatherTip1" xml:space="preserve">
-    <value>The weather comes from a free OpenWeatherMap account: create a key under API keys on openweathermap.org. A new key can take up to a couple of hours to start working.</value>
-  </data>
-  <data name="WeatherTip2" xml:space="preserve">
-    <value>A key saved here overrides {0} in {1}. Remove it to use the environment's key again.</value>
-  </data>
-  <data name="WeatherIntro" xml:space="preserve">
-    <value>The weather each charging session ran in — temperature, cloud cover, sunrise and sunset — recorded with the session for the site's location. Optional. A save applies at once and checks the key with one call.</value>
-  </data>
-  <data name="WeatherReadOnly" xml:space="preserve">
-    <value>Read-only, because this UI has no login, and the key is a secret. Configure {0} ({1}) and the key becomes editable here; until then, set {2} in {3} and restart.</value>
-  </data>
-  <data name="SourceEnvironmentWeather" xml:space="preserve">
-    <value>From the environment (WEATHER_API_KEY)</value>
-  </data>
-  <data name="NotConfiguredNoWeather" xml:space="preserve">
-    <value>Not configured — sessions are recorded without the weather.</value>
-  </data>
-  <data name="WeatherConfigured" xml:space="preserve">
-    <value>Configured — each charging session records the weather it ran in.</value>
-  </data>
-  <data name="SaveAndCheck" xml:space="preserve">
-    <value>Save and check</value>
-  </data>
-  <data name="WeatherKeyAccepted" xml:space="preserve">
-    <value>Saved, and OpenWeatherMap accepted the key.</value>
-  </data>
-  <data name="WeatherKeyRefused" xml:space="preserve">
-    <value>Saved, but OpenWeatherMap refused the key. A new key can take up to a couple of hours to start working; if this one is older, check it on openweathermap.org.</value>
-  </data>
-  <data name="WeatherCheckFailed" xml:space="preserve">
-    <value>Saved, but OpenWeatherMap could not be reached to check the key. It is tried again with the next charging session.</value>
-  </data>
-  <data name="WeatherRemovedEnvironment" xml:space="preserve">
-    <value>Removed. The key from the environment is in use again.</value>
-  </data>
-  <data name="WeatherRemovedNone" xml:space="preserve">
-    <value>Removed. Sessions are recorded without the weather.</value>
+    <value>Gleanvolt calls no weather service itself: an external provider sends the weather. The OpenWeather plugin, released with Gleanvolt, reads it from a free OpenWeatherMap account, with the key entered on the plugin's own page.</value>
   </data>
   <data name="HomeAssistantLink" xml:space="preserve">
     <value>Home Assistant (MQTT)</value>
@@ -1179,10 +1143,10 @@
     <comment>{0} the source now in use.</comment>
   </data>
   <data name="WeatherNotProvided" xml:space="preserve">
-    <value>Sessions are recorded without the weather. Choose OpenWeather or External to record it.</value>
+    <value>Sessions are recorded without the weather. Choose External to record it from a provider, such as the OpenWeather plugin.</value>
   </data>
   <data name="WeatherExternalIntro" xml:space="preserve">
-    <value>The weather comes from the provider connected here, for example the OpenWeather plugin. Gleanvolt asks it when a charging session opens and when it closes; a session it doesn't answer is recorded without the weather. OpenWeatherMap is not called while External is selected, and its key is kept for when you choose OpenWeather again.</value>
+    <value>The weather comes from the provider connected here. The OpenWeather plugin, released with Gleanvolt, is the ready-made one: it reads OpenWeatherMap, with the key entered on its page below. Gleanvolt asks the provider when a charging session opens and when it closes; a session it doesn't answer is recorded without the weather.</value>
   </data>
   <data name="WeatherExternalWizard" xml:space="preserve">
     <value>Connect the provider once setup is finished, on Settings: its address, the token and its own page are there.</value>
@@ -1190,5 +1154,9 @@
   <data name="WeatherExternalPageIntro" xml:space="preserve">
     <value>{0} has a page of its own, shown here: enter its settings, such as an API key, there. It comes from the provider itself, not from Gleanvolt.</value>
     <comment>{0} the provider's name.</comment>
+  </data>
+  <data name="WeatherBuiltInRetired" xml:space="preserve">
+    <value>The built-in OpenWeather is gone, so External is chosen for you: OpenWeatherMap's weather now comes from the OpenWeather plugin. Run the plugin with the token from External providers, then enter your OpenWeatherMap key on its page, which appears here once it connects. A key saved here before was not kept. Until then, charges are recorded without the weather.</value>
+    <comment>Shown once after the upgrade that removed the built-in OpenWeather (#425), until a weather provider connects. OpenWeather and OpenWeatherMap are names.</comment>
   </data>
 </root>

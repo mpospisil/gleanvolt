@@ -5,7 +5,6 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Infrastructure;
-using Gleanvolt.Infrastructure.OpenWeather;
 using Gleanvolt.Infrastructure.Solcast;
 using Gleanvolt.Web.Auth;
 
@@ -40,10 +39,7 @@ public sealed class SetupDocument
     /// <summary>The Solcast rooftop site, stored with the key.</summary>
     public const string SolcastResourceId = "Solcast:ResourceId";
 
-    /// <summary>The OpenWeatherMap API key: a secret.</summary>
-    public const string WeatherApiKey = "Weather:ApiKey";
-
-    /// <summary>Where the weather comes from (#424): NotProvided, OpenWeather or External.</summary>
+    /// <summary>Where the weather comes from (#424): NotProvided or External (#425).</summary>
     public const string WeatherSourceKey = "Weather:Source";
 
     /// <summary>The site's time zone.</summary>
@@ -59,7 +55,6 @@ public sealed class SetupDocument
         .. PvSystemSettingKeys.All,
         SolcastApiKey,
         SolcastResourceId,
-        WeatherApiKey,
         WeatherSourceKey,
         .. EvSettingKeys.All,
         .. IntegrationSettingKeys.Plain,
@@ -87,7 +82,7 @@ public sealed class SetupDocument
 
     /// <summary>The keys whose values are secrets: never written to the overrides file.</summary>
     public static IReadOnlyList<string> SecretKeys { get; } =
-        [WebPassword, SolcastApiKey, WeatherApiKey, EvSettingKeys.WebsitePassword, EvSettingKeys.DataActPassword, IntegrationSettingKeys.MqttPassword];
+        [WebPassword, SolcastApiKey, EvSettingKeys.WebsitePassword, EvSettingKeys.DataActPassword, IntegrationSettingKeys.MqttPassword];
 
     private SetupDocument(IReadOnlyDictionary<string, string> values) => Values = values;
 
@@ -263,7 +258,7 @@ public sealed class SetupDocument
             && Weather.WeatherSourceSelection.Parse(weatherSource) is null)
         {
             problems.Add(
-                $"{WeatherSourceKey} ('{weatherSource.Trim()}') must be NotProvided, OpenWeather or External.",
+                $"{WeatherSourceKey} ('{weatherSource.Trim()}') must be NotProvided or External: OpenWeatherMap comes from the OpenWeather plugin, chosen as External.",
                 Phrase.Of("Config.SetupBadWeatherSource", new PhraseArg.Text(weatherSource.Trim())));
         }
 
@@ -337,17 +332,6 @@ public sealed class SetupDocument
             if (!saved)
             {
                 return SetupApplyResult.Refused(SecretNotSaved("Solcast"));
-            }
-        }
-
-        if (Values.TryGetValue(WeatherApiKey, out var weatherKey) && !string.IsNullOrWhiteSpace(weatherKey))
-        {
-            var saved = target.Weather?.Save(weatherKey)
-                ?? target.Secrets.Write(SecretNames.WeatherApiKey, weatherKey.Trim());
-
-            if (!saved)
-            {
-                return SetupApplyResult.Refused(SecretNotSaved("weather"));
             }
         }
 
@@ -483,14 +467,12 @@ public sealed class SetupDocument
 /// <param name="Secrets">The secret store secrets go to.</param>
 /// <param name="Password">Sets the web UI password; null on a host that has none.</param>
 /// <param name="Solcast">The running Solcast account, so a saved key is used without a restart; null writes the store directly.</param>
-/// <param name="Weather">The running weather key, likewise.</param>
 public sealed record SetupTarget(
     IConfiguration Configuration,
     string OverridesPath,
     ISecretStore Secrets,
     WebPasswordService? Password = null,
-    SolcastAccountStore? Solcast = null,
-    WeatherKeyStore? Weather = null);
+    SolcastAccountStore? Solcast = null);
 
 /// <summary>What applying a document came to. <see cref="RecoveryKey"/> is set when it set the password.</summary>
 public sealed record SetupApplyResult(bool Applied, IReadOnlyList<string> Problems, string? RecoveryKey)

@@ -28,7 +28,7 @@ public class WizardTests : PageTest
         Services.AddSingleton<ISetupState>(_setup);
         Services.AddSingleton<IEvEditor>(new FakeEvEditor());
         Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());
-        Services.AddSingleton<IWeatherKeyEditor>(new FakeWeatherKeyEditor());
+        Services.AddSingleton<IWeatherSourceSelection>(new FakeWeatherSourceSelection());
         Services.AddSingleton<IIntegrationsEditor>(new FakeIntegrationsEditor());
         Services.AddSingleton<ITariffEditor>(new FakeTariffEditor());
         Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));
@@ -73,11 +73,12 @@ public class WizardTests : PageTest
     }
 
     [Fact]
-    public void The_extras_step_sets_the_weather_key_home_assistant_and_the_api()
+    public void The_extras_step_sets_the_weather_source_home_assistant_and_the_api()
     {
         var extras = Step("extras");
 
-        Assert.NotNull(extras.Find("#weather-api-key"));
+        Assert.NotNull(extras.Find("#weather-source-choice"));
+        Assert.Empty(extras.FindAll("#weather-api-key"));
         Assert.NotNull(extras.Find("#mqtt-brokerhost"));
         Assert.NotNull(extras.Find("#api-enabled"));
     }

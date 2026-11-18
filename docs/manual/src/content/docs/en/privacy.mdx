@@ -20,7 +20,7 @@ Everything is in Gleanvolt's `data` and `logs` folders, on the computer it runs 
 | Energy history | Every quarter hour: solar, grid, home battery, car | Always, unless you delete it |
 | Logs | What Gleanvolt decided and why, and errors | 14 days |
 | Settings | Your settings, including your home's location and your devices' addresses | Until you delete them |
-| Passwords and keys | Your car account's password, the Solcast and weather keys, and others | Until you remove them |
+| Passwords and keys | Your car account's password, the Solcast key, and others | Until you remove them |
 
 Gleanvolt never asks for your name, e-mail, address, phone number or payment details.
 
@@ -47,17 +47,16 @@ Only these, and **only if you set them up**:
 | Service | What is sent | When |
 |---|---|---|
 | **Solcast** (solar forecast) | Your Solcast key and the site id you created at Solcast. Not your location | A few times a day |
-| **OpenWeatherMap** (weather) | Your key, and **your home's location** | Twice per charge |
 | **Volkswagen, Škoda or the VW Group Data Act portal** (car battery level) | Your account's sign-in, and your car's VIN, to the car maker | While reading the car |
 
 Requests to your car's maker go to them, under their privacy policy. Gleanvolt signs in as you, with the
 details you gave it, and keeps only the car's battery level, range, plug and charge state, and when the
 car reported them. Your VIN isn't stored in the history.
 
-**Your home's location** leaves your network only if you set up the weather, which needs it.
+Gleanvolt itself sends **your home's location** nowhere outside your network.
 
-With an **external** weather provider, Gleanvolt gives your home's location to that program, and the
-program decides where it goes: the OpenWeather plugin sends it, with your key, to OpenWeatherMap, as
-Gleanvolt would.
+For the weather, Gleanvolt gives your home's location to the weather program on your network, and that
+program decides where it goes: the OpenWeather plugin sends it, with your key, to OpenWeatherMap, at most
+once every 10 minutes while charges ask for it. The plugin keeps that key in its own folder.
 
 Nothing else is ever contacted.

@@ -20,7 +20,7 @@ Všechno je ve složkách `data` a `logs` Gleanvoltu, na počítači, na kterém
 | Historie energie | Každá čtvrthodina: slunce, síť, domácí baterie, auto | Napořád, pokud ji nesmažete |
 | Záznamy | Co Gleanvolt rozhodl a proč, a chyby | 14 dní |
 | Nastavení | Vaše nastavení, včetně polohy domu a adres zařízení | Dokud je nesmažete |
-| Hesla a klíče | Heslo k účtu auta, klíče Solcast a počasí a další | Dokud je neodstraníte |
+| Hesla a klíče | Heslo k účtu auta, klíč Solcast a další | Dokud je neodstraníte |
 
 Gleanvolt se nikdy neptá na vaše jméno, e-mail, adresu, telefon ani platební údaje.
 
@@ -46,17 +46,16 @@ Jen tyto služby, a **jen pokud je nastavíte**:
 | Služba | Co se posílá | Kdy |
 |---|---|---|
 | **Solcast** (předpověď slunce) | Váš klíč Solcast a ID instalace, které jste u Solcastu vytvořili. Ne vaše poloha | Několikrát denně |
-| **OpenWeatherMap** (počasí) | Váš klíč a **poloha vašeho domu** | Dvakrát za nabíjení |
 | **Volkswagen, Škoda nebo portál VW Group Data Act** (stav baterie auta) | Přihlášení k vašemu účtu a VIN auta, výrobci auta | Při čtení auta |
 
 Požadavky na výrobce auta jdou k němu a řídí se jeho zásadami ochrany soukromí. Gleanvolt se přihlašuje
 jako vy, s údaji, které jste mu dali, a uchovává si jen stav baterie auta, dojezd, stav připojení a
 nabíjení a čas, kdy to auto nahlásilo. VIN se do historie neukládá.
 
-**Poloha vašeho domu** opouští vaši síť jen tehdy, když nastavíte počasí, které ji potřebuje.
+Gleanvolt sám **polohu vašeho domu** mimo vaši síť neposílá nikam.
 
-S **externím** zdrojem počasí Gleanvolt předá polohu vašeho domu tomuto programu a o tom, kam ji pošle,
-rozhoduje program: plugin OpenWeather ji s vaším klíčem posílá do OpenWeatherMap, stejně jako by to
-udělal Gleanvolt.
+Kvůli počasí ji Gleanvolt předá programu pro počasí ve vaší síti a o tom, kam ji pošle, rozhoduje tento
+program: plugin OpenWeather ji s vaším klíčem posílá do OpenWeatherMap, nejvýš jednou za 10 minut, když
+se na počasí ptá nabíjení. Klíč si plugin ukládá ve vlastní složce.
 
 Nic jiného se nikdy nekontaktuje.

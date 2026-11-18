@@ -4,6 +4,47 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-18 — The built-in OpenWeather removed; the plugin is the only way (#425)
+
+**Found.** After #424 and #426 the OpenWeather plugin did everything the built-in did, shipped wherever
+Gleanvolt does, and could be fixed without a Gleanvolt release. Keeping both meant two copies of the
+OpenWeatherMap client, the key on two pages, and a third choice on Settings that only differed in where
+the same call ran.
+
+**Decided.**
+- **Removed:** `OpenWeatherMapService`, `WeatherKeyStore`, `WeatherKeyEditor` / `IWeatherKeyEditor` and
+  the key models, the OpenWeather HTTP client, the key form on Settings and in the wizard (now
+  `WeatherForm`, the source and the provider's page), the CLI's key question, `Weather:ApiKey` in setup
+  documents, and `WeatherOptions.ApiKey`/`BaseUrl`/`Units`/`RequestTimeout`. `WeatherOptions` moved to
+  `Gleanvolt.Hosting.Weather`.
+- **`WeatherSource` is `NotProvided` | `External`.** Unset means `NotProvided`; it no longer follows a key.
+- **Migration, in `WeatherSourceSelection` at start:** an installation that used the built-in
+  (`Weather:Source` = `OpenWeather`, or unset with a key on Settings or in `Weather:ApiKey`) gets
+  `External` written to the overrides file, one warning in the log, and `Weather:BuiltInRetired` = `true`
+  beside it, which keeps a notice on Settings across restarts until a weather provider connects
+  (`ExternalWeatherSelectionWatcher` clears it). Done when the selection is built, so nothing reads a
+  source before the move.
+- **The old key is deleted, not handed over.** The secret store's `weather-api-key` is removed at the
+  first start, whatever the source. Gleanvolt has no channel to give a plugin a secret, and adding one
+  for a single migration would outlive it. The owner enters the key on the plugin's page.
+- **`Weather:ApiKey` is ignored with a warning, not refused.** Unlike the moved keys in
+  `RetiredConfigurationKeys`, it decided nothing that would now silently point elsewhere, and the Pi's
+  compose file still passes `WEATHER_API_KEY` on, to the plugin, so `.env` keeps working.
+- **`openWeather` leaves the API's `WeatherSource`.** Breaking for a client that matched on it; noted in
+  HTTP_API.md's new "Changes that can break a client". Neither gleanvolt-ha nor gleanvolt-mcp reads it.
+- **Setup documents** with `Weather:Source` = `OpenWeather` or a `Weather:ApiKey` are refused, with a
+  message pointing at the plugin, rather than quietly migrated: a document is written now, by someone
+  who can be told.
+
+**Consequences accepted.**
+- After the upgrade an installation records no weather until the plugin runs and has a key. The notice
+  and the log say so; the release notes should too.
+- A key that lived only on Settings has to be typed again on the plugin's page.
+- A choice of `OpenWeather` set in the environment (`Weather__Source`) is overridden by the overrides
+  file's `External` and stays in the environment until removed; it does no harm.
+
+---
+
 ## 2026-11-17 — Shipping plugins: an image and a compose profile each, a zip for Windows (#426)
 
 **Found.** Plugins were built with the solution and run by hand; none was in an image, a release or

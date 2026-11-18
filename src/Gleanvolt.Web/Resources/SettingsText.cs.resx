@@ -784,43 +784,7 @@
     <value>počasí</value>
   </data>
   <data name="WeatherTip1" xml:space="preserve">
-    <value>Počasí pochází z bezplatného účtu OpenWeatherMap: klíč vytvoříte v sekci API keys na openweathermap.org. Než nový klíč začne fungovat, může to trvat až několik hodin.</value>
-  </data>
-  <data name="WeatherTip2" xml:space="preserve">
-    <value>Klíč uložený tady má přednost před {0} v {1}. Když ho odstraníte, znovu se použije klíč z prostředí.</value>
-  </data>
-  <data name="WeatherIntro" xml:space="preserve">
-    <value>Počasí, za kterého každé nabíjení proběhlo — teplota, oblačnost, východ a západ slunce — se zaznamená k nabíjení pro polohu instalace. Volitelné. Uložení platí hned a ověří klíč jedním dotazem.</value>
-  </data>
-  <data name="WeatherReadOnly" xml:space="preserve">
-    <value>Jen pro čtení, protože toto rozhraní nemá přihlášení a klíč je tajný. Nastavte {0} ({1}) a klíč půjde upravovat tady; do té doby nastavte {2} v {3} a restartujte.</value>
-  </data>
-  <data name="SourceEnvironmentWeather" xml:space="preserve">
-    <value>Z prostředí (WEATHER_API_KEY)</value>
-  </data>
-  <data name="NotConfiguredNoWeather" xml:space="preserve">
-    <value>Nenastaveno — nabíjení se zaznamenává bez počasí.</value>
-  </data>
-  <data name="WeatherConfigured" xml:space="preserve">
-    <value>Nastaveno — každé nabíjení zaznamená počasí, za kterého proběhlo.</value>
-  </data>
-  <data name="SaveAndCheck" xml:space="preserve">
-    <value>Uložit a ověřit</value>
-  </data>
-  <data name="WeatherKeyAccepted" xml:space="preserve">
-    <value>Uloženo a OpenWeatherMap klíč přijal.</value>
-  </data>
-  <data name="WeatherKeyRefused" xml:space="preserve">
-    <value>Uloženo, ale OpenWeatherMap klíč odmítl. Nový klíč může začít fungovat až za několik hodin; pokud je tento starší, zkontrolujte ho na openweathermap.org.</value>
-  </data>
-  <data name="WeatherCheckFailed" xml:space="preserve">
-    <value>Uloženo, ale OpenWeatherMap nebyl dostupný, aby klíč ověřil. Zkusí se znovu při dalším nabíjení.</value>
-  </data>
-  <data name="WeatherRemovedEnvironment" xml:space="preserve">
-    <value>Odstraněno. Znovu se používá klíč z prostředí.</value>
-  </data>
-  <data name="WeatherRemovedNone" xml:space="preserve">
-    <value>Odstraněno. Nabíjení se zaznamenává bez počasí.</value>
+    <value>Gleanvolt se sám žádné služby počasí neptá: počasí mu posílá externí zdroj. Plugin OpenWeather, který vychází s Gleanvoltem, ho čte z bezplatného účtu OpenWeatherMap s klíčem zadaným na vlastní stránce pluginu.</value>
   </data>
   <data name="HomeAssistantLink" xml:space="preserve">
     <value>Home Assistant (MQTT)</value>
@@ -1151,15 +1115,18 @@
     <value>Uloženo. Zdroj počasí: {0}.</value>
   </data>
   <data name="WeatherNotProvided" xml:space="preserve">
-    <value>Nabíjení se zaznamenává bez počasí. Pokud ho chcete zaznamenávat, vyberte OpenWeather nebo Externí.</value>
+    <value>Nabíjení se zaznamenává bez počasí. Pokud ho chcete zaznamenávat ze zdroje, například z pluginu OpenWeather, vyberte Externí.</value>
   </data>
   <data name="WeatherExternalIntro" xml:space="preserve">
-    <value>Počasí posílá zdroj připojený tady, například plugin OpenWeather. Gleanvolt se ho zeptá, když nabíjení začne a když skončí; pokud zdroj neodpoví, nabíjení se zaznamená bez počasí. Dokud je vybrána volba Externí, OpenWeatherMap se nevolá a jeho klíč zůstává uložený pro chvíli, kdy OpenWeather znovu vyberete.</value>
+    <value>Počasí posílá zdroj připojený tady. Hotovým zdrojem je plugin OpenWeather, který vychází s Gleanvoltem: čte OpenWeatherMap s klíčem zadaným na jeho stránce níže. Gleanvolt se zdroje zeptá, když nabíjení začne a když skončí; pokud zdroj neodpoví, nabíjení se zaznamená bez počasí.</value>
   </data>
   <data name="WeatherExternalWizard" xml:space="preserve">
     <value>Zdroj připojíte po dokončení nastavení v Nastavení: najdete tam adresu, token i vlastní stránku zdroje.</value>
   </data>
   <data name="WeatherExternalPageIntro" xml:space="preserve">
     <value>{0} má vlastní stránku, zobrazenou tady: zadejte na ní jeho nastavení, například klíč API. Stránka pochází přímo od zdroje, ne od Gleanvoltu.</value>
+  </data>
+  <data name="WeatherBuiltInRetired" xml:space="preserve">
+    <value>Vestavěné OpenWeather skončilo, a proto je vybrána volba Externí: počasí z OpenWeatherMap teď dodává plugin OpenWeather. Spusťte plugin s tokenem z Externích zdrojů dat a pak na jeho stránce, která se tu objeví po připojení, zadejte svůj klíč OpenWeatherMap. Klíč dřív uložený tady se nezachoval. Do té doby se nabíjení zaznamenává bez počasí.</value>
   </data>
 </root>

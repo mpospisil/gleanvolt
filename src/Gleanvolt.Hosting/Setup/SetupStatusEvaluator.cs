@@ -194,8 +194,8 @@ public sealed record SetupHost(TimeZoneInfo LocalZone, bool IsWindows)
 public sealed record OptionalSettings(bool Solcast, bool Ev, bool Tariff, bool Weather = false)
 {
     /// <summary>
-    /// Judged from configuration alone: a Solcast key and site in the environment, a described car, a
-    /// weather key in the environment.
+    /// Judged from configuration alone: a Solcast key and site in the environment, a described car, the
+    /// weather from an external provider (<c>Weather:Source</c>, #425).
     /// The tariff lives only in its own file, so configuration cannot see one.
     /// </summary>
     public static OptionalSettings FromConfiguration(IConfiguration configuration)
@@ -208,8 +208,9 @@ public sealed record OptionalSettings(bool Solcast, bool Ev, bool Tariff, bool W
         var ev = !string.IsNullOrWhiteSpace(configuration[EvSettingKeys.Id])
             || double.TryParse(configuration[EvSettingKeys.BatteryCapacityKWh], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var capacity) && capacity > 0;
 
-        var weather = !string.IsNullOrWhiteSpace(configuration["Weather:ApiKey"])
-            && configuration["Weather:ApiKey"] != "your-openweathermap-api-key";
+        var source = configuration[Gleanvolt.Hosting.Weather.WeatherSourceSelection.Key];
+        var weather = Gleanvolt.Hosting.Weather.WeatherSourceSelection.Parse(source) == WeatherSource.External
+            || Gleanvolt.Hosting.Weather.WeatherSourceSelection.IsRetired(source);
 
         return new OptionalSettings(solcast, ev, Tariff: false, weather);
     }

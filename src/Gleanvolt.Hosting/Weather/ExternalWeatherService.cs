@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
-using Gleanvolt.Infrastructure.OpenWeather;
 using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Weather;
 using Gleanvolt.Providers.Server;

@@ -140,7 +140,7 @@ holds:
 |---|---|---|
 | `vw-website-session.json` | a live volkswagen.de session | read the car as you, with no password and no emailed code |
 | `skoda-api-key.json` | the MyŠkoda Public API key | read the car, and start and stop charging |
-| the secret store's other entries | keys and passwords entered in the web UI (Solcast, OpenWeatherMap, MQTT, the car) | use those accounts |
+| the secret store's other entries | keys and passwords entered in the web UI (Solcast, MQTT, the car) | use those accounts |
 
 ```jsonc
 "Secrets": {
@@ -211,8 +211,11 @@ allows about ten calls a day, and every start spends one, so keep `RefreshInterv
 ## Weather (the `Weather` section, optional)
 
 Records **what the sky was doing** at the start and end of each charging session, so a session can be
-read against its day. Off unless configured: with no key and no
-[coordinates](#the-pv-system-the-pv-section), no weather call is ever made.
+read against its day. Gleanvolt calls no weather service itself (#425): an
+[external provider](PROVIDERS.md#the-weather-kind) sends it. The ready-made one is the
+[OpenWeather plugin](PROVIDERS.md#shipped-plugins), released with Gleanvolt, which reads OpenWeatherMap
+with a key entered on its own page. Gleanvolt gives the provider the site's
+[coordinates](#the-pv-system-the-pv-section).
 
 **Where it comes from: `Weather:Source`** (#424), chosen under **Settings → Installation → Weather**, in
 the setup wizard's Extras step, or with `gleanvolt setup`. A choice applies at once and is saved in
@@ -220,37 +223,34 @@ the setup wizard's Extras step, or with `gleanvolt setup`. A choice applies at o
 
 | `Weather:Source` | |
 |---|---|
-| `NotProvided` | No weather. Sessions are recorded without it |
-| `OpenWeather` | Built in: OpenWeatherMap, with the key below |
-| `External` | An [external provider](PROVIDERS.md#the-weather-kind) publishes it, e.g. the OpenWeather plugin. OpenWeatherMap is not called; the key stays for when OpenWeather is chosen again |
-| unset | As before the choice existed: `OpenWeather` while a key is configured, `NotProvided` otherwise |
+| `NotProvided` | No weather. Sessions are recorded without it. Also what unset means |
+| `External` | An external provider publishes it, e.g. the OpenWeather plugin |
 
-Any case is accepted. A value that names none of these is logged and treated as unset.
-
-**Getting a key.** Register at [openweathermap.org](https://openweathermap.org/) — the free plan is
-enough — and copy the API key from your account's API keys page.
-
-**On the web UI:** paste the key on **Settings → Installation → Weather**, or in the setup wizard's
-Extras step. It is checked with one call and used from the next session, with no
-restart. A new OpenWeatherMap key can take a couple of hours to start working, so it is kept even when
-that first check fails.
-
-**Optionally, in configuration:** the key as `Weather__ApiKey` (`WEATHER_API_KEY` in `deploy/.env`).
-A key saved in the web UI wins over it; **Remove** goes back to it.
+Any case is accepted. A value that names neither is logged and treated as unset.
 
 ```jsonc
 "Weather": {
-  "Source": "OpenWeather",      // NotProvided, OpenWeather or External; unset follows the key
-  "BaseUrl": "https://api.openweathermap.org/",
-  "Units": "metric",            // °C and metres; changing this changes what the stored numbers mean
-  "RequestTimeout": "00:00:05", // a slow provider is abandoned, never waited for
-  "ExternalRequestTimeout": "00:00:15", // how long an external provider has to answer
-  "ExternalReadingMaxAge": "00:10:00"   // an external reading this recent is used without asking again
+  "Source": "External",                 // NotProvided or External
+  "ExternalRequestTimeout": "00:00:15", // how long the provider has to answer
+  "ExternalReadingMaxAge": "00:10:00"   // a reading this recent is used without asking again
 }
 ```
 
-**Two calls per charging session**, to the free current-weather endpoint. See
-[The weather a session ran in](DATA.md#the-weather-a-session-ran-in) for what is stored.
+**Upgrading from the built-in OpenWeather** (#425). Until #425 Gleanvolt called OpenWeatherMap itself,
+with `Weather:Source` = `OpenWeather` and a key on Settings or in `Weather__ApiKey`. At the first start
+after the upgrade, an installation that used it (that source chosen, or a key with nothing chosen):
+
+- gets `Weather:Source` = `External`, saved in `pv-system.json`;
+- has the key Settings kept deleted from the secret store. It is not handed to the plugin, which keeps
+  its own;
+- logs one warning, and shows a notice under **Settings → Weather**, until a weather provider connects.
+
+`Weather__ApiKey` (`WEATHER_API_KEY`) is no longer read; while it is set, each start logs one warning.
+The Pi's compose file passes `WEATHER_API_KEY` to the plugin while `OPENWEATHER_API_KEY` is unset, so a
+key kept in `.env` carries over. `Weather:BaseUrl`, `Units` and `RequestTimeout` are gone and ignored.
+A setup document with `Weather:Source` = `OpenWeather` or a `Weather:ApiKey` is refused.
+
+See [The weather a session ran in](DATA.md#the-weather-a-session-ran-in) for what is stored.
 
 ## Grid tariff (the `Tariff` section)
 

@@ -49,7 +49,6 @@ public sealed class SetupScreenshots : ScreenshotTest
         Services.AddSingleton<ISetupState>(_setup);
         Services.AddSingleton<IEvEditor>(new FakeEvEditor());
         Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());
-        Services.AddSingleton<IWeatherKeyEditor>(new FakeWeatherKeyEditor());
         // The weather source (#424): nothing chosen yet on a new installation.
         Services.AddSingleton<IWeatherSourceSelection>(new FakeWeatherSourceSelection());
         Services.AddSingleton<IIntegrationsEditor>(new FakeIntegrationsEditor());

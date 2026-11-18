@@ -105,7 +105,6 @@ public sealed class SetupDocumentTests : IDisposable
             ("ChargeControl:Forecast:BatteryCapacityKWh", "9"),
             ("Solcast:ApiKey", "solcast-secret"),
             ("Solcast:ResourceId", "abcd-1234"),
-            ("Weather:ApiKey", "weather-secret"),
             ("Web:Password", "correct horse"))
             .Apply(Target());
 
@@ -125,8 +124,6 @@ public sealed class SetupDocumentTests : IDisposable
         Assert.DoesNotContain("solcast-secret", file, StringComparison.Ordinal);
         Assert.DoesNotContain("correct horse", file, StringComparison.Ordinal);
         Assert.DoesNotContain("abcd-1234", file, StringComparison.Ordinal);
-        Assert.DoesNotContain("weather-secret", file, StringComparison.Ordinal);
-        Assert.Equal("weather-secret", Secrets.Read(SecretNames.WeatherApiKey));
 
         var account = JsonSerializer.Deserialize<SolcastAccount>(Secrets.Read(SecretNames.SolcastAccount)!);
         Assert.Equal(new SolcastAccount("solcast-secret", "abcd-1234"), account);
@@ -142,12 +139,27 @@ public sealed class SetupDocumentTests : IDisposable
         Assert.Equal("external", PvSystemOverrides.Read(OverridesPath)["Weather:Source"]);
     }
 
+    [Theory]
+    [InlineData("OpenWeather")]
+    [InlineData("openweather")]
+    public void The_removed_built_in_is_refused_and_pointed_at_the_plugin(string value)
+    {
+        // #425: a document written for the built-in names a source that no longer exists.
+        var problems = Document(("Weather:Source", value)).Validate(Target().Configuration);
+
+        Assert.Contains("OpenWeather plugin", Assert.Single(problems));
+    }
+
+    [Fact]
+    public void The_built_ins_key_is_no_longer_a_setup_setting() =>
+        Assert.False(SetupDocument.IsAllowed("Weather:ApiKey"));
+
     [Fact]
     public void A_weather_source_that_names_none_is_refused()
     {
         var problems = Document(("Weather:Source", "meteoblue")).Validate(Target().Configuration);
 
-        Assert.Contains("must be NotProvided, OpenWeather or External", Assert.Single(problems));
+        Assert.Contains("must be NotProvided or External", Assert.Single(problems));
         Assert.Equal("Config.SetupBadWeatherSource", problems.Phrases[0]!.Key);
     }
 

@@ -30,14 +30,13 @@ public sealed class SettingsScreenshots : ScreenshotTest
     };
 
     private readonly FakeSolcastAccountEditor _solcast = new();
-    private readonly FakeWeatherKeyEditor _weather = new();
     // With the External strategy too, as the controller registers it (#401).
     private readonly FakeTariffEditor _tariff = new(new Gleanvolt.Core.Strategies.ExternalTariffProvider());
     private readonly FakeExternalProviders _providers = new();
     // Solcast, with External on offer, as the controller registers them (#388).
     private readonly FakeSolarForecastSourceSelection _forecastSources = new();
-    // OpenWeather, chosen, with the key saved on Settings (#424).
-    private readonly FakeWeatherSourceSelection _weatherSources = new() { Selected = WeatherSource.OpenWeather, IsChosen = true };
+    // No weather until a case chooses it (#425).
+    private readonly FakeWeatherSourceSelection _weatherSources = new();
     private readonly FakeEvEditor _car = new();
     private readonly FakeIntegrationsEditor _integrations = new();
 
@@ -63,7 +62,6 @@ public sealed class SettingsScreenshots : ScreenshotTest
         _solcast.Settings = new SolcastAccountSettings(
             SolcastAccountSource.Page, "sk-7f3a9c2e41d8b605", "a1b2-c3d4-e5f6-0789", false, "an owner-only file",
             new SolcastFetchStatus(Now.AddHours(-2), null, SolcastFetchFailure.None, null));
-        _weather.Settings = new WeatherKeySettings(WeatherKeySource.Page, "3f9c2e41d8b6057a", false, "an owner-only file");
 
         // A Czech night tariff (HDO): 22:00 to 06:00 every night, and two more hours on weekend afternoons.
         _tariff.Stored = TestTariffs.Table(new TariffTable(
@@ -73,7 +71,6 @@ public sealed class SettingsScreenshots : ScreenshotTest
         Services.AddSingleton<TimeProvider>(new FixedTimeProvider(Now, Prague));
         Services.AddSingleton<IPvSystemEditor>(_pv);
         Services.AddSingleton<ISolcastAccountEditor>(_solcast);
-        Services.AddSingleton<IWeatherKeyEditor>(_weather);
         Services.AddSingleton<ITariffEditor>(_tariff);
         Services.AddSingleton<ITariffSchedule>(new FakeTariffSchedule());
         Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));
@@ -122,9 +119,20 @@ public sealed class SettingsScreenshots : ScreenshotTest
         Capture(RenderPage<PvSystem>("/settings"), "settings-solar-forecast-external", selector: "#solcast-editor");
     }
 
+    /// <summary>
+    /// The weather right after the upgrade that removed the built-in OpenWeather (#425): External chosen
+    /// for the owner, the notice saying what to do, and no provider connected yet.
+    /// </summary>
     [Fact]
-    public void The_weather() =>
+    public void The_weather()
+    {
+        _weatherSources.Selected = WeatherSource.External;
+        _weatherSources.BuiltInRetired = true;
+        _providers.Set(new ExternalProviderStatus("weather", "Weather", "/providers/weather", HasToken: true, ExternalProviderState.Waiting));
+        _providers.Token = "gvp_8nR3yW6kM1qT9vB4xC7zD2fG5hJ0sL3eP6iU9oA1wE4";
+
         Capture(RenderPage<PvSystem>("/settings"), "settings-weather", selector: "#weather-editor");
+    }
 
     /// <summary>
     /// The weather from an external provider (#424): the OpenWeather plugin connected, with its own page

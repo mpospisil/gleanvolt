@@ -13,7 +13,6 @@ using Microsoft.Extensions.Time.Testing;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Weather;
-using Gleanvolt.Infrastructure.OpenWeather;
 using Gleanvolt.Plugin.OpenWeather.OpenWeather;
 using Gleanvolt.Providers.Client;
 using Gleanvolt.Providers.Client.Weather;
@@ -56,15 +55,17 @@ public sealed class ExternalWeatherHubTests : IAsyncLifetime, IDisposable
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
         builder.Logging.ClearProviders();
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Weather:Source"] = "external" });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Weather:Source"] = "external",
+            // As after the upgrade that removed the built-in (#425): the notice stands until a provider connects.
+            ["Weather:BuiltInRetired"] = "true",
+        });
         builder.Services.AddSingleton<TimeProvider>(_time);
         builder.Services.AddSingleton<ISecretStore>(new RecordingSecretStore());
         builder.Services.AddSingleton(new ProviderHostInfo("1.4.0-test"));
         builder.Services.AddSingleton(Site);
         builder.Services.Configure<WeatherOptions>(builder.Configuration.GetSection(WeatherOptions.SectionName));
-        builder.Services.AddHttpClient();
-        builder.Services.AddSingleton<WeatherKeyStore>();
-        builder.Services.AddSingleton<OpenWeatherMapService>();
         builder.Services.AddSingleton<WeatherSourceSelection>();
         builder.Services.AddSingleton<IWeatherSourceSelection>(provider => provider.GetRequiredService<WeatherSourceSelection>());
         builder.Services.AddSingleton<ExternalWeatherService>();
@@ -234,20 +235,31 @@ public sealed class ExternalWeatherHubTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
-    public async Task ChoosingOpenWeatherClosesTheSessionAndRefusesTheNextHello()
+    public async Task AProviderConnectingEndsTheNoticeAboutTheBuiltIn()
+    {
+        Assert.True(Selection.BuiltInRetired);
+
+        await using var connection = await ConnectAsync();
+        await connection.InvokeAsync<WeatherWelcome>("Hello", Hello());
+
+        await Eventually(() => !Selection.BuiltInRetired, "the notice should go once a weather provider connects");
+    }
+
+    [Fact]
+    public async Task ChoosingNotProvidedClosesTheSessionAndRefusesTheNextHello()
     {
         await using var connection = await ConnectAsync();
         await connection.InvokeAsync<WeatherWelcome>("Hello", Hello());
         var goodbye = new TaskCompletionSource<string>();
         connection.On<string, string>("Goodbye", (code, _) => goodbye.TrySetResult(code));
 
-        Assert.True(Selection.Select(WeatherSource.OpenWeather).Saved);
+        Assert.True(Selection.Select(WeatherSource.NotProvided).Saved);
 
         Assert.Equal(RefusalCodes.Disabled, await goodbye.Task.WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal(ExternalProviderState.Off, Status.State);
-        Assert.Equal(WeatherSource.OpenWeather, Weather.Source);
-        // No key here: OpenWeatherMap is chosen but not configured, so no session gets weather.
+        Assert.Equal(WeatherSource.NotProvided, Weather.Source);
         Assert.False(Weather.IsConfigured);
+        Assert.Null(await Weather.GetCurrentAsync());
 
         await using var again = await ConnectAsync();
         Assert.Equal(RefusalCodes.Disabled, (await again.InvokeAsync<WeatherWelcome>("Hello", Hello())).ReasonCode);
@@ -350,7 +362,7 @@ internal static class OpenWeatherFixture
     public const long ObservedAt = 1787417210;
 
     // A real response from api.openweathermap.org/data/2.5/weather, trimmed to the fields recorded; the
-    // same one OpenWeatherMapServiceTests reads.
+    // same one the built-in read before #425.
     public const string Sample = """
         {
           "weather": [{ "id": 800, "main": "Clear", "description": "clear sky", "icon": "01d" }],

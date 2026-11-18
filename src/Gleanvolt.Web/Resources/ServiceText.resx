@@ -859,7 +859,7 @@
     <comment>{0} what was asked for.</comment>
   </data>
   <data name="Config_SetupBadWeatherSource" xml:space="preserve">
-    <value>Weather:Source ('{0}') must be NotProvided, OpenWeather or External.</value>
-    <comment>{0} the value given. The three names are configuration values and stay as they are.</comment>
+    <value>Weather:Source ('{0}') must be NotProvided or External: OpenWeatherMap comes from the OpenWeather plugin, chosen as External.</value>
+    <comment>{0} the value given. NotProvided and External are configuration values and stay as they are.</comment>
   </data>
 </root>
