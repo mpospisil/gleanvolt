@@ -86,9 +86,10 @@ public sealed class WeatherSourceSelection : IWeatherSourceSelection, IDisposabl
         if (keyInEnvironment)
         {
             _logger.LogWarning(
-                "{Key} (WEATHER_API_KEY) is set, and Gleanvolt no longer reads it: OpenWeatherMap comes from the OpenWeather plugin, "
-                + "which takes the key on its own page or as OPENWEATHER_API_KEY. The compose file passes WEATHER_API_KEY to the plugin "
-                + "while OPENWEATHER_API_KEY is unset; remove it from Gleanvolt's own configuration.", RetiredApiKey);
+                "{Key} (WEATHER_API_KEY) is set, and Gleanvolt calls no weather service with it any more: OpenWeatherMap comes from "
+                + "the OpenWeather plugin, which takes the key on its own page or as OPENWEATHER_API_KEY. Move the key to "
+                + "OPENWEATHER_API_KEY in the deploy's .env (the compose file hands WEATHER_API_KEY to the plugin meanwhile) "
+                + "and remove WEATHER_API_KEY; this warning repeats at every start until then.", RetiredApiKey);
         }
 
         _last = Selected;
