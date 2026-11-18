@@ -36,6 +36,11 @@ public enum DiscoveryFinding
     /// A go-e Charger's local HTTP API v2 answered on a web port (#353). Not Modbus: no unit id.
     /// </summary>
     GoeCharger,
+
+    /// <summary>
+    /// A Shelly TopAC Portable EV Charger's local RPC API answered on a web port (#429). Not Modbus: no unit id.
+    /// </summary>
+    ShellyCharger,
 }
 
 /// <summary>
@@ -110,8 +115,9 @@ public sealed record DiscoveredDevice(
     string? Driver = null,
     string? Topology = null)
 {
-    /// <summary>Whether the scan said what the device is: a SolaX serial number, a Huawei model or a go-e's API.</summary>
-    public bool Identified => Finding is DiscoveryFinding.SolaxDevice or DiscoveryFinding.HuaweiDevice or DiscoveryFinding.GoeCharger;
+    /// <summary>Whether the scan said what the device is: a SolaX serial number, a Huawei model, or a go-e's or a Shelly TopAC's API.</summary>
+    public bool Identified => Finding is DiscoveryFinding.SolaxDevice or DiscoveryFinding.HuaweiDevice
+        or DiscoveryFinding.GoeCharger or DiscoveryFinding.ShellyCharger;
 }
 
 /// <summary>Everything one scan found, and what it was told to scan.</summary>

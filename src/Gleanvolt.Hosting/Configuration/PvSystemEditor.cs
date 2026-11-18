@@ -173,7 +173,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
                 var answer = (long)Math.Round(apiProbe.Reading);
 
                 return apiProbe.Recognised
-                    ? new DeviceProbeResult(true, true, $"{address} answered: the charger's API reports car state {answer}.",
+                    ? new DeviceProbeResult(true, true, $"{address} answered: the charger's API reports state {answer}.",
                         Phrase.Of("Probe.ChargerApiOk", new PhraseArg.Text(address), new PhraseArg.Number(answer)))
                     : new DeviceProbeResult(true, false,
                         $"{address} answered (HTTP {answer}), but not with the selected charger's API. "

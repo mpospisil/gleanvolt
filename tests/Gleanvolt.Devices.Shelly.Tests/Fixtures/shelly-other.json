@@ -1,0 +1,10 @@
+{
+  "format": "gleanvolt-http-dump",
+  "formatVersion": 1,
+  "driver": "shelly-topac",
+  "family": "Another Shelly, or a web server without the TopAC's service",
+  "gleanvoltVersion": "synthetic",
+  "capturedAt": null,
+  "note": "SYNTHETIC. Nothing recorded, so every request is answered 404: a Shelly plug or relay has no service:0, and any other web server has no /rpc.",
+  "responses": {}
+}

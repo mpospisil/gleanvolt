@@ -109,7 +109,7 @@ Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue
 
 ## 3. Before installing: the devices
 
-Ask whether **Modbus TCP is on** in the inverter and the charger (go-e: **Local HTTP API v2**). It is off
+Ask whether **Modbus TCP is on** in the inverter and the charger (go-e: **Local HTTP API v2**; Shelly TopAC: its password off). It is off
 from the factory on most models, and the setup wizard can't find the devices without it. Installing can
 go ahead either way. If the user doesn't know, point them to
 [Preparing your inverter and charger](https://mpospisil.github.io/gleanvolt/latest/en/installation/preparing-devices/),

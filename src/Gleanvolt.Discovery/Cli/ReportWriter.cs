@@ -54,6 +54,7 @@ internal static class ReportWriter
             output.WriteLine("Is Modbus TCP enabled in the inverter's own menu? A PocketLAN dongle does not provide it.");
             output.WriteLine("On a Huawei SDongle or EMMA, Modbus TCP is enabled with the installer account in FusionSolar.");
             output.WriteLine("A Huawei SCharger needs Modbus TCP switched on in FusionSolar, a go-e its local HTTP API v2 in the go-e app.");
+            output.WriteLine("A Shelly TopAC needs its password switched off: Gleanvolt does not send one.");
             return;
         }
 

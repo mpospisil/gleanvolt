@@ -125,8 +125,8 @@
     <value>{0} answered, but its run-mode register reads {1}, which no charger reports. Is this the inverter's address?</value>
   </data>
   <data name="Probe_ChargerApiOk" xml:space="preserve">
-    <value>{0} answered: the charger's API reports car state {1}.</value>
-    <comment>A charger reached over HTTP (go-e). {1} is the charger's own car-state number.</comment>
+    <value>{0} answered: the charger's API reports state {1}.</value>
+    <comment>A charger reached over HTTP (go-e, Shelly TopAC). {1} is the charger's own state number: go-e's car state, Shelly's work state.</comment>
   </data>
   <data name="Probe_ChargerApiImplausible" xml:space="preserve">
     <value>{0} answered (HTTP {1}), but not with the selected charger's API. Is its local HTTP API switched on?</value>

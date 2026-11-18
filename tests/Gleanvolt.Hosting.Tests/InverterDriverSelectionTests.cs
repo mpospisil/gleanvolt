@@ -5,6 +5,7 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Devices;
 using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Huawei;
+using Gleanvolt.Devices.Shelly;
 using Gleanvolt.Devices.Solax;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Setup;
@@ -128,9 +129,9 @@ public class InverterDriverSelectionTests
     }
 
     [Fact]
-    public void The_charger_catalog_has_solax_first_then_the_two_sChargers_then_go_e()
+    public void The_charger_catalog_has_solax_first_then_the_two_sChargers_then_go_e_then_shelly()
     {
-        Assert.Equal(["solax", "huawei-7ks", "huawei-22kt", "goe"], ChargerDrivers.Known.Select(driver => driver.Id));
+        Assert.Equal(["solax", "huawei-7ks", "huawei-22kt", "goe", "shelly-topac"], ChargerDrivers.Known.Select(driver => driver.Id));
     }
 
     [Fact]
@@ -151,6 +152,27 @@ public class InverterDriverSelectionTests
         Assert.Equal(new Uri("http://127.0.0.2:80/"), http.BaseAddress);
 
         using var write = ChargerHttp.Write("api/set?amp=6");
+        using var answer = await http.SendAsync(write);
+        Assert.Equal("{}", await answer.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task The_container_runs_the_shelly_topac_over_http_on_port_80_within_the_shipped_limits()
+    {
+        // Shelly TopAC (#429): the same HTTP client as go-e's. Its 16 A ceiling is the shipped appsettings.json's
+        // MaxChargingCurrentAmps, which this host does not load, so it is stated here.
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.Configuration.AddInMemoryCollection(
+            [.. UsableSite.Pairs, new("Pv:Chargers:0:Driver", "shelly-topac"), new("ChargeControl:MaxChargingCurrentAmps", "16"),
+                new("ChargeControl:DryRun", "true"), new("Web:Enabled", "false")]);
+        builder.Services.AddGleanvolt(builder.Configuration);
+        await using var provider = builder.Services.BuildServiceProvider();
+
+        Assert.IsType<ShellyTopAcChargerDriver>(provider.GetRequiredService<IEvChargerDriver>());
+        Assert.Equal(80, provider.GetRequiredService<PvSystemInfo>().Chargers[0].Connection.Port);
+
+        var http = provider.GetRequiredKeyedService<HttpClient>(ModbusClientKeys.EvCharger);
+        using var write = ChargerHttp.Write("rpc/Boolean.Set?owner=%22service:0%22&role=%22start_charging%22&value=true");
         using var answer = await http.SendAsync(write);
         Assert.Equal("{}", await answer.Content.ReadAsStringAsync());
     }

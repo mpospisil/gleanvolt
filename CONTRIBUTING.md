@@ -22,7 +22,7 @@ keep your copyright either way.
 You need:
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- Network access to the inverter and the EV charger, with Modbus TCP enabled (or, for a go-e, its local HTTP API)
+- Network access to the inverter and the EV charger, with Modbus TCP enabled (or, for a go-e or a Shelly TopAC, its local HTTP API)
 
 ```bash
 dotnet build Gleanvolt.slnx
@@ -74,6 +74,7 @@ Gleanvolt.slnx
 │   ├── Gleanvolt.Devices.Solax/        # The SolaX Gen4 inverter driver: register map, decoding, power control
 │   ├── Gleanvolt.Devices.Huawei/       # The Huawei SUN2000 driver: readings, the EMMA topology, the battery hold; and the SCharger
 │   ├── Gleanvolt.Devices.GoE/          # The go-e Charger driver, over its local HTTP API v2
+│   ├── Gleanvolt.Devices.Shelly/       # The Shelly TopAC Portable EV Charger driver, over its local RPC API
 │   │
 │   ├── Gleanvolt.Core/                 # Domain logic, free of hardware and hosting
 │   │   ├── Models/                 # Strongly typed models (EnergyState, DeviceConfig, ...)
@@ -129,7 +130,8 @@ Gleanvolt.slnx
 │   ├── Gleanvolt.Devices.Tests/        # The dump format, the snapshot and the replay
 │   ├── Gleanvolt.Devices.Solax.Tests/  # The SolaX driver against the conformance tests and its recordings
 │   ├── Gleanvolt.Devices.Huawei.Tests/ # The Huawei drivers against the same tests, on synthetic recordings
-│   └── Gleanvolt.Devices.GoE.Tests/    # The go-e driver against the charger tests, on synthetic HTTP recordings
+│   ├── Gleanvolt.Devices.GoE.Tests/    # The go-e driver against the charger tests, on synthetic HTTP recordings
+│   └── Gleanvolt.Devices.Shelly.Tests/ # The Shelly TopAC driver against the charger tests, on synthetic HTTP recordings
 ├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
 ├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
 ├── Dockerfile                      # Cross-compiled linux/arm64 image for the Pi

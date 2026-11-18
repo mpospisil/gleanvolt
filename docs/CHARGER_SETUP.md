@@ -1,10 +1,10 @@
-# Setting up a Huawei SCharger or a go-e
+# Setting up a charger that is not a SolaX
 
 > **Using Gleanvolt?** The user manual has this step by step: [Preparing your inverter and charger](https://mpospisil.github.io/gleanvolt/latest/en/installation/preparing-devices/). This page is the reference behind it.
 
 How to connect Gleanvolt to an EV charger that is not a SolaX: Huawei's **SCharger-7KS-S0** or
-**-22KT-S0**, or a **go-e Charger**. What works, and how well it has been tested, is in
-[Supported EV chargers](SUPPORTED_CHARGERS.md). In short: both are **Expected**. Their drivers
+**-22KT-S0**, a **go-e Charger**, or a **Shelly TopAC Portable EV Charger**. What works, and how well it has
+been tested, is in [Supported EV chargers](SUPPORTED_CHARGERS.md). In short: all are **Expected**. Their drivers
 were written from the manufacturers' documentation, and nobody has run them against a real charger yet.
 
 **Run in dry-run first.** `ChargeControl:DryRun` is on by default: Gleanvolt then only reads, and logs the
@@ -119,11 +119,68 @@ local API is still off.
   setting.
 - An **11 kW unit** is never asked for more than 16 A.
 
+## Shelly TopAC
+
+### 1. Switch off its password
+
+Gleanvolt reaches the TopAC over its **local RPC API**, on port 80, the same API the Shelly app and the
+charger's web page use. Nothing needs switching on. But Gleanvolt does not send a password yet, so the
+charger's **authentication must be off**, which is Shelly's default. If you set one, switch it off in the
+Shelly app or on the charger's web page. A charger with a password answers "Test connection" with
+*HTTP 401*, and the log says to switch it off.
+
+### 2. Hand the TopAC to Gleanvolt alone
+
+Gleanvolt starts and stops the charge with the TopAC's *start charging* switch, and sets its current limit.
+Anything else that does the same fights it:
+
+- **evcc** driving the TopAC: hand control over. Do not run both.
+- **Auto balance**, Shelly's load management with a Shelly EM: switch it off in the Shelly app. It lowers
+  the current by itself. Gleanvolt logs a warning while it is on.
+- **Auto charge**, which starts a car as soon as it is plugged in: switch it off, so a car waits for a mode.
+  Left on, the car starts at the charger's own limit before any mode is picked, as a SolaX does.
+
+Gleanvolt never writes auto charge, auto balance, or the charger's energy and time limits.
+
+### 3. Find the TopAC
+
+The wizard's search and `gleanvolt-discover` try port 80 on every host. A host that answers HTTP, and is
+neither a SolaX dongle nor a go-e, is asked for the TopAC's work state. If it answers, it is named a Shelly
+TopAC, with the `shelly-topac` driver. Other Shelly devices have no charger service, and are not reported.
+
+By hand, on **Settings → Installation → Charger**:
+
+| Field | Value |
+|---|---|
+| Charger brand | Shelly TopAC |
+| Charger address | the charger's address on your LAN |
+| Charger port | 80 |
+| Charger unit id | unused: leave it as it is |
+
+Optionally, in `.env` instead: `PV_CHARGER_DRIVER=shelly-topac`, and `EV_CHARGER_HOST`.
+
+The TopAC takes **6–16 A**, so `ChargeControl:MaxChargingCurrentAmps` must be 16 or less. It is 16 unless
+you changed it.
+
+### 4. What to expect from the TopAC
+
+- **Status** comes from its work state and the *start charging* switch. A car that waits or has finished
+  while charging is switched off is the charger's doing, never "the car is full". So is the charger's
+  own *pause*.
+- **Start and stop** switch *start charging* on and off.
+- **A pause is *start charging* off.** The charger's range starts at 6 A, and Gleanvolt pauses by asking
+  for 0 A. So a pause switches charging off, and the next current of 6 A or more sets the limit and
+  switches it back on.
+- **Two components are written, only when they change:** the current limit and *start charging*.
+  Whether the charger stores either in flash is not documented.
+- **Power** is read from the charger's total, which evcc reads as kilowatts. Gleanvolt checks it against
+  the phases' volts and amps while current flows, so a wrong unit cannot show 1000 times the power.
+
 ## Help confirm it
 
-Nobody on the project has either charger yet. On **Settings**, under the charger, take a **register
-snapshot** in three moments: no car, a car plugged in and waiting, and a car charging. For a go-e it is a
-recording of the API's answers, without the serial number, Wi-Fi or cloud keys. Attach the files to
+Nobody on the project has any of these chargers yet. On **Settings**, under the charger, take a **register
+snapshot** in three moments: no car, a car plugged in and waiting, and a car charging. For a go-e or a
+Shelly TopAC it is a recording of the API's answers, without the serial number, Wi-Fi or cloud keys. Attach the files to
 [issue #354](https://github.com/mpospisil/gleanvolt/issues/354). Say:
 
 - whether the status and power on the dashboard match the charger's own app at the same moment;

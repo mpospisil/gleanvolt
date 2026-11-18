@@ -3,15 +3,17 @@
 Which inverters and EV chargers Gleanvolt can drive. It talks to two devices on your LAN:
 
 - a hybrid inverter, **SolaX** or **Huawei SUN2000**, over Modbus TCP;
-- an EV charger: a **SolaX** or a **Huawei SCharger** over Modbus TCP, or a **go-e** over its local HTTP API.
+- an EV charger: a **SolaX** or a **Huawei SCharger** over Modbus TCP, or a **go-e** or a **Shelly TopAC** over
+  its local HTTP API.
 
 The SolaX register maps were written for the reference installation's **X3-HYB-G4 PRO** and
-**X1/X3-HAC**. The Huawei and go-e drivers come from the manufacturers' documentation.
+**X1/X3-HAC**. The Huawei, go-e and Shelly drivers come from the manufacturers' documentation.
 
 Each device's driver is chosen in configuration:
 
 - the inverter's by `Pv:Inverter:Driver`: `solax` (the default, when it is empty) or `huawei`;
-- the charger's by `Pv:Chargers:0:Driver`: `solax` (the default), `huawei-7ks`, `huawei-22kt` or `goe`.
+- the charger's by `Pv:Chargers:0:Driver`: `solax` (the default), `huawei-7ks`, `huawei-22kt`, `goe` or
+  `shelly-topac`.
 
 A driver is never chosen by model: `Pv:Inverter:Model` and `Pv:Chargers:0:Model` are documentation. So
 *supported* here means one thing: **the device answers what its driver reads, with the meaning the driver
@@ -92,6 +94,19 @@ From go-e's [API v2 documentation](https://github.com/goecharger/go-eCharger-API
 |---|---|---|
 | Read, `GET /api/status?filter=…` | `car`, `alw`, `nrg` (power at index 11, W), `amp`, `frc`, `ama`, `var` | Every charging mode, "Test connection" and discovery |
 | Write, `GET /api/set?…` | `amp` current, `frc` force state (1 off, 2 on) | The setpoint, start, stop and pause |
+
+### Shelly TopAC (`shelly-topac`)
+
+From Shelly's [TopAC API documentation](https://shelly-api-docs.shelly.cloud/gen2/Devices/ShellyX/XT1/TopACPortableEVCharger).
+Port 80. Every call is `GET /rpc/<Method>?owner="service:0"&role="<role>"`, answered with `{"value": …}`.
+
+| Access | Components | Used for |
+|---|---|---|
+| Read, `Enum.GetStatus` | `work_state`: `charger_free`, `_insert`, `_wait`, `_charging`, `_pause`, `_complete`, `_end`, `_error` | Status, "Test connection" and discovery |
+| Read, `Object.GetStatus` | `phase_info`: `total_power` (kW, checked against volts × amps), and each phase's volts and amps | Power |
+| Read, `Service.GetConfig?id=0` | `auto_balance`, `auto_charge` | A warning while auto balance is on |
+| Read and write, `Number.GetStatus` / `Number.Set` | `current_limit`, amps | The setpoint |
+| Read and write, `Boolean.GetStatus` / `Boolean.Set` | `start_charging` | Start, stop and pause |
 
 ---
 
@@ -279,6 +294,7 @@ One charger is supported per installation. A tester's register snapshots
 | [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#solax-chargers) | **X1/X3-HAC**; the other HAC variants; X1/X3-EVC | `solax` | **Verified** (X1/X3-HAC); Expected |
 | [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#huawei-scharger) | SCharger-7KS-S0, SCharger-22KT-S0 | `huawei-7ks`, `huawei-22kt` | Expected |
 | [go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#go-e-charger) | Gemini, Gemini flex, HOMEfix, HOME+ (hardware V3 or later) | `goe` | Expected |
+| [Shelly](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#shelly-topac) | TopAC Portable EV Charger 11 kW (EVE01-11R) | `shelly-topac` | Expected |
 | Others | — | — | Not supported yet |
 
 ### SolaX chargers
@@ -344,6 +360,20 @@ Driver `goe`, over the go-e's local HTTP API v2 on port 80. How to switch the AP
   change.
 - Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
 
+### Shelly TopAC
+
+Driver `shelly-topac`, over the charger's local RPC API on port 80. What to switch off first:
+**[Setting up a Shelly TopAC](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md#shelly-topac)**.
+
+| Model | Driver | Tier | Notes |
+|---|---|---|---|
+| [**TopAC Portable EV Charger 11 kW**](https://www.shelly.com/blogs/documentation/topac-portable-ev-charger-eve01-11r) (EVE01-11R), 6–16 A, three phases | `shelly-topac` | Expected | Its password must be off: Gleanvolt does not send one yet |
+
+- **A pause is *start charging* off**, because the charger's range starts at 6 A.
+- **Shelly's auto balance fights the setpoint.** Gleanvolt logs a warning while it is on.
+- **The power's unit is checked**, against volts × amps, because Shelly's documentation does not state it.
+- Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
+
 ### Other chargers
 
 Not supported yet.
@@ -355,11 +385,12 @@ Not supported yet.
 
 - **Not sure of the address?** [`gleanvolt-discover`](DISCOVERY.md) scans the LAN
   and reports host, port and unit id for each device: from its serial number (SolaX), its model name
-  (Huawei SUN2000), its phase voltages (Huawei SCharger) or its API (go-e, on port 80).
+  (Huawei SUN2000), its phase voltages (Huawei SCharger) or its API (go-e or Shelly TopAC, on port 80).
 - **Huawei:** Modbus TCP is off by default on the SDongle and the EMMA. See
   [Setting up a Huawei SUN2000](HUAWEI_SETUP.md).
-- **Huawei SCharger and go-e:** see [Setting up a Huawei SCharger or a go-e](CHARGER_SETUP.md).
-- **Modbus TCP on port 502, unit id 1** for both devices, except a go-e: HTTP on port 80, no unit id. All
+- **Huawei SCharger, go-e and Shelly TopAC:** see [Setting up a charger that is not a SolaX](CHARGER_SETUP.md).
+- **Modbus TCP on port 502, unit id 1** for both devices, except a go-e or a Shelly TopAC: HTTP on port 80, no unit
+  id. All
   are configurable (`Pv:Inverter:Port`, `Pv:Inverter:UnitId`, and the same under `Pv:Chargers:0`).
 - **Inverter access.** G2 and G3 hybrids have Ethernet built in. G4 and later need the LAN port or a
   **Pocket WiFi 3.0 or newer** dongle — **PocketLAN does not provide Modbus**. Modbus is off by default on
@@ -386,8 +417,8 @@ signs and ranges are proven against your device rather than assumed.
 
 For a charger, the same button is under the charger. Three snapshots are the most useful: no car, a car
 plugged in and waiting, and a car charging. It reads over Gleanvolt's own connection, so Gleanvolt keeps
-running; a charger that serves one Modbus client at a time would drop a second one. For a go-e, the file is
-a recording of its API's answers instead of registers.
+running; a charger that serves one Modbus client at a time would drop a second one. For a go-e or a Shelly
+TopAC, the file is a recording of its API's answers instead of registers.
 
 ## Sources
 
@@ -407,6 +438,9 @@ a recording of its API's answers instead of registers.
   [evcc discussion #8985](https://github.com/evcc-io/evcc/discussions/8985)
 - [goecharger/go-eCharger-API-v2](https://github.com/goecharger/go-eCharger-API-v2) — the HTTP API and its
   key list
+- [Shelly TopAC Portable EV Charger](https://shelly-api-docs.shelly.cloud/gen2/Devices/ShellyX/XT1/TopACPortableEVCharger)
+  — the RPC components; the work states other than `charger_free`, and kilowatts for `total_power`, are
+  evcc's reading of the device
 - [Dražice inverters](https://www.dzd.cz/fotovoltaika-drazice/stridace), the
   [IN.HYBRID COMPACT PRO datasheet](https://www.dzd.cz/images/sortiment/in-hybrid-compact-pro/PL-stridace-inhybrid-compact-pro-cz.pdf),
   and SolaX's [X3-HYB G4 PRO page](https://www.solaxpower.com/our-products/x3-hyb-g4-pro.html) it was compared with

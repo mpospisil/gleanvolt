@@ -4,6 +4,7 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Devices;
 using Gleanvolt.Devices.GoE;
+using Gleanvolt.Devices.Shelly;
 using Gleanvolt.Devices.Testing;
 
 namespace Gleanvolt.Discovery.Tests;
@@ -367,7 +368,7 @@ public class DeviceScannerTests
         var report = await scanner.ScanAsync(ScanPlan.ForHosts(["192.168.1.20"]));
 
         Assert.Equal(reported, report.Devices.Any(device => device.Finding == DiscoveryFinding.SolaxDongle));
-        Assert.DoesNotContain(report.Devices, device => device.Finding == DiscoveryFinding.GoeCharger);
+        Assert.DoesNotContain(report.Devices, device => device.Finding is DiscoveryFinding.GoeCharger or DiscoveryFinding.ShellyCharger);
     }
 
     [Fact]
@@ -404,6 +405,50 @@ public class DeviceScannerTests
         Assert.Contains("Car state 3", device.Note);
         Assert.Equal(("192.168.1.30", 80), (asked!.Host, asked.Port));
         Assert.Empty(handler!.Writes);
+    }
+
+    [Fact]
+    public async Task A_shelly_topac_is_found_on_its_web_port_by_its_work_state_and_brings_its_driver()
+    {
+        // #429: not a go-e (its /api/status is a 404), so the Shelly's /rpc is asked next.
+        ReplayHttpHandler? handler = null;
+        var scanner = new DeviceScanner(
+            new DiscoveryOptions { Ports = [80] },
+            new FakePortProbe(("192.168.1.31", 80)),
+            _ => throw new InvalidOperationException("A web port is not spoken Modbus to."),
+            new FakeWebProbe("<title>Shelly</title>"),
+            httpClientFactory: _ => Http(new HttpDump
+            {
+                Responses = new Dictionary<string, JsonNode?>
+                {
+                    [ShellyTopAcChargerDriver.WorkStateRequest] = JsonNode.Parse("""{"value":"charger_wait","source":"","last_update_ts":0}"""),
+                },
+            }, h => handler = h));
+
+        var device = Assert.Single((await scanner.ScanAsync(ScanPlan.ForHosts(["192.168.1.31"]))).Devices);
+
+        Assert.Equal(DiscoveryFinding.ShellyCharger, device.Finding);
+        Assert.Equal(PvDeviceRole.Charger, device.Role);
+        Assert.Null(device.UnitId);
+        Assert.Equal("shelly-topac", device.Driver);
+        Assert.Equal(SupportTier.Expected, device.Tier);
+        Assert.True(device.Identified);
+        Assert.Contains("Work state 3", device.Note);
+        Assert.Empty(handler!.Writes);
+    }
+
+    [Fact]
+    public async Task Another_shelly_is_not_taken_for_the_topac()
+    {
+        // A Shelly plug answers /rpc, but has no charger service: an error, not a work state.
+        var scanner = new DeviceScanner(
+            new DiscoveryOptions { Ports = [80] },
+            new FakePortProbe(("192.168.1.32", 80)),
+            _ => throw new InvalidOperationException("A web port is not spoken Modbus to."),
+            new FakeWebProbe("<title>Shelly Plug S</title>"),
+            httpClientFactory: _ => Http(new HttpDump()));
+
+        Assert.Empty((await scanner.ScanAsync(ScanPlan.ForHosts(["192.168.1.32"]))).Devices);
     }
 
     [Fact]
