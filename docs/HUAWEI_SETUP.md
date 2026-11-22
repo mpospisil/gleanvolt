@@ -36,6 +36,9 @@ further connection. Gleanvolt keeps one connection open all the time, so:
 
 - **Home Assistant's `huawei_solar` integration competes for the same connection.** Run one or the
   other. To run both, put a Modbus proxy in front of the dongle or EMMA, and point both at the proxy.
+- **The SDongle mixes up its clients' replies.** When something else polls it, it now and then sends
+  that client's reply to Gleanvolt. Gleanvolt ignores such a reply and asks again, which slows the poll.
+  A proxy, or switching the other client off, avoids it.
 - Stop Gleanvolt while you run `gleanvolt-discover`. Otherwise the scan finds the port taken.
 - Behind an EMMA, Gleanvolt reads the EMMA and the inverter behind it over its one connection.
 

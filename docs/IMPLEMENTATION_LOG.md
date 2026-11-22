@@ -4,6 +4,42 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-22 — Late and foreign Modbus replies are read past (#433)
+
+**What.** A Modbus reply older than the request it is read for is skipped instead of failing the read.
+On a tester's Huawei SDongle this was most of a night's failed polls.
+
+**How.**
+- `ModbusTcpClient` sets NModbus's `Transport.RetryOnOldResponseThreshold` to `OldResponseThreshold` (16)
+  on every new master. NModbus then reads past a reply whose transaction id is behind the request.
+- The class comment explains how this relates to the #24 teardown, which stays.
+- `FakeModbusTcpServer` gained `DelayNextResponse` (a reply after the client gave up) and
+  `SendForeignReplyFirst` (another master's reply ahead of ours). The old "corrupt" mode replaces the id
+  and does not reproduce either case.
+
+**Quirks.** From the tester's log (SUN2000-10KTL-M1, SDongle, one night, 1.2.0 on Windows):
+- 1,859 replies 2–4 ids behind. The SDongle at night answers some reads after 5 s.
+- 61 replies with another master's ids, rising ~900 an hour. The SDongle sends one client's replies down
+  another client's connection.
+- 1,620 of the 1,971 failures were the first read of a poll, after the idle gap in which late replies pile
+  up.
+- The first two runs failed every read with exception 4, until a settings change, most likely the unit
+  id. That was configuration, not code.
+- Not addressed here: 1,275 polls whose three inverter reads succeeded were thrown away by a charger
+  timeout. The go-e driver's HTTP timeout is an `OperationCanceledException` and gets past the charger's
+  best-effort catch.
+
+**Verified.** The two new tests fail without the threshold (the late one with "Expected 5, received 4",
+the shape in the log) and pass with it, on one connection. The persistent-corruption tests now fail by
+timeout, so they use a 200 ms I/O timeout; the class runs in 13 s instead of 2.4 min. All tests pass in
+Release. Not yet: a night on the tester's SDongle.
+
+**Files.** `src/Gleanvolt.Infrastructure/Modbus/ModbusTcpClient.cs`,
+`tests/Gleanvolt.Infrastructure.Tests/{FakeModbusTcpServer,ModbusTcpClientTests}.cs`,
+`docs/{HUAWEI_SETUP,DECISIONS,IMPLEMENTATION_LOG}.md`.
+
+---
+
 ## 2026-11-18 — The built-in OpenWeather removed; the OpenWeather plugin replaces it (#425)
 
 **What.** Gleanvolt no longer calls OpenWeatherMap. The weather comes from nowhere or from an external

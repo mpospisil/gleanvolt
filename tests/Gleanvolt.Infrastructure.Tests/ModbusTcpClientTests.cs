@@ -20,6 +20,10 @@ public class ModbusTcpClientTests
         MinRequestInterval = minRequestInterval ?? TimeSpan.Zero,
     };
 
+    // A reply with an old transaction id is read past (#433), so a device that only ever answers with
+    // one fails each attempt by timing out: kept short, or each such test waits four 5 s timeouts.
+    private static readonly TimeSpan ShortIoTimeout = TimeSpan.FromMilliseconds(200);
+
     [Fact]
     public async Task ReadsRegisters()
     {
@@ -46,13 +50,13 @@ public class ModbusTcpClientTests
     public async Task ATransactionIdMismatchDropsTheConnection()
     {
         await using var server = new FakeModbusTcpServer();
-        await using var client = new ModbusTcpClient(Device(server.Port));
+        await using var client = new ModbusTcpClient(Device(server.Port), ioTimeout: ShortIoTimeout);
 
         await client.ReadInputRegistersAsync(0x1D, 1);
         Assert.True(client.IsConnected);
 
-        // Persistent, as in the field: once a stale reply is in the buffer every response is offset,
-        // so NModbus's own retries cannot dig out of it.
+        // Persistent: every reply carries an id the request does not, so every attempt fails and the
+        // read with it. (One stale reply in the buffer is read past now; see the late-reply tests.)
         server.CorruptNextResponses(FakeModbusTcpServer.Persistent);
         await Assert.ThrowsAnyAsync<Exception>(() => client.ReadInputRegistersAsync(0x1D, 1));
 
@@ -65,7 +69,7 @@ public class ModbusTcpClientTests
     public async Task TheNextCallAfterAFailureSucceedsOnAFreshConnection()
     {
         await using var server = new FakeModbusTcpServer { RegisterValue = 7 };
-        await using var client = new ModbusTcpClient(Device(server.Port));
+        await using var client = new ModbusTcpClient(Device(server.Port), ioTimeout: ShortIoTimeout);
 
         await client.ReadInputRegistersAsync(0x1D, 1);
         server.CorruptNextResponses(FakeModbusTcpServer.Persistent);
@@ -84,7 +88,7 @@ public class ModbusTcpClientTests
         // The field symptom: fifteen minutes of normal operation, then every poll failing for
         // three quarters of an hour. Each failure must cost one request, not the whole session.
         await using var server = new FakeModbusTcpServer();
-        await using var client = new ModbusTcpClient(Device(server.Port));
+        await using var client = new ModbusTcpClient(Device(server.Port), ioTimeout: ShortIoTimeout);
 
         for (var i = 0; i < 3; i++)
         {
@@ -98,10 +102,44 @@ public class ModbusTcpClientTests
     }
 
     [Fact]
+    public async Task AReplyThatArrivesAfterItsRequestGaveUpIsReadPast()
+    {
+        // Huawei's SDongle at night (#433): the reply comes after the client has timed out and repeated
+        // the request, so it sits in front of the reply to the repeat. It used to fail the read one step
+        // behind ("Expected 5, received 4") and cost a reconnect.
+        await using var server = new FakeModbusTcpServer { RegisterValue = 3356 };
+        await using var client = new ModbusTcpClient(Device(server.Port), ioTimeout: ShortIoTimeout);
+        await client.ReadHoldingRegistersAsync(32064, 2);
+
+        server.DelayNextResponse(ShortIoTimeout * 2);
+        var values = await client.ReadHoldingRegistersAsync(32064, 2);
+
+        Assert.Equal([3356, 3356], values);
+        Assert.Single(await client.ReadHoldingRegistersAsync(37760, 1));
+        Assert.Equal(1, server.Connections);
+    }
+
+    [Fact]
+    public async Task AReplyMeantForAnotherClientCostsOneAttemptNotTheRead()
+    {
+        // A second Modbus master polling the same SDongle (#433): now and then its reply, with its own
+        // ever-growing transaction id, comes down this connection instead.
+        await using var server = new FakeModbusTcpServer { RegisterValue = 7 };
+        await using var client = new ModbusTcpClient(Device(server.Port), ioTimeout: ShortIoTimeout);
+        await client.ReadHoldingRegistersAsync(32064, 2);
+
+        server.SendForeignReplyFirst(9951);
+        var values = await client.ReadHoldingRegistersAsync(32064, 2);
+
+        Assert.Equal([7, 7], values);
+        Assert.Equal(1, server.Connections);
+    }
+
+    [Fact]
     public async Task WritesRecoverTheSameWay()
     {
         await using var server = new FakeModbusTcpServer();
-        await using var client = new ModbusTcpClient(Device(server.Port));
+        await using var client = new ModbusTcpClient(Device(server.Port), ioTimeout: ShortIoTimeout);
 
         server.CorruptNextResponses(FakeModbusTcpServer.Persistent);
         await Assert.ThrowsAnyAsync<Exception>(() => client.WriteSingleRegisterAsync(0x628, 1600));
@@ -202,7 +240,7 @@ public class ModbusTcpClientTests
             MinRequestInterval = TimeSpan.Zero,
             ReconnectBackoff = TimeSpan.FromSeconds(5),
         };
-        await using var client = new ModbusTcpClient(device, clock);
+        await using var client = new ModbusTcpClient(device, clock, ioTimeout: ShortIoTimeout);
 
         await client.ReadInputRegistersAsync(0x1D, 1);
         server.CorruptNextResponses(FakeModbusTcpServer.Persistent);

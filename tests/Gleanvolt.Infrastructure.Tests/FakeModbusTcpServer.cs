@@ -61,6 +61,36 @@ public sealed class FakeModbusTcpServer : IAsyncDisposable
     /// <summary>Go back to answering correctly.</summary>
     public void StopCorrupting() => Volatile.Write(ref _responsesToCorrupt, 0);
 
+    /// <summary>
+    /// Answer the next request only after <paramref name="delay"/>, as Huawei's SDongle does when the
+    /// inverter behind it is slow: the client has given up and repeated the request by then, so the late
+    /// reply lands in front of the reply to the repeat. Requests that arrive meanwhile wait their turn.
+    /// </summary>
+    public void DelayNextResponse(TimeSpan delay)
+    {
+        lock (_pending)
+        {
+            _nextDelay = delay;
+        }
+    }
+
+    /// <summary>
+    /// Before the reply to the next request, send a reply to a request this client never made, carrying
+    /// <paramref name="transactionId"/>: the SDongle hands one client's replies to another when a second
+    /// Modbus master polls it.
+    /// </summary>
+    public void SendForeignReplyFirst(ushort transactionId)
+    {
+        lock (_pending)
+        {
+            _foreignReply = transactionId;
+        }
+    }
+
+    private readonly object _pending = new();
+    private TimeSpan _nextDelay;
+    private ushort? _foreignReply;
+
     private async Task AcceptLoopAsync()
     {
         try
@@ -107,6 +137,24 @@ public sealed class FakeModbusTcpServer : IAsyncDisposable
                 }
 
                 UnitIds.Enqueue(header[6]);
+                TimeSpan delay;
+                ushort? foreign;
+                lock (_pending)
+                {
+                    (delay, foreign) = (_nextDelay, _foreignReply);
+                    (_nextDelay, _foreignReply) = (TimeSpan.Zero, null);
+                }
+
+                if (delay > TimeSpan.Zero)
+                {
+                    await Task.Delay(delay, _cts.Token).ConfigureAwait(false);
+                }
+
+                if (foreign is { } foreignId)
+                {
+                    await stream.WriteAsync(BuildResponse(header[6], pdu, foreignId, corrupt: false), _cts.Token).ConfigureAwait(false);
+                }
+
                 var response = BuildResponse(header[6], pdu, transactionId);
                 Interlocked.Increment(ref _requestsHandled);
                 await stream.WriteAsync(response, _cts.Token).ConfigureAwait(false);
@@ -114,11 +162,11 @@ public sealed class FakeModbusTcpServer : IAsyncDisposable
         }
     }
 
-    private byte[] BuildResponse(byte unitId, byte[] pdu, ushort transactionId)
+    private byte[] BuildResponse(byte unitId, byte[] pdu, ushort transactionId, bool corrupt = true)
     {
         // The whole point of the fake: hand back somebody else's transaction id, exactly as a stale
         // response left in the buffer would.
-        var remaining = Volatile.Read(ref _responsesToCorrupt);
+        var remaining = corrupt ? Volatile.Read(ref _responsesToCorrupt) : 0;
         if (remaining > 0)
         {
             if (remaining != Persistent)

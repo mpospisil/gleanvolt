@@ -4,6 +4,33 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-22 — A Modbus reply older than its request is read past (#433)
+
+**Found.** A tester's SUN2000-10KTL-M1 behind an SDongle failed 1,971 inverter reads in one night
+(Gleanvolt 1.2.0). 1,859 were "Response was not of expected transaction ID" with the received id 2–4
+below the expected one. The dongle answers after the 5 s timeout. NModbus repeats the request, reads the
+late reply first, rejects it, repeats again, and runs out of attempts still behind. 61 more carried ids far
+above ours, climbing steadily from 84 to 9,951 over the night: a second Modbus master polling the dongle,
+whose replies the dongle sometimes sends to our connection. The teardown of 2026-07-29 recovered each
+time, but only after the poll had failed.
+
+**Decided.**
+- **`RetryOnOldResponseThreshold` = 16 on every connection** (`ModbusTcpClient.OldResponseThreshold`). A
+  reply whose id is up to 15 behind the request is skipped and the next one read. A foreign reply still
+  fails one attempt, and the repeat reads past the late reply to the attempt before.
+- **For every device, not only Huawei.** Skipping a reply that is not for the request is always right,
+  and #24's SolaX desync was the same late reply.
+- **The teardown stays.** Any exchange that still fails invalidates the connection, as before.
+
+**Consequences accepted.**
+- A device that answers every request with a wrong old id now fails by timing out: four 5 s timeouts
+  instead of four quick rejections. It is the same cost as a device that does not answer.
+- A foreign reply that happens to carry exactly our id, with the same function and length, would be taken
+  as ours. Modbus TCP gives no way to tell. Our ids restart at one with every connection, and the foreign
+  counter seen was in the thousands. The docs say to run one client or a proxy.
+
+---
+
 ## 2026-11-18 — The built-in OpenWeather removed; the plugin is the only way (#425)
 
 **Found.** After #424 and #426 the OpenWeather plugin did everything the built-in did, shipped wherever
