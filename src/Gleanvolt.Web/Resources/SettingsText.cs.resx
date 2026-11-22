@@ -1129,4 +1129,10 @@
   <data name="WeatherBuiltInRetired" xml:space="preserve">
     <value>Vestavěné OpenWeather skončilo, a proto je vybrána volba Externí: počasí z OpenWeatherMap teď dodává plugin OpenWeather. Spusťte plugin s tokenem z Externích zdrojů dat a pak na jeho stránce, která se tu objeví po připojení, zadejte svůj klíč OpenWeatherMap. Klíč dřív uložený tady se nezachoval. Do té doby se nabíjení zaznamenává bez počasí.</value>
   </data>
+  <data name="ChargerDriverExternal" xml:space="preserve">
+    <value>Externí plugin</value>
+  </data>
+  <data name="NoteChargerPlugin" xml:space="preserve">
+    <value>Nabíječku obsluhuje plugin, takže Gleanvolt pro ni nepotřebuje adresu. Spusťte plugin s tokenem z Nastavení → Externí zdroje dat; Gleanvolt ho přijme po restartu.</value>
+  </data>
 </root>

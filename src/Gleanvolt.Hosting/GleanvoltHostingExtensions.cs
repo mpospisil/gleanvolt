@@ -30,6 +30,7 @@ using Gleanvolt.Infrastructure.Monitoring;
 using Gleanvolt.Infrastructure.Secrets;
 using Gleanvolt.Infrastructure.Sessions;
 using Gleanvolt.Hosting.Weather;
+using Gleanvolt.Hosting.Chargers;
 using Gleanvolt.Infrastructure.Solcast;
 using Gleanvolt.Api;
 using Gleanvolt.Web;
@@ -350,8 +351,14 @@ public static class GleanvoltHostingExtensions
         // HTTP, as the family says (#352), and read-only in dry-run.
         foreach (var make in ChargerDrivers.Factories)
         {
-            services.AddSingleton(provider => make(provider.GetRequiredService<ILoggerFactory>()));
+            services.AddSingleton(provider => make(provider));
         }
+
+        // A charger behind a plugin (#435): its hub on the web port, on while the controlled charger's driver is
+        // "external", and the link its driver reads and commands through.
+        services.Configure<ExternalChargerOptions>(configuration.GetSection(ExternalChargerOptions.SectionName));
+        services.AddSingleton<ExternalChargerLink>();
+        services.AddExternalProvider<ChargerHub>(ChargerHub.Kind);
 
         services.AddSingleton<IEvChargerDriver>(provider =>
         {
@@ -361,9 +368,12 @@ public static class GleanvoltHostingExtensions
                 : ChargerDrivers.DefaultId;
             var factory = provider.GetServices<IEvChargerDriverFactory>().SingleOrDefault(candidate => candidate.Id == id)
                 ?? throw new InvalidOperationException($"No charger driver '{id}' is registered.");
-            var connection = factory.Transport == EvChargerTransport.Http
-                ? EvChargerConnection.Over(provider.GetRequiredKeyedService<HttpClient>(ModbusClientKeys.EvCharger))
-                : EvChargerConnection.Over(provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.EvCharger));
+            var connection = factory.Transport switch
+            {
+                EvChargerTransport.Http => EvChargerConnection.Over(provider.GetRequiredKeyedService<HttpClient>(ModbusClientKeys.EvCharger)),
+                EvChargerTransport.External => EvChargerConnection.External,
+                _ => EvChargerConnection.Over(provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.EvCharger)),
+            };
 
             return factory.Create(
                 connection,

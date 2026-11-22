@@ -209,4 +209,7 @@ public static class ProviderMethods
     public const string SiteChanged = "SiteChanged";
     public const string VehicleChanged = "VehicleChanged";
     public const string ChargingSessionChanged = "ChargingSessionChanged";
+    public const string CommandDone = "CommandDone";
+    public const string SetCurrent = "SetCurrent";
+    public const string SetChargingAllowed = "SetChargingAllowed";
 }

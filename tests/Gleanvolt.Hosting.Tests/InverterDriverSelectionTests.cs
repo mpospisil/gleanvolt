@@ -6,6 +6,7 @@ using Gleanvolt.Devices;
 using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Huawei;
 using Gleanvolt.Devices.Solax;
+using Gleanvolt.Hosting.Chargers;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Setup;
 using Gleanvolt.Infrastructure;
@@ -128,9 +129,52 @@ public class InverterDriverSelectionTests
     }
 
     [Fact]
-    public void The_charger_catalog_has_solax_first_then_the_two_sChargers_then_go_e()
+    public void The_charger_catalog_has_solax_first_then_the_two_sChargers_then_go_e_then_the_plugin()
     {
-        Assert.Equal(["solax", "huawei-7ks", "huawei-22kt", "goe"], ChargerDrivers.Known.Select(driver => driver.Id));
+        Assert.Equal(["solax", "huawei-7ks", "huawei-22kt", "goe", "external"], ChargerDrivers.Known.Select(driver => driver.Id));
+        Assert.Equal(EvChargerTransport.External, ChargerDrivers.Known[^1].Transport);
+    }
+
+    [Fact]
+    public async Task The_container_runs_a_charger_behind_a_plugin_with_no_address_and_turns_its_hub_on()
+    {
+        // #435: the plugin reaches the charger, so the configuration names none, and the start does not refuse it.
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.Configuration.AddInMemoryCollection(
+            [.. UsableSite.Pairs.Where(pair => pair.Key != "Pv:Chargers:0:Host"), new("Pv:Chargers:0:Driver", "external"), new("Web:Enabled", "false")]);
+        builder.Services.AddGleanvolt(builder.Configuration);
+        await using var provider = builder.Services.BuildServiceProvider();
+
+        var site = provider.GetRequiredService<PvSystemInfo>();
+        Assert.Equal("external", site.Chargers[0].Driver);
+        Assert.Equal(string.Empty, site.Chargers[0].Connection.Host);
+        Assert.Contains("through a plugin", site.Describe());
+        Assert.IsType<ExternalChargerDriver>(provider.GetRequiredService<IEvChargerDriver>());
+
+        var registry = provider.GetRequiredService<Gleanvolt.Providers.Server.ExternalProviderRegistry>();
+        Assert.True(registry.IsEnabled(ChargerHub.Kind));
+    }
+
+    [Fact]
+    public async Task Any_other_charger_driver_leaves_the_charger_hub_off()
+    {
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.Configuration.AddInMemoryCollection([.. UsableSite.Pairs, new("Web:Enabled", "false")]);
+        builder.Services.AddGleanvolt(builder.Configuration);
+        await using var provider = builder.Services.BuildServiceProvider();
+
+        var registry = provider.GetRequiredService<Gleanvolt.Providers.Server.ExternalProviderRegistry>();
+        Assert.False(registry.IsEnabled(ChargerHub.Kind));
+    }
+
+    [Fact]
+    public void Headless_a_charger_with_neither_an_address_nor_the_plugin_driver_still_stops_the_start()
+    {
+        var error = Record.Exception(() => PvSystemResolver.Resolve(Configuration(
+            [.. UsableSite.Settings.Where(setting => setting.Key != "Pv:Chargers:0:Host"), ("Pv:Chargers:0:Driver", "goe")])));
+
+        Assert.NotNull(error);
+        Assert.Contains("Pv:Chargers:0:Host is required", error.Message);
     }
 
     [Fact]

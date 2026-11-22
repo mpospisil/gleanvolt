@@ -1,0 +1,251 @@
+@page "/"
+@using System.Globalization
+@implements IDisposable
+@inject ChargerAddressStore Address
+@inject ShellyRpcClient Rpc
+@inject ShellyCharger Charger
+@inject Gleanvolt.Providers.Client.Charger.ChargerProviderConnection Connection
+@inject TimeProvider Time
+
+@*
+    The plugin's page (#429), linked from Gleanvolt's Settings → External providers: the plugin's status, the
+    limits Gleanvolt works in, the last reading, the owner's settings in the Shelly app, and the charger's
+    address. Opening the page writes nothing; "Save and check" only reads the charger's state.
+*@
+
+<PageTitle>Shelly TopAC</PageTitle>
+
+<h1>Shelly TopAC</h1>
+
+<p id="status" class="@StatusClass">@StatusText</p>
+
+<section>
+    <h2>@PageText.Gleanvolt</h2>
+
+    @if (Connection.Welcome is { } welcome)
+    {
+        <dl id="limits">
+            <dt>@PageText.Range</dt>
+            <dd>@welcome.Limits.MinCurrentAmps–@welcome.Limits.MaxCurrentAmps A</dd>
+            <dt>@PageText.Phases</dt>
+            <dd>@welcome.Limits.Phases</dd>
+        </dl>
+
+        @if (welcome.Limits.MaxCurrentAmps > ChargerMax)
+        {
+            <p class="muted" id="above-charger">@PageText.AboveCharger.Format(welcome.Limits.MaxCurrentAmps, ChargerMax)</p>
+        }
+
+        @if (welcome.DryRun)
+        {
+            <p class="muted" id="dry-run">@PageText.DryRun</p>
+        }
+    }
+    else
+    {
+        <p class="muted" id="not-connected">@PageText.NotConnected</p>
+    }
+</section>
+
+<section>
+    <h2>@PageText.Charger</h2>
+
+    @if (Charger.LastReading is { } reading)
+    {
+        <dl id="reading">
+            <dt>@PageText.State</dt>
+            <dd id="reading-state">@reading.Status <span class="muted">(@Charger.LastWorkState)</span></dd>
+            <dt>@PageText.Power</dt>
+            <dd id="reading-power">@Watts(reading.PowerWatts)</dd>
+            <dt>@PageText.Setpoint</dt>
+            <dd id="reading-setpoint">@(reading.CurrentAmps is { } amps ? $"{amps} A" : PageText.NotSaid.ToString())</dd>
+            <dt>@PageText.Switch</dt>
+            <dd id="reading-allowed">@SwitchText(reading)</dd>
+            @if (Charger.LastPower is { Phases.Count: > 0 } power)
+            {
+                <dt>@PageText.PerPhase</dt>
+                <dd>
+                    @foreach (var phase in power.Phases)
+                    {
+                        <div>@Number(phase.Voltage, "0", " V") · @Number(phase.Current, "0.0", " A") · @Number(phase.Power, "0", "")</div>
+                    }
+                </dd>
+            }
+            <dt>@PageText.UnitFound</dt>
+            <dd id="reading-unit">@(Charger.Unit switch { PowerUnit.Watts => "W", PowerUnit.Kilowatts => "kW", _ => PageText.UnitUnknown.ToString() })</dd>
+            <dt>@PageText.Read</dt>
+            <dd>@Local(reading.ReadAt)</dd>
+        </dl>
+
+        @if (Charger.OwnerSettings is { } owner)
+        {
+            <h3>@PageText.OwnerSettings</h3>
+            <dl id="owner-settings">
+                <dt>auto_charge</dt>
+                <dd>@OnOff(owner.AutoCharge)</dd>
+                <dt>auto_balance</dt>
+                <dd id="owner-auto-balance" class="@(owner.AutoBalance == true ? "error" : null)">@OnOff(owner.AutoBalance)</dd>
+            </dl>
+        }
+    }
+    else
+    {
+        <p class="muted" id="reading-none">@PageText.NoReadingYet</p>
+    }
+</section>
+
+<section>
+    <h2>@PageText.AddressHeading</h2>
+
+    <p class="muted">@PageText.AddressIntro</p>
+
+    <label for="address">@PageText.Address</label>
+    <input id="address" type="text" autocomplete="off" spellcheck="false" @bind="_address" @bind:event="oninput"
+           placeholder="@(Address.Current?.Authority ?? PageText.AddressNotSet.ToString())" disabled="@_busy" />
+
+    <p class="muted" id="address-source">
+        @(Address.Source switch
+        {
+            AddressSource.Page => PageText.SourcePage,
+            AddressSource.Configuration => PageText.SourceConfiguration,
+            _ => PageText.SourceNone,
+        })
+    </p>
+
+    <div class="actions">
+        <button type="button" id="address-save" disabled="@(_busy || _address.Trim().Length == 0)" @onclick="SaveAsync">
+            @(_busy ? PageText.Checking : PageText.SaveAndCheck)
+        </button>
+        @if (Address.Source == AddressSource.Page)
+        {
+            <button type="button" id="address-remove" class="secondary" disabled="@_busy" @onclick="Remove">@PageText.Remove</button>
+        }
+    </div>
+
+    @if (_message is { } message)
+    {
+        <p id="address-message" class="@(_messageIsError ? "error" : "ok")">@message</p>
+    }
+</section>
+
+@code {
+    private string _address = string.Empty;
+    private Words? _message;
+    private bool _messageIsError;
+    private bool _busy;
+
+    private int ChargerMax => Charger.LastReading?.MaxCurrentAmps ?? 16;
+
+    protected override void OnInitialized()
+    {
+        Charger.Changed += Refresh;
+        Connection.Welcomed += OnWelcomed;
+    }
+
+    public void Dispose()
+    {
+        Charger.Changed -= Refresh;
+        Connection.Welcomed -= OnWelcomed;
+    }
+
+    private void OnWelcomed(ChargerWelcome welcome) => Refresh();
+
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+
+    private string StatusText => Charger.Status switch
+    {
+        null => PageText.StatusWaiting.ToString(),
+        { Healthy: true } => PageText.StatusReading.ToString(),
+        _ => (Charger.StatusWords ?? PageText.StatusNotReading).ToString(),
+    };
+
+    private string? StatusClass => Charger.Status switch
+    {
+        { Healthy: true } => "ok",
+        { NeedsOwner: true } => "error",
+        _ => null,
+    };
+
+    private async Task SaveAsync()
+    {
+        if (_busy || _address.Trim().Length == 0)
+        {
+            return;
+        }
+
+        if (ChargerAddressStore.Parse(_address) is not { } address)
+        {
+            _messageIsError = true;
+            _message = PageText.NotAnAddress;
+            return;
+        }
+
+        _busy = true;
+        _message = null;
+
+        try
+        {
+            var kept = Address.Save(address);
+            _address = string.Empty;
+            Charger.AddressChanged();
+
+            try
+            {
+                var state = await Rpc.GetWorkStateAsync(address, CancellationToken.None);
+                _messageIsError = !kept;
+                _message = kept ? PageText.AddressAccepted.Format(state) : PageText.AddressNotKept;
+
+                // A charger that answers: Gleanvolt gets a reading now, and with it the status clears.
+                if (Connection.IsAttached)
+                {
+                    await Connection.PublishNowAsync();
+                }
+            }
+            catch (RpcFailedException ex)
+            {
+                _messageIsError = true;
+                _message = kept ? PageText.AddressNotChecked.Format(ex.Message) : PageText.AddressNotKept;
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Remove()
+    {
+        Address.Clear();
+        Charger.AddressChanged();
+        _messageIsError = false;
+        _message = Address.Current is null ? PageText.AddressRemovedNone : PageText.AddressRemovedConfiguration;
+    }
+
+    private string SwitchText(ChargerReading reading) => reading.ChargingAllowed switch
+    {
+        true when Charger.Paused => PageText.PausedByGleanvolt.ToString(),
+        true => PageText.Allowed.ToString(),
+        false => PageText.Stopped.ToString(),
+        null => PageText.NotSaid.ToString(),
+    };
+
+    private static string OnOff(bool? value) => value switch
+    {
+        true => PageText.On.ToString(),
+        false => PageText.Off.ToString(),
+        null => PageText.NotSaid.ToString(),
+    };
+
+    private static string Watts(double watts) =>
+        watts >= 1000 ? (watts / 1000).ToString("0.00", CultureInfo.CurrentCulture) + " kW" : watts.ToString("0", CultureInfo.CurrentCulture) + " W";
+
+    private static string Number(double? value, string format, string unit) =>
+        value is { } number ? number.ToString(format, CultureInfo.CurrentCulture) + unit : "?";
+
+    private TimeZoneInfo Zone => Connection.Welcome?.TimeZone is { Length: > 0 } id && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var found)
+        ? found
+        : Time.LocalTimeZone;
+
+    private string Local(DateTimeOffset at) =>
+        TimeZoneInfo.ConvertTime(at, Zone).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+}

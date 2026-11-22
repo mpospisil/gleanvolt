@@ -50,13 +50,18 @@ search. Fill in the form below it:
 
 | Field | Inverter | Charger |
 |---|---|---|
-| **Brand** | SolaX or Huawei | SolaX, Huawei SCharger or go-e |
+| **Brand** | SolaX or Huawei | SolaX, Huawei SCharger, go-e, or External plugin |
 | **Host** | the inverter's address, such as `192.168.1.10` | the charger's address |
 | **Port** | 502 | 502 (go-e: 80) |
 | **Unit id** | usually 1 | as the charger's settings show it |
 
 The brand fills in its usual port and unit id. A Huawei inverter behind an EMMA also needs
 **Connected through: EMMA**, and the EMMA's address as the host.
+
+**External plugin** is for a charger a plugin drives, such as the Shelly TopAC. The address fields go
+away: the plugin has the charger's address, on its own page. Start the plugin with the token from
+**Settings → External providers**; Gleanvolt accepts it after the restart, and the save checks that it
+answers.
 
 ## When you save
 

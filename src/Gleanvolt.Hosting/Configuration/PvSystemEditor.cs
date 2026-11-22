@@ -159,6 +159,12 @@ public sealed class PvSystemEditor : IPvSystemEditor
     {
         var address = $"{host}:{port}";
 
+        // A charger behind a plugin (#435) has no address: its probe is a reading through the connected plugin.
+        if (role == PvDeviceRole.Charger && ChargerDriverFactory(driver) is { Transport: EvChargerTransport.External } plugin)
+        {
+            return await ProbePluginAsync(plugin, cancellationToken).ConfigureAwait(false);
+        }
+
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(ProbeTimeout);
 
@@ -214,6 +220,29 @@ public sealed class PvSystemEditor : IPvSystemEditor
         {
             return new DeviceProbeResult(false, false, $"{address} did not answer ({ex.Message}).",
                 Phrase.Of("Probe.NoAnswer", new PhraseArg.Text(address), new PhraseArg.Text(ex.Message)));
+        }
+    }
+
+    private async Task<DeviceProbeResult> ProbePluginAsync(IEvChargerDriverFactory plugin, CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(ProbeTimeout);
+
+        try
+        {
+            var probe = await plugin.Create(EvChargerConnection.External, new EvChargerDriverOptions { DryRun = true })
+                .ProbeAsync(timeout.Token).ConfigureAwait(false);
+            var watts = (long)Math.Round(probe.Reading);
+            return new DeviceProbeResult(true, true, $"The charger plugin answered: the charger delivers {watts} W.",
+                Phrase.Of("Probe.ChargerPluginOk", new PhraseArg.Number(watts)));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            // Said, not refused: the plugin may well be started after the save, as its README says.
+            return new DeviceProbeResult(false, false,
+                $"No charger plugin answered ({ex.Message}). Start it with the provider token from Settings → External providers; "
+                + "Gleanvolt accepts it after the restart.",
+                Phrase.Of("Probe.ChargerPluginMissing", new PhraseArg.Text(ex.Message)));
         }
     }
 

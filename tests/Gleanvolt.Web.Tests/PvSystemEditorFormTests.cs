@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
+using Gleanvolt.Devices;
+using Gleanvolt.Web.Resources;
 using Gleanvolt.Web.Auth;
 using Gleanvolt.Web.Components;
 
@@ -180,6 +182,32 @@ public class PvSystemEditorFormTests : BunitContext
         Assert.Equal(PvDeviceRole.Charger, probe.Role);
         Assert.Equal((5020, (byte)2), (probe.Port, probe.UnitId));
         Assert.Equal("wallco", Assert.Single(_editor.ProbeDrivers));
+    }
+
+    [Fact]
+    public void Choosing_a_charger_behind_a_plugin_hides_its_address_and_probes_the_plugin_instead()
+    {
+        // #435: the plugin reaches the charger, so the form asks for no address, and its name is said, not a brand.
+        _editor.ChargerDrivers = [.. _editor.ChargerDrivers, new("external", "External plugin", EvChargerTransport.External, null,
+            new EvChargerCapabilities(6, 32, 0, 3, false, false))];
+        _editor.Running[PvSystemSettingKeys.ChargerHost] = "192.168.2.6";
+        var form = Render<PvSystemEditorForm>();
+
+        Assert.Equal(SettingsText.ChargerDriverExternal, form.Find(Field(PvSystemSettingKeys.ChargerDriver)).QuerySelectorAll("option")[^1].TextContent);
+        Assert.Empty(form.FindAll("#pv-charger-plugin"));
+
+        form.Find(Field(PvSystemSettingKeys.ChargerDriver)).Change("external");
+
+        Assert.Empty(form.FindAll(Field(PvSystemSettingKeys.ChargerHost)));
+        Assert.Empty(form.FindAll(Field(PvSystemSettingKeys.ChargerPort)));
+        Assert.Empty(form.FindAll(Field(PvSystemSettingKeys.ChargerUnitId)));
+        Assert.NotNull(form.Find("#pv-charger-plugin"));
+
+        form.Find("#pv-save").Click();
+
+        Assert.Equal(new Dictionary<string, string> { [PvSystemSettingKeys.ChargerDriver] = "external" }, Assert.Single(_editor.Saves));
+        Assert.Equal((PvDeviceRole.Charger, string.Empty), (Assert.Single(_editor.Probes).Role, _editor.Probes[0].Host));
+        Assert.Equal("external", Assert.Single(_editor.ProbeDrivers));
     }
 
     [Fact]

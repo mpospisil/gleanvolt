@@ -421,6 +421,18 @@ public static partial class PvSystemRules
                 problems.Add($"{path}:Id ('{id}') is used by more than one charger; each id must be unique.", Phrase.Of("Config.PvChargerIdTwice", new PhraseArg.Text(path), new PhraseArg.Text(id)));
             }
 
+            var driver = ResolveChargerDriver(charger, path, drivers, problems);
+
+            // A charger behind a plugin (#435) is reached by the plugin: Gleanvolt has no address to check.
+            if (driver?.Transport == EvChargerTransport.External)
+            {
+                chargers.Add(new PvDeviceInfo(id, charger.Name.Trim(), charger.Model.Trim(), new DeviceConfig { Host = string.Empty })
+                {
+                    Driver = driver.Id,
+                });
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(charger.Host))
             {
                 problems.Add($"{path}:Host is required.", Phrase.Of("Config.PvHostRequired", new PhraseArg.Text(path)));
@@ -428,8 +440,6 @@ public static partial class PvSystemRules
             }
 
             ValidateConnection(charger, path, problems);
-
-            var driver = ResolveChargerDriver(charger, path, drivers, problems);
             chargers.Add(new PvDeviceInfo(id, charger.Name.Trim(), charger.Model.Trim(), charger.ToDeviceConfig(driver?.Defaults))
             {
                 Driver = driver?.Id ?? NormaliseChargerDriverId(charger),
