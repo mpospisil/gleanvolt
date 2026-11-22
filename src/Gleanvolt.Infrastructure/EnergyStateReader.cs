@@ -110,7 +110,11 @@ public sealed class EnergyStateReader : IEnergyStateReader
 
             return reading;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        // Only our own cancellation, a shutdown, stops the poll. An HTTP charger's request timeout is an
+        // OperationCanceledException too, and it is the commonest way an HTTP charger is unreachable: it
+        // used to escape this filter and cost the inverter reading with it (1,275 polls in one night on a
+        // tester's site, #429).
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
             // One line per outage, not one per poll: this runs on the polling interval, and a charger
             // that is switched off stays switched off for hours. The recovery above closes the pair,

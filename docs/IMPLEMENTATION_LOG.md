@@ -34,6 +34,11 @@ Tier Expected: every recording is synthetic.
   `HttpChargerAsync` helper. There is a new finding, `ShellyCharger`, and the `.env` lines carry the driver
   and no unit id.
 - *Text.* "Test connection" for an HTTP charger says "reports state {1}" (en, cs), no longer go-e's "car state".
+- *A charger timeout no longer costs the inverter reading.* `EnergyStateReader`'s best-effort charger catch
+  let `OperationCanceledException` through, and an `HttpClient` timeout is one. A tester's log (1.2.0, the
+  TopAC set up as a go-e before this driver existed) lost 1,275 polls in one night whose inverter reads had
+  all succeeded, with a stack trace each instead of the one-per-outage warning. The filter now lets only our
+  own token's cancellation through, which is a shutdown. Any HTTP charger is affected, this one included.
 
 **Quirks.**
 - `HttpClient` sends a relative URI's `"` as `%22` once it is joined to the base address. So recordings keyed
@@ -53,7 +58,9 @@ Tier Expected: every recording is synthetic.
 - Discovery: `DeviceScanner.cs`, `DiscoveryResults.cs`, `DiscoveryConfiguration.cs`, `DiscoveryOptions.cs`,
   `Cli/ReportWriter.cs`, the csproj.
 - Web: `Resources/ServiceText.resx`, `ServiceText.cs.resx`.
-- Tests: `Hosting.Tests/InverterDriverSelectionTests.cs`, `Discovery.Tests/DeviceScannerTests.cs`, `CliTests.cs`.
+- Tests: `Hosting.Tests/InverterDriverSelectionTests.cs`, `Discovery.Tests/DeviceScannerTests.cs`, `CliTests.cs`,
+  `Infrastructure.Tests/EnergyStateReaderTests.cs` (an HTTP charger that times out; a shutdown during its read).
+- Poll: `Gleanvolt.Infrastructure/EnergyStateReader.cs`.
 - Build: `Gleanvolt.slnx`, `Dockerfile`, `Dockerfile.windows`, `.github/workflows/release.yml` (pack list and
   expected packages).
 - Docs: `SUPPORTED_CHARGERS.md` (and its copies in `SUPPORTED_PV_SYSTEMS.md` and `README.md`),

@@ -81,6 +81,39 @@ public class EnergyStateReaderTests
         Assert.Equal(7000, afterRecovery.EvChargerPowerWatts);
     }
 
+    [Fact]
+    public async Task Reports_inverter_telemetry_when_an_http_charger_times_out()
+    {
+        // An HttpClient timeout is a TaskCanceledException, which the charger's best-effort catch used to
+        // let through: every poll of an HTTP charger that did not answer lost its inverter reading (#429).
+        var inverter = new FakeModbusClient();
+        inverter.SetHolding(InverterRegisterMap.BatteryCapacity.Address, 47);
+        using var http = new HttpClient(new NeverAnswersHandler())
+        {
+            BaseAddress = new Uri("http://charger.test/"),
+            Timeout = TimeSpan.FromMilliseconds(50),
+        };
+        var reader = new EnergyStateReader(
+            new SolaxInverterDriver(inverter), new HttpChargerDriver(http), NullLogger<EnergyStateReader>.Instance);
+
+        var state = await reader.ReadAsync();
+
+        Assert.Equal(47, state.BatterySocPercent);
+        Assert.Equal(EvChargerStatus.Unknown, state.EvChargerStatus);
+    }
+
+    [Fact]
+    public async Task Still_stops_the_poll_when_it_is_cancelled_during_the_charger_read()
+    {
+        // A shutdown arriving while the charger is being read is not the charger being unreachable.
+        using var http = new HttpClient(new NeverAnswersHandler()) { BaseAddress = new Uri("http://charger.test/") };
+        var reader = new EnergyStateReader(
+            new SolaxInverterDriver(new FakeModbusClient()), new HttpChargerDriver(http), NullLogger<EnergyStateReader>.Instance);
+        using var shutdown = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reader.ReadAsync(shutdown.Token));
+    }
+
     // The charger's two raw readings, decoded by its driver (#348) and composed here.
     [Fact]
     public async Task Maps_the_charger_run_mode_to_its_status()
@@ -102,6 +135,43 @@ public class EnergyStateReaderTests
         var state = await Reader(new FakeModbusClient(), evCharger).ReadAsync();
 
         Assert.Equal(7000, state.EvChargerPowerWatts);
+    }
+
+    /// <summary>A charger whose web server takes the connection and never answers.</summary>
+    private sealed class NeverAnswersHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            throw new InvalidOperationException("unreachable");
+        }
+    }
+
+    /// <summary>
+    /// The read path of an HTTP charger (go-e, Shelly TopAC), reduced to its one request: what matters is
+    /// what the HttpClient throws, not what the reply would decode to.
+    /// </summary>
+    private sealed class HttpChargerDriver(HttpClient http) : IEvChargerDriver
+    {
+        public EvChargerCapabilities Capabilities { get; } = new(6, 16, 0, 3, false, false);
+
+        public async Task<EvChargerReading> ReadAsync(CancellationToken cancellationToken = default)
+        {
+            using var response = await http.GetAsync("status", cancellationToken);
+            return new EvChargerReading(EvChargerStatus.Available, PowerWatts: 0, CurrentAmps: null, Mode: null);
+        }
+
+        public Task<EvChargerSettings> ReadSettingsAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task SetCurrentAsync(int activeAmps, int targetAmps, string reason, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task SetChargingAllowedAsync(bool allowed, string reason, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<EvChargerProbeResult> ProbeAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     /// <summary>Nothing at the address at all: every operation fails, the connect included.</summary>
