@@ -19,6 +19,12 @@ namespace Gleanvolt.Infrastructure.Modbus;
 /// followed by 45 minutes of every single poll failing, recoverable only by restarting the process.
 /// So any failed exchange invalidates the connection, and the next call reconnects with a fresh
 /// stream and a fresh transaction counter.</para>
+///
+/// <para><b>Reading past a late reply (issue #433).</b> The teardown recovers after the request has
+/// failed; <see cref="OldResponseThreshold"/> keeps it from failing. A reply older than the request
+/// is skipped and the next one read, so a late reply no longer costs a request and a reconnect. Huawei's
+/// SDongle produced one every few polls at night, and replies meant for a second Modbus master polling
+/// it, which cost one repeat now instead.</para>
 /// </summary>
 public sealed class ModbusTcpClient : IModbusClient
 {
@@ -26,6 +32,16 @@ public sealed class ModbusTcpClient : IModbusClient
     // device (wrong IP, firewalled, powered off) otherwise blocks the caller indefinitely.
     private static readonly TimeSpan DefaultConnectTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan DefaultIoTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// How far behind the request a reply's transaction id may be and still be read past rather than
+    /// failing the request. A reply that arrives after its request gave up and was repeated (Huawei's
+    /// SDongle, slow at night) is older than the repeat; without this NModbus rejects it, repeats again,
+    /// reads the next reply of the queue, and runs out of attempts one step behind. A reply to a
+    /// request made on another connection is never older than this connection's ids, which start at
+    /// one; it fails one attempt, and the repeat reads past its own late reply.
+    /// </summary>
+    public const int OldResponseThreshold = 16;
 
     private readonly DeviceConfig _device;
     private readonly TimeSpan _connectTimeout;
@@ -261,6 +277,7 @@ public sealed class ModbusTcpClient : IModbusClient
         Invalidate();
         _tcpClient = tcpClient;
         _master = new ModbusFactory().CreateMaster(tcpClient);
+        _master.Transport.RetryOnOldResponseThreshold = OldResponseThreshold;
 
         if (_retries is { } retries)
         {
