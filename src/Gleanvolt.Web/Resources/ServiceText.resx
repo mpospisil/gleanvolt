@@ -862,4 +862,41 @@
     <value>Weather:Source ('{0}') must be NotProvided or External: OpenWeatherMap comes from the OpenWeather plugin, chosen as External.</value>
     <comment>{0} the value given. NotProvided and External are configuration values and stay as they are.</comment>
   </data>
+  <data name="Probe_ChargerPluginOk" xml:space="preserve">
+    <value>The charger plugin answered: the charger delivers {0} W.</value>
+    <comment>{0} the charger's power in watts.</comment>
+  </data>
+  <data name="Probe_ChargerPluginMissing" xml:space="preserve">
+    <value>No charger plugin answered ({0}). Start it with the provider token from Settings → External providers; Gleanvolt accepts it after the restart.</value>
+    <comment>{0} why, in English.</comment>
+  </data>
+  <data name="Charger_Empty" xml:space="preserve">
+    <value>The reading is empty.</value>
+  </data>
+  <data name="Charger_NoReadAt" xml:space="preserve">
+    <value>The reading has no time.</value>
+  </data>
+  <data name="Charger_Future" xml:space="preserve">
+    <value>The charger was read at {0} {1}, more than {2} ahead of Gleanvolt's clock.</value>
+    <comment>{0} a date, {1} a time, {2} a duration.</comment>
+  </data>
+  <data name="Charger_TooOld" xml:space="preserve">
+    <value>The charger was read at {0} {1}, more than {2} ago.</value>
+    <comment>{0} a date, {1} a time, {2} a duration.</comment>
+  </data>
+  <data name="Charger_Status" xml:space="preserve">
+    <value>The status {0} is not one Gleanvolt knows.</value>
+  </data>
+  <data name="Charger_Power" xml:space="preserve">
+    <value>The power is {0} W; it must be 0 to {1} W.</value>
+  </data>
+  <data name="Charger_Current" xml:space="preserve">
+    <value>The setpoint is {0} A; it must be 0 to {1} A.</value>
+  </data>
+  <data name="Charger_MaxCurrent" xml:space="preserve">
+    <value>The charger's maximum is {0} A; it must be {1} to {2} A.</value>
+  </data>
+  <data name="Charger_ModeTooLong" xml:space="preserve">
+    <value>The mode is longer than {0} characters.</value>
+  </data>
 </root>

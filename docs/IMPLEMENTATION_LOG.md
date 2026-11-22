@@ -4,6 +4,67 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-22 — Chargers as external plugins, and the Shelly TopAC as the first (#435, #429)
+
+**What.** A charger can now be driven by a plugin: a program outside Gleanvolt that reads and commands the
+charger over a new `charger` provider kind. The Shelly TopAC Portable EV Charger (#429) is the first
+plugin, in place of the in-tree driver the issue planned.
+
+**How.**
+- **Contract** (`Gleanvolt.Providers.Contracts/Charger.cs`, 1.0): `IChargerHub` (`Publish`, `CommandDone`),
+  `IChargerClient` (`RefreshRequested`, `SetCurrent`, `SetChargingAllowed`), `ChargerWelcome` (the charge
+  control's limits, dry-run, time zone), `ChargerReading`, `ChargerState` (OCPP names), the two commands and
+  `ChargerCommandResult`.
+- **Gleanvolt** (`Gleanvolt.Hosting/Chargers/`): `ChargerHub` validates readings
+  (`ChargerReadingValidator`: 1 min max age, W 0–100 000, A 0–80) and hands them and command results to
+  `ExternalChargerLink`, which sends requests through `IHubContext` and waits on the host's side.
+  `ExternalChargerDriver` is an ordinary `IEvChargerDriver`: threshold, clamp, dry-run simulation,
+  unknown-on-failure. `ExternalChargerDriverFactory` is driver id `external`, transport `External`.
+  `ExternalChargerOptions` (section `ExternalCharger`): read 5 s, command 10 s, reading reuse 2 s.
+- **Abstractions:** `EvChargerTransport.External` and `EvChargerConnection.External`.
+- **Wiring:** `ChargerDrivers.Factories` now take `IServiceProvider?`; the hub is registered beside the
+  others and is on while the controlled charger's driver is `external`. `PvSystemRules` resolves the driver
+  first and requires no `Host` for it; `PvDeviceInfo.Describe` says "through a plugin".
+- **Settings:** the brand drop-down lists "External plugin" (translated); choosing it hides host, port and
+  unit id and the register snapshot, shows a note, and "Test connection" asks the connected plugin for a
+  reading (`PvSystemEditor.ProbePluginAsync`). External providers lists the kind as "Charger".
+- **SDK** (`Gleanvolt.Providers.Client/Charger/`): `AddGleanvoltChargerProvider<T>`, `IChargerSource`,
+  `ChargerProviderConnection`, which serialises calls to the device so a stop can't overtake a setpoint.
+- **Plugin** (`plugins/Gleanvolt.Plugin.Shelly`): `ShellyRpcClient` (the four components under
+  `service:0`, `Service.GetConfig`), `ShellyCharger` (state mapping, remembered pause, write-on-change of
+  `current_limit`, the kW/W check, Auto balance warning), `ChargerAddressStore` and a page for the address.
+
+**Quirks.**
+- The TopAC takes nothing below 6 A: a pause is `start_charging=false`, held by the plugin, as go-e's force
+  state is. Out of a pause the limit is written before the switch.
+- `total_power`'s unit is undocumented (Shelly shows zeros; evcc says kW). The plugin decides it once Σ V·I
+  exceeds 500 W, by which of W or kW is nearer, and uses Σ V·I until then.
+- `work_state` `wait`/`complete`/`end` are the car's doing only while `start_charging` is on; with it off
+  they are `SuspendedEvse`, so Gleanvolt never reads its own pause as a full car.
+- A read that fails in the plugin isn't published; Gleanvolt's read times out and the poll says unknown.
+  The status (401, no address, unreachable) goes to Settings separately.
+
+**Verified.** New: `ExternalChargerTests` (end to end on a TestServer: the real hub and link, the driver,
+the Shelly plugin via the SDK, and `FakeTopAc`, a synthetic RPC API with idle, waiting and charging),
+container and rules tests in `InverterDriverSelectionTests`, a form test in `PvSystemEditorFormTests`.
+Full suite passes in Release. Not yet: any real TopAC.
+
+**Files.** `src/Gleanvolt.Providers.Contracts/{Charger,Handshake}.cs`,
+`src/Gleanvolt.Providers.Client/Charger/ChargerProvider.cs`,
+`src/Gleanvolt.Devices.Abstractions/IEvChargerDriverFactory.cs`,
+`src/Gleanvolt.Hosting/Chargers/{ChargerHub,ChargerReadingValidator,ExternalChargerDriver,ExternalChargerLink,ExternalChargerOptions}.cs`,
+`src/Gleanvolt.Hosting/{ChargerDrivers,GleanvoltHostingExtensions}.cs`,
+`src/Gleanvolt.Hosting/Configuration/PvSystemEditor.cs`, `src/Gleanvolt.Core/Configuration/PvSystemRules.cs`,
+`src/Gleanvolt.Core/Models/PvSystemInfo.cs`,
+`src/Gleanvolt.Web/Components/{PvSystemEditorForm,ExternalProvidersForm}.razor`,
+`src/Gleanvolt.Web/Resources/{ServiceText,SettingsText}{,.cs}.resx`, `plugins/Gleanvolt.Plugin.Shelly/**`,
+`Gleanvolt.slnx`, `tests/Gleanvolt.Hosting.Tests/{ExternalChargerTests,FakeTopAc,InverterDriverSelectionTests}.cs`,
+`tests/Gleanvolt.Hosting.Tests/Gleanvolt.Hosting.Tests.csproj`, `tests/Gleanvolt.Web.Tests/PvSystemEditorFormTests.cs`,
+`docs/{PROVIDERS,SUPPORTED_CHARGERS,SUPPORTED_PV_SYSTEMS,CONFIGURATION,DECISIONS,IMPLEMENTATION_LOG}.md`, `README.md` (the synced chargers table),
+`docs/manual/src/content/docs/{en,cs}/{index,installation/preparing-devices,setting-up/finding-devices}.mdx`.
+
+---
+
 ## 2026-11-22 — Late and foreign Modbus replies are read past (#433)
 
 **What.** A Modbus reply older than the request it is read for is skipped instead of failing the read.

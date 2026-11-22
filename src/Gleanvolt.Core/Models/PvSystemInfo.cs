@@ -104,10 +104,12 @@ public sealed record PvDeviceInfo(string Id, string Name, string Model, DeviceCo
     /// </summary>
     public string Driver { get; init; } = string.Empty;
 
-    /// <summary>The device in a log line: the model if it is known, and always the address.</summary>
+    /// <summary>The device in a log line: the model if it is known, and the address, or that a plugin reaches it.</summary>
     public string Describe()
     {
         var what = string.IsNullOrWhiteSpace(Model) ? Id : Model;
-        return $"{what} at {Connection.Host}:{Connection.Port}";
+
+        // A charger behind a plugin (#435) has no address of Gleanvolt's.
+        return string.IsNullOrEmpty(Connection.Host) ? $"{what} through a plugin" : $"{what} at {Connection.Host}:{Connection.Port}";
     }
 }

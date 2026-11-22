@@ -97,7 +97,7 @@
                                 @onchange="e => SelectChargerDriver(e.Value?.ToString() ?? string.Empty)">
                             @foreach (var driver in Editor.ChargerDrivers)
                             {
-                                <option value="@driver.Id">@driver.DisplayName</option>
+                                <option value="@driver.Id">@ChargerDriverName(driver)</option>
                             }
                             @if (SelectedChargerDriver is null)
                             {
@@ -137,6 +137,10 @@
                     {
                         <span class="field-note" id="pv-emma-one-client">@SettingsText.NoteEmmaOneClient</span>
                     }
+                    @if (key == PvSystemSettingKeys.ChargerDriver && ChargerThroughPlugin)
+                    {
+                        <span class="field-note" id="pv-charger-plugin">@SettingsText.NoteChargerPlugin</span>
+                    }
                     @if (setting.IsPending)
                     {
                         <span class="field-pending">@Localized.Format(SettingsText.RunningRestartToApply, Show(setting.Running))</span>
@@ -151,7 +155,7 @@
             }
         </div>
 
-        @if (OfferSnapshot && !ReadOnly && section is PvEditorSection.Inverter or PvEditorSection.Charger)
+        @if (OfferSnapshot && !ReadOnly && (section is PvEditorSection.Inverter || (section is PvEditorSection.Charger && !ChargerThroughPlugin)))
         {
             <DeviceSnapshotPanel Role="@(section == PvEditorSection.Inverter ? PvDeviceRole.Inverter : PvDeviceRole.Charger)" />
         }
@@ -377,7 +381,15 @@
 
     // A field the selected driver has no use for is not shown: the topology, for a driver reached one way.
     private bool Shown(string key) =>
-        key != PvSystemSettingKeys.InverterTopology || SelectedDriver is { Topologies.Count: > 0 };
+        (key != PvSystemSettingKeys.InverterTopology || SelectedDriver is { Topologies.Count: > 0 })
+        // A charger behind a plugin (#435) is reached by the plugin: Gleanvolt has no address for it.
+        && !(ChargerThroughPlugin && ChargerAddress.Contains(key));
+
+    private bool ChargerThroughPlugin => SelectedChargerDriver?.Transport == EvChargerTransport.External;
+
+    // A brand is its own name; the plugin's entry is a description, so it is said in the viewer's language.
+    private static string ChargerDriverName(EvChargerDriverInfo driver) =>
+        driver.Transport == EvChargerTransport.External ? SettingsText.ChargerDriverExternal : driver.DisplayName;
 
     // The topology the form has selected, as an id: empty means the driver's first, as in configuration.
     private string SelectedTopologyId =>
@@ -593,7 +605,13 @@
                 _values.GetValueOrDefault(PvSystemSettingKeys.InverterTopology))));
         }
 
-        if (ChargerProbeKeys.Any(edits.ContainsKey) && Address(ChargerAddress, SelectedChargerDriver?.Defaults) is { } charger)
+        if (ChargerProbeKeys.Any(edits.ContainsKey) && ChargerThroughPlugin)
+        {
+            // No address: the probe asks the connected plugin for a reading instead (#435).
+            probes.Add((SettingsText.Charger, await Editor.ProbeAsync(
+                PvDeviceRole.Charger, string.Empty, 0, 0, SelectedChargerDriverId)));
+        }
+        else if (ChargerProbeKeys.Any(edits.ContainsKey) && Address(ChargerAddress, SelectedChargerDriver?.Defaults) is { } charger)
         {
             probes.Add((SettingsText.Charger, await Editor.ProbeAsync(
                 PvDeviceRole.Charger, charger.Host, charger.Port, charger.UnitId, SelectedChargerDriverId)));

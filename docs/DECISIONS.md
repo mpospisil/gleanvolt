@@ -4,6 +4,51 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-22 — Chargers as plugins: a charger provider kind, with the safeguards kept in Gleanvolt (#435, #429)
+
+**Found.** #429 planned the Shelly TopAC as a seventh in-tree driver over the HTTP transport go-e added.
+Every new charger family so far has meant a Gleanvolt release, and the families still to come (#347) are
+mostly HTTP APIs that change with their makers' firmware. The provider hubs (#386) already carry tariffs,
+forecasts, cars and weather from programs outside Gleanvolt, so a charger can be one too.
+
+**Decided.**
+- **A fifth provider kind, `charger` 1.0 at `/providers/charger`.** A plugin answers `RefreshRequested`
+  with a `ChargerReading` (OCPP status, W, setpoint, allowed, the charger's own ceiling) and carries out
+  `SetCurrent` and `SetChargingAllowed`, answering each with `CommandDone`. Same handshake, token, status
+  and page as every kind; the SDK has `AddGleanvoltChargerProvider<T>` and `IChargerSource`.
+- **A charger driver `external`, picked like a brand.** `ExternalChargerDriver` implements
+  `IEvChargerDriver` over `ExternalChargerLink`, so nothing downstream of the driver changed. It has
+  transport `External`: no address, no connection, Settings hides the address fields, the resolver
+  doesn't require `Host`. Choosing it is the kind's switch; it takes the restart every driver change takes.
+- **The safeguards stay on Gleanvolt's side.** The setpoint threshold, the clamp (to the reading's
+  `maxCurrentAmps`), dry-run (no command is sent at all, and the would-be values stand in) and "a charger
+  it could not read is Unknown" live in `ExternalChargerDriver`, not in the plugin. A plugin cannot get
+  them wrong, and dry-run doesn't depend on a plugin honouring a flag.
+- **Reads are pulled, each poll.** The control loop's own cadence drives the plugin; a reading received in
+  the last 2 s serves the settings read that follows the status read in the same tick, and any command
+  marks it stale. The link waits on the host's side (5 s for a read, 10 s for a command); the hub never
+  waits, as for every kind.
+- **The driver's contract is the plugin's contract.** Pause is 0 A, the plugin maps it (the TopAC, like the
+  go-e, turns its switch off and remembers); `SuspendedEv`/`Finishing` mean the car is done and nothing
+  else does. Written into the contract's docs rather than left to each plugin.
+- **#429 is the first plugin**, `plugins/Gleanvolt.Plugin.Shelly`, referencing only the MIT SDK. Its own
+  page holds the charger's address. Not shipped: only a plugin that stands in for a built-in ships (#426).
+- **`ChargerDrivers.Factories` take the container** (`IServiceProvider?`) instead of a logger factory, so
+  the plugin's factory can reach the link; null still describes a driver without making one.
+
+**Consequences accepted.**
+- **A round trip per poll:** Gleanvolt → plugin → charger → plugin → Gleanvolt. On a LAN it is tens of
+  milliseconds; a plugin that is slower than 5 s is a charger read as unknown.
+- **One more process to keep running.** A plugin that is down stops charge control's decisions, as an
+  unreachable charger does; it does not stop Gleanvolt.
+- **Commands are not idempotent across a restart of the plugin.** A pause it held is forgotten, as go-e's
+  driver forgets one; the charger then reads as stopped, which the control loop handles as a stop.
+- **No register snapshot, no discovery** for a charger behind a plugin. A plugin can offer its own.
+- **Untested on hardware.** The TopAC's recordings are synthetic, from Shelly's documentation, and the
+  `total_power` unit is decided at run time by comparing with V × I rather than assumed.
+
+---
+
 ## 2026-11-22 — A Modbus reply older than its request is read past (#433)
 
 **Found.** A tester's SUN2000-10KTL-M1 behind an SDongle failed 1,971 inverter reads in one night

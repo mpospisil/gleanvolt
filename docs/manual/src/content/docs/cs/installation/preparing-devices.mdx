@@ -17,6 +17,7 @@ Co zkontrolovat, záleží na značce:
 | Střídač Huawei SUN2000 | Modbus TCP, **Enable (Unrestricted)** | Aplikace FusionSolar, jako instalační technik |
 | Huawei SCharger | Modbus TCP | Aplikace FusionSolar |
 | Nabíječka go-e | **Local HTTP API v2** | Aplikace go-e |
+| Shelly TopAC Portable | Pevná adresa, ověřování **vypnuté** | Router; aplikace Shelly |
 
 Obě zařízení musí být také **připojená k domácí síti**, kabelem nebo přes Wi-Fi, a zapnutá.
 
@@ -76,6 +77,26 @@ Pokud nabíječku řídí EMMA, nechte ji zatím EMMA: Gleanvolt ji může čís
 </Steps>
 
 Potřebujete go-e s hardwarem verze 3 nebo novější: Gemini, Gemini flex, HOMEfix nebo HOME+ V3 či V4.
+
+## Nabíječka Shelly TopAC Portable
+
+TopAC se řídí přes **plugin**, malý program, který běží vedle Gleanvoltu a s nabíječkou mluví za něj.
+Gleanvolt sám adresu nabíječky nepotřebuje: zadáte ji pluginu.
+
+<Steps>
+
+1. Přidělte nabíječce v routeru **pevnou adresu**, aby ji plugin vždy našel.
+
+2. V aplikaci Shelly nechte **ověřování vypnuté**. Plugin zatím heslo posílat neumí.
+
+3. Pokud používáte **Auto balance** (řízení zátěže přes Shelly EM), vypněte ho. Samo snižuje proud a jde
+   proti Gleanvoltu; plugin na to upozorňuje, dokud je zapnuté.
+
+</Steps>
+
+Jak plugin spustit, popisuje jeho
+[README](https://github.com/mpospisil/gleanvolt/blob/main/plugins/Gleanvolt.Plugin.Shelly/README.md)
+(anglicky).
 
 ## Vždy jen jeden řídicí systém
 

@@ -17,6 +17,7 @@ What to check depends on the brand:
 | Huawei SUN2000 inverter | Modbus TCP, **Enable (Unrestricted)** | FusionSolar app, as the installer |
 | Huawei SCharger | Modbus TCP | FusionSolar app |
 | go-e charger | **Local HTTP API v2** | go-e app |
+| Shelly TopAC Portable | A fixed address, authentication **off** | Your router; the Shelly app |
 
 Both devices also need to be **connected to your home network**, by cable or Wi-Fi, and switched on.
 
@@ -74,6 +75,25 @@ control it.
 </Steps>
 
 This needs a go-e with hardware version 3 or later: a Gemini, Gemini flex, HOMEfix or HOME+ V3 or V4.
+
+## Shelly TopAC Portable EV Charger
+
+The TopAC is driven through a **plugin**, a small program that runs beside Gleanvolt and talks to the
+charger for it. Gleanvolt itself needs no address for the charger: you give it to the plugin.
+
+<Steps>
+
+1. Give the charger a **fixed address** in your router, so the plugin always finds it.
+
+2. In the Shelly app, leave **authentication off**. The plugin can't send a password yet.
+
+3. Switch off **Auto balance** (Shelly EM load management), if you use it. It lowers the current on its
+   own and works against Gleanvolt; the plugin warns while it is on.
+
+</Steps>
+
+How to start the plugin is in its
+[README](https://github.com/mpospisil/gleanvolt/blob/main/plugins/Gleanvolt.Plugin.Shelly/README.md).
 
 ## Only one controller at a time
 

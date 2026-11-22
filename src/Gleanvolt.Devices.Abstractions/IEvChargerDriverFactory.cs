@@ -78,11 +78,18 @@ public enum EvChargerTransport
 
     /// <summary>A local HTTP API: <see cref="EvChargerConnection.Http"/>.</summary>
     Http,
+
+    /// <summary>
+    /// Through an external provider (a plugin, #435): the plugin owns how the charger is reached, so Gleanvolt
+    /// needs no address and builds no connection (<see cref="EvChargerConnection.External"/>).
+    /// </summary>
+    External,
 }
 
 /// <summary>
 /// The connection a charger driver is handed (issue #347, decision 2): Modbus for most families, HTTP for
-/// those whose documented local interface is a web API (go-e). Exactly one is set. The host owns both.
+/// those whose documented local interface is a web API (go-e), and none for a charger behind a plugin (#435).
+/// At most one is set. The host owns both.
 /// </summary>
 public sealed record EvChargerConnection
 {
@@ -91,6 +98,9 @@ public sealed record EvChargerConnection
         Modbus = modbus;
         Http = http;
     }
+
+    /// <summary>No connection: the charger is reached through a plugin (#435).</summary>
+    public static EvChargerConnection External { get; } = new(null, null);
 
     /// <summary>The Modbus client, for <see cref="EvChargerTransport.Modbus"/>.</summary>
     public IModbusClient? Modbus { get; }
@@ -101,7 +111,8 @@ public sealed record EvChargerConnection
     public HttpClient? Http { get; }
 
     /// <summary>Which of the two this is.</summary>
-    public EvChargerTransport Transport => Modbus is not null ? EvChargerTransport.Modbus : EvChargerTransport.Http;
+    public EvChargerTransport Transport =>
+        Modbus is not null ? EvChargerTransport.Modbus : Http is not null ? EvChargerTransport.Http : EvChargerTransport.External;
 
     /// <summary>A connection over <paramref name="client"/>.</summary>
     public static EvChargerConnection Over(IModbusClient client) =>

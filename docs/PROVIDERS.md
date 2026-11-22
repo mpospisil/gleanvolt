@@ -5,7 +5,7 @@ otherwise get from a built-in source. It runs in its own process, on the same ma
 one, connects to Gleanvolt's web port, and sends its data over a public, versioned contract. A
 provider that crashes or hangs can only make its own data stale. It cannot slow the controller down.
 
-There are four **kinds** of provider:
+There are five **kinds** of provider:
 
 | Kind | Replaces | Hub | Turned on by |
 | --- | --- | --- | --- |
@@ -13,6 +13,7 @@ There are four **kinds** of provider:
 | `solar-forecast` | Solcast | `/providers/solar-forecast` | Choosing **External** under **Settings → Solar forecast** and saving |
 | `vehicle` | The car's built-in feeds (volkswagen.de, MyŠkoda, Data Act) | `/providers/vehicle` | Choosing **An external provider** on the **Car** page, saving and restarting |
 | `weather` | The built-in OpenWeatherMap, removed in #425 | `/providers/weather` | Choosing **External** under **Settings → Weather** and saving |
+| `charger` | A charger driver built into Gleanvolt | `/providers/charger` | Choosing **External plugin** as the charger's brand on **Settings**, saving and restarting |
 
 Gleanvolt holds one active provider per kind. The owner sees each kind's session on Settings, and a
 program can read it at [`GET /api/v1/providers`](HTTP_API.md).
@@ -60,6 +61,12 @@ A weather provider uses `AddGleanvoltWeatherProvider<T>` and an `IWeatherSource`
 `GetReadingAsync(WeatherSite site, …)` returns a `WeatherData`, or null when it has nothing (no key yet,
 the service down: say why with `ReportStatusAsync`). Its connection is `WeatherProviderConnection`.
 
+A charger provider uses `AddGleanvoltChargerProvider<T>` and an `IChargerSource` with three methods:
+`ReadAsync` returns a `ChargerReading` (throw when the charger can't be read), `SetCurrentAsync(amps, …)`
+and `SetChargingAllowedAsync(allowed, …)` carry out Gleanvolt's commands (throw when the charger refuses).
+The SDK answers every request, says how each command ended, and runs one call to the charger at a time.
+Its connection is `ChargerProviderConnection`.
+
 Three complete providers send fixed data:
 [`plugins/Gleanvolt.Plugin.TariffSample`](../plugins/Gleanvolt.Plugin.TariffSample) a tariff pattern,
 [`plugins/Gleanvolt.Plugin.SolarForecastSample`](../plugins/Gleanvolt.Plugin.SolarForecastSample)
@@ -70,6 +77,10 @@ installation: Gleanvolt acts on what they send.
 [`plugins/Gleanvolt.Plugin.Volkswagen`](../plugins/Gleanvolt.Plugin.Volkswagen) is a real one: a copy
 of the built-in volkswagen.de feed, run as a plugin, with its own page for the account and the sign-in
 (#410). It is a test of moving a car integration out of Gleanvolt, not part of the release.
+
+[`plugins/Gleanvolt.Plugin.Shelly`](../plugins/Gleanvolt.Plugin.Shelly) is the first charger plugin
+(#429, #435): the Shelly TopAC Portable EV Charger over its local RPC API, with its own page for the
+charger's address. It is not shipped.
 
 [`plugins/Gleanvolt.Plugin.OpenWeather`](../plugins/Gleanvolt.Plugin.OpenWeather) is another (#424):
 OpenWeatherMap as a weather provider, with its own page for the key, which Gleanvolt shows under
@@ -290,10 +301,11 @@ and the `Welcome` says which version the host speaks.
 | `solar-forecast` | 1 | 3 |
 | `vehicle` | 1 | 3 |
 | `weather` | 1 | 0 |
+| `charger` | 1 | 0 |
 
 The minors grew with `pageUrl` in the hello (#410). Vehicle 1.2 added the charging session (#414).
-All three went up by one with the status's `code` and `messages` (#415). The weather kind (#424)
-started at 1.0 with all of these.
+All three went up by one with the status's `code` and `messages` (#415). The weather kind (#424) and the
+charger kind (#435) started at 1.0 with all of these.
 
 ## The tariff kind
 
@@ -603,6 +615,86 @@ start, so for now a change arrives as a new welcome after the restart.
 not the provider is connected. A provider that is disconnected, silent or refused means a session
 recorded without the weather; there is nothing to fall back to.
 
+## The charger kind
+
+Hub: `/providers/charger` (#435). A program outside Gleanvolt **is** the EV charger's driver: it reads the
+charger when asked and carries out Gleanvolt's two commands, so a charger Gleanvolt has no driver for can
+be controlled without a new Gleanvolt. Unlike every other kind, this one writes to a device. Turned on by
+`Pv:Chargers:0:Driver` = `external`, which **Settings** writes as the charger brand **External plugin**,
+after a restart. The charger then needs no address in Gleanvolt; the plugin has it.
+
+**Gleanvolt keeps the safeguards on its side.** The driver contract's rules hold whatever the plugin does:
+
+- A setpoint is sent only when it moved by `ChargeControl:CurrentChangeThresholdAmps` from what the last
+  reading said, and never above the reading's `maxCurrentAmps`.
+- In `ChargeControl:DryRun` **no command is sent**. What would have been sent stands in for the charger's
+  own values, as for every driver. The welcome says `dryRun`, for the plugin's page.
+- A read that isn't answered in time, or is refused, is a charger Gleanvolt couldn't read: the poll
+  reports **unknown**, never a car that is gone, and the control loop makes no decision on it.
+
+**`Hello(hello)` → `ChargerWelcome`.** On top of the common fields: the charge control's `limits`
+(`minCurrentAmps`, `maxCurrentAmps`, `phases`, `nominalVoltage`), `dryRun`, and the installation's
+`timeZone`.
+
+**`RefreshRequested(request)`**, from Gleanvolt, asks for the charger's state now: on every poll of the
+control loop, every few seconds while it runs. Answer with `Publish`, with `inReplyTo` set to
+`request.id`, within 5 seconds (`ExternalCharger:ReadTimeout`). Read the charger for each request; don't
+answer from a cache. Publish unprompted too, for example when a car is plugged in. A reading received in
+the last 2 seconds (`ExternalCharger:ReadingMaxAge`) serves the next read too, unless a command was sent
+since.
+
+**`Publish(reading)` → `PublishResult`.**
+
+```json
+{
+  "readAt": "2026-11-22T10:15:02+01:00",
+  "inReplyTo": { "value": "6f1c…" },
+  "status": "charging",
+  "powerWatts": 6900,
+  "currentAmps": 10,
+  "chargingAllowed": true,
+  "maxCurrentAmps": 16,
+  "mode": null
+}
+```
+
+- `status` is OCPP 1.6's: `unknown`, `available`, `preparing`, `charging`, `suspendedEv`, `suspendedEvse`,
+  `finishing`, `faulted`, `unavailable`. **`suspendedEv` and `finishing` mean the car is done**, and are
+  read that way. A charger that stopped delivering because of a pause or a stop, Gleanvolt's or its own,
+  is `suspendedEvse`.
+- `powerWatts` is what it delivers, all phases together, in **watts**.
+- `currentAmps` is the active setpoint as Gleanvolt last set it: **0 while the plugin holds a pause**.
+  `chargingAllowed` is whether the charger is in the state a start puts it in, a pause under a start
+  included. Without either, Gleanvolt makes no decision that needs it.
+- `maxCurrentAmps` is the highest current the charger takes now, when it says.
+- `mode` is the charger's own name for its mode, for display only.
+
+The rules: `readAt` no more than 5 minutes ahead of Gleanvolt's clock and no older than 1 minute; a known
+`status`; `powerWatts` 0 to 100 000; `currentAmps` 0 to 80; `maxCurrentAmps` 6 to 80; `mode` at most 50
+characters.
+
+**`SetCurrent(command)`**, from Gleanvolt: `{ "id": {…}, "amps": 10, "reason": "…" }`. Below the charger's
+minimum (0, in practice) is a **pause**: the session stays open. A charger that takes nothing below 6 A
+pauses some other way (its start/stop switch) and remembers it, so the next setpoint of 6 A or more
+resumes, the setpoint first.
+
+**`SetChargingAllowed(command)`**, from Gleanvolt: `{ "id": {…}, "allowed": false, "reason": "…" }`. Lets
+the charger charge, or stops it, whatever it was doing. It never touches the setpoint, and a start while
+paused stays paused.
+
+**`CommandDone(result)`**, to Gleanvolt, after every command: `{ "inReplyTo": {…}, "succeeded": true }`,
+or `"succeeded": false` with an English `error`. Gleanvolt waits 10 seconds for it
+(`ExternalCharger:CommandTimeout`); a command not answered by then failed. Carry out commands one at a
+time and in order: a stop must not overtake the setpoint before it.
+
+**Status.** Report anything that keeps the plugin from controlling the charger with `ReportStatus`, with
+`needsOwner` when only the owner can fix it: no address, a password the plugin can't send, a setting on
+the charger that fights the control loop.
+
+**What Gleanvolt does with it.** Everything a built-in charger driver does: the Overview, the charging
+modes, sessions, Home Assistant. **Settings → External providers** shows the session and links to the
+plugin's page. There is no register snapshot.
+
 ## The protocol, for a client in another language
 
 The hubs are [ASP.NET Core SignalR](https://learn.microsoft.com/aspnet/core/signalr/introduction)
@@ -631,6 +723,7 @@ ISO 8601. One message may be up to 1 MiB; a larger one closes the connection.
 The hello may carry `"pageUrl":"http://…"`; see [the provider's own page](#the-providers-own-page).
 A provider in another language checks the ticket itself, as described there.
 
-The method names: `Hello`, `ReportStatus` and `Publish` on the hub; `RefreshRequested`, `SiteChanged`
-(solar forecast and weather), `VehicleChanged` and `ChargingSessionChanged` (vehicle only) and `Goodbye` on
-the provider.
+The method names: `Hello`, `ReportStatus`, `Publish` and `CommandDone` (charger only) on the hub;
+`RefreshRequested`, `SiteChanged` (solar forecast and weather), `VehicleChanged` and
+`ChargingSessionChanged` (vehicle only), `SetCurrent` and `SetChargingAllowed` (charger only) and `Goodbye`
+on the provider.

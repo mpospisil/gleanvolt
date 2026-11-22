@@ -279,7 +279,8 @@ One charger is supported per installation. A tester's register snapshots
 | [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#solax-chargers) | **X1/X3-HAC**; the other HAC variants; X1/X3-EVC | `solax` | **Verified** (X1/X3-HAC); Expected |
 | [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#huawei-scharger) | SCharger-7KS-S0, SCharger-22KT-S0 | `huawei-7ks`, `huawei-22kt` | Expected |
 | [go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#go-e-charger) | Gemini, Gemini flex, HOMEfix, HOME+ (hardware V3 or later) | `goe` | Expected |
-| Others | — | — | Not supported yet |
+| [Shelly](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#shelly-topac-portable-ev-charger) | TopAC Portable EV Charger (EVE01-11R) | `external`, with the Shelly plugin | Expected |
+| Others | — | `external`, with a plugin someone writes | Not supported yet |
 
 ### SolaX chargers
 
@@ -344,9 +345,44 @@ Driver `goe`, over the go-e's local HTTP API v2 on port 80. How to switch the AP
   change.
 - Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
 
+### Chargers behind a plugin
+
+Driver `external` (#435). A **plugin**, a program outside Gleanvolt, reads and commands the charger, and
+Gleanvolt drives it through the plugin. Gleanvolt needs no address for the charger; the plugin has it.
+So a new charger needs no new release of Gleanvolt, only a plugin:
+[the charger kind](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md#the-charger-kind).
+
+- **Gleanvolt keeps the safeguards.** The setpoint goes to the plugin only when it moved by
+  `ChargeControl:CurrentChangeThresholdAmps`, never above what the charger says it takes, and in
+  `ChargeControl:DryRun` nothing goes to the plugin at all.
+- **A plugin that is away is a charger Gleanvolt can't read**: the charger shows as *unknown*, and the
+  control loop makes no decision until it answers again.
+- **No register snapshot**: the button on Settings is hidden. A plugin can offer its own.
+
+### Shelly TopAC Portable EV Charger
+
+Driver `external`, with
+[`plugins/Gleanvolt.Plugin.Shelly`](https://github.com/mpospisil/gleanvolt/blob/main/plugins/Gleanvolt.Plugin.Shelly/README.md)
+(#429), over the charger's local Gen2 RPC API.
+
+| Model | Driver | Tier | Notes |
+|---|---|---|---|
+| [**TopAC Portable EV Charger**](https://shelly-api-docs.shelly.cloud/gen2/Devices/ShellyX/XT1/TopACPortableEVCharger) (EVE01-11R), 11 kW, three phases, 6–16 A | `external` | Expected | Authentication off; the plugin has the address |
+
+- **A pause is the start/stop switch off**, because the TopAC takes nothing below 6 A. The plugin
+  remembers that it paused, as the go-e driver does.
+- **The power's unit is checked**, not assumed: Shelly documents `total_power` only with zeros, and evcc
+  reads it as kW. The plugin compares it with V × I on the phases once the car draws.
+- **Auto balance** (Shelly EM load management) fights the control loop. The plugin asks the owner to turn
+  it off.
+- **No password yet.** The plugin sends none, so authentication must stay off in the Shelly app.
+- **No search.** The charger isn't found by Gleanvolt's search; enter its address on the plugin's page.
+- **Not shipped.** The plugin is built with Gleanvolt and run by hand, not released as an image or a zip.
+- Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
+
 ### Other chargers
 
-Not supported yet.
+Not supported yet. A plugin can add one; see [Chargers behind a plugin](#chargers-behind-a-plugin).
 <!-- end include -->
 
 ---

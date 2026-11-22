@@ -1159,4 +1159,11 @@
     <value>The built-in OpenWeather is gone, so External is chosen for you: OpenWeatherMap's weather now comes from the OpenWeather plugin. Run the plugin with the token from External providers, then enter your OpenWeatherMap key on its page, which appears here once it connects. A key saved here before was not kept. Until then, charges are recorded without the weather.</value>
     <comment>Shown once after the upgrade that removed the built-in OpenWeather (#425), until a weather provider connects. OpenWeather and OpenWeatherMap are names.</comment>
   </data>
+  <data name="ChargerDriverExternal" xml:space="preserve">
+    <value>External plugin</value>
+    <comment>The charger driver for a charger reached through a plugin (#435), in the brand drop-down.</comment>
+  </data>
+  <data name="NoteChargerPlugin" xml:space="preserve">
+    <value>A plugin reaches the charger, so Gleanvolt needs no address for it. Start the plugin with the provider token from Settings → External providers; Gleanvolt accepts it after the restart.</value>
+  </data>
 </root>

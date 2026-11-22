@@ -4,6 +4,7 @@ using Gleanvolt.Devices;
 using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Huawei;
 using Gleanvolt.Devices.Solax;
+using Gleanvolt.Hosting.Chargers;
 using Gleanvolt.Hosting.Configuration;
 
 namespace Gleanvolt.Hosting;
@@ -11,27 +12,33 @@ namespace Gleanvolt.Hosting;
 /// <summary>
 /// The EV charger drivers this build has (issue #348), in one list, as <see cref="InverterDrivers"/> is for
 /// inverters. SolaX first: it is the default. Then Huawei's SCharger, one entry per model (#351), because the
-/// two differ in phase count. Then go-e, over its local HTTP API (#352). <c>Pv:Chargers:0:Driver</c> picks one
-/// (#349); the configuration is checked against this list, the container registers a factory from it, and
-/// Settings offers it in a drop-down.
+/// two differ in phase count. Then go-e, over its local HTTP API (#352). Last, a charger behind a plugin (#435),
+/// which reaches the charger itself. <c>Pv:Chargers:0:Driver</c> picks one (#349); the configuration is checked
+/// against this list, the container registers a factory from it, and Settings offers it in a drop-down.
 /// </summary>
 public static class ChargerDrivers
 {
     /// <summary>The id of the driver used when the configuration names none.</summary>
     public const string DefaultId = SolaxChargerDriverFactory.DriverId;
 
-    /// <summary>One factory per driver, in the order a drop-down shows them.</summary>
-    public static IReadOnlyList<Func<ILoggerFactory?, IEvChargerDriverFactory>> Factories { get; } =
+    /// <summary>
+    /// One factory per driver, in the order a drop-down shows them, made from the container. Null makes one that
+    /// only describes its driver: what it can do, without a log or, for the plugin's, a hub to reach it through.
+    /// </summary>
+    public static IReadOnlyList<Func<IServiceProvider?, IEvChargerDriverFactory>> Factories { get; } =
     [
-        loggers => new SolaxChargerDriverFactory(loggers),
-        loggers => HuaweiSChargerDriverFactory.SevenKs(loggers),
-        loggers => HuaweiSChargerDriverFactory.TwentyTwoKt(loggers),
-        loggers => new GoeChargerDriverFactory(loggers),
+        services => new SolaxChargerDriverFactory(Loggers(services)),
+        services => HuaweiSChargerDriverFactory.SevenKs(Loggers(services)),
+        services => HuaweiSChargerDriverFactory.TwentyTwoKt(Loggers(services)),
+        services => new GoeChargerDriverFactory(Loggers(services)),
+        services => new ExternalChargerDriverFactory(services?.GetService<ExternalChargerLink>(), Loggers(services)),
     ];
 
     /// <summary>What each driver is, without creating one: for the configuration rules and the UI.</summary>
     public static IReadOnlyList<EvChargerDriverInfo> Known { get; } =
         [.. Factories.Select(make => EvChargerDriverInfo.Of(make(null)))];
+
+    private static ILoggerFactory? Loggers(IServiceProvider? services) => services?.GetService<ILoggerFactory>();
 
     /// <summary>
     /// <c>ChargeControl</c>'s current range and phase count against what the controlled charger's driver can

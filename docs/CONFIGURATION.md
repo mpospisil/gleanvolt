@@ -86,7 +86,7 @@ Installation**. The keys below are the reference behind those forms.
   "Chargers": [                    // a list; exactly one entry is supported
     {
       "Id": "charger",             // slug: the charger's identity within the system
-      "Driver": "",                // which charger family it speaks to: "solax" (empty), "huawei-7ks", "huawei-22kt" or "goe" (untested)
+      "Driver": "",                // which charger family it speaks to: "solax" (empty), "huawei-7ks", "huawei-22kt", "goe" (untested) or "external" (a plugin)
       "Name": "Garage wallbox",
       "Model": "SolaX X1/X3-HAC",
       "Host": "192.168.2.6", "Port": 502, "UnitId": 1
@@ -105,6 +105,18 @@ Installation**. The keys below are the reference behind those forms.
 - **`AzimuthDegrees` is stored, not used.** The Solcast forecast already knows your roof's orientation
   from its resource id.
 - **One charger.** `Chargers` is a list, but a second entry stops startup.
+- **`Driver` = `external`: a charger behind a plugin** (#435), such as the Shelly TopAC. `Host`, `Port`
+  and `UnitId` are not used and may be left out: the plugin has the charger's address. Choosing it turns
+  the [charger hub](PROVIDERS.md#the-charger-kind) on, after the restart every driver change takes. How
+  long Gleanvolt waits for the plugin is the `ExternalCharger` section; the defaults need no change:
+
+  ```jsonc
+  "ExternalCharger": {
+    "ReadTimeout": "00:00:05",    // a read not answered by then is a charger Gleanvolt couldn't read
+    "CommandTimeout": "00:00:10", // a command not answered by then failed
+    "ReadingMaxAge": "00:00:02"   // a reading this recent serves the next read too
+  }
+  ```
 - **`UnmeteredGridPhase`** is only for a grid meter with a phase clamp missing; leave it empty on a
   correctly wired installation. Name the blind phase (`L1`–`L3`, or SolaX's `R`/`S`/`T`) and the grid
   flow on it is estimated from the inverter's output on that phase. See
@@ -113,7 +125,7 @@ Installation**. The keys below are the reference behind those forms.
 **Checked at startup.** A configuration that cannot describe a site stops the controller with every
 problem listed, each naming its key: an id that is not a slug, a latitude without a longitude, a tilt
 outside 0–90, a loss factor outside (0, 1], an unparsable install date, a missing inverter or charger
-address, an unknown driver, an unmetered phase that is not a phase, or two chargers. (In
+address (except for the `external` driver), an unknown driver, an unmetered phase that is not a phase, or two chargers. (In
 [setup mode](WEB_UI.md#setup-mode) these are listed on the setup page instead.)
 
 ### Keys that have moved

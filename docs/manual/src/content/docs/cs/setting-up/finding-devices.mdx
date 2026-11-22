@@ -48,13 +48,17 @@ Vyplňte formulář pod ním:
 
 | Pole | Střídač | Nabíječka |
 |---|---|---|
-| **Značka** | SolaX nebo Huawei | SolaX, Huawei SCharger nebo go-e |
+| **Značka** | SolaX nebo Huawei | SolaX, Huawei SCharger, go-e nebo Externí plugin |
 | **Adresa** | adresa střídače, například `192.168.1.10` | adresa nabíječky |
 | **Port** | 502 | 502 (go-e: 80) |
 | **Unit ID** | obvykle 1 | jak ho uvádí nastavení nabíječky |
 
 Značka vyplní svůj obvyklý port a unit ID. Střídač Huawei za EMMA potřebuje ještě **Připojení přes:
 EMMA** a jako adresu adresu EMMA.
+
+**Externí plugin** je pro nabíječku, kterou řídí plugin, například Shelly TopAC. Pole pro adresu zmizí:
+adresu nabíječky má plugin, na své vlastní stránce. Spusťte plugin s tokenem z **Nastavení → Externí
+zdroje dat**; Gleanvolt ho přijme po restartu a uložení ověří, že odpovídá.
 
 ## Při uložení
 

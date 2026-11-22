@@ -781,4 +781,37 @@
   <data name="Config_SetupBadWeatherSource" xml:space="preserve">
     <value>Weather:Source ('{0}') musí být NotProvided nebo External: OpenWeatherMap teď dodává plugin OpenWeather, vybraný jako External.</value>
   </data>
+  <data name="Probe_ChargerPluginOk" xml:space="preserve">
+    <value>Plugin nabíječky odpovídá: nabíječka dodává {0} W.</value>
+  </data>
+  <data name="Probe_ChargerPluginMissing" xml:space="preserve">
+    <value>Žádný plugin nabíječky neodpovídá ({0}). Spusťte ho s tokenem z Nastavení → Externí zdroje dat; Gleanvolt ho přijme po restartu.</value>
+  </data>
+  <data name="Charger_Empty" xml:space="preserve">
+    <value>Údaj je prázdný.</value>
+  </data>
+  <data name="Charger_NoReadAt" xml:space="preserve">
+    <value>Údaj nemá čas.</value>
+  </data>
+  <data name="Charger_Future" xml:space="preserve">
+    <value>Nabíječka je přečtená {0} {1}, víc než {2} před hodinami Gleanvoltu.</value>
+  </data>
+  <data name="Charger_TooOld" xml:space="preserve">
+    <value>Nabíječka je přečtená {0} {1}, před víc než {2}.</value>
+  </data>
+  <data name="Charger_Status" xml:space="preserve">
+    <value>Stav {0} Gleanvolt nezná.</value>
+  </data>
+  <data name="Charger_Power" xml:space="preserve">
+    <value>Výkon je {0} W; musí být 0 až {1} W.</value>
+  </data>
+  <data name="Charger_Current" xml:space="preserve">
+    <value>Nastavený proud je {0} A; musí být 0 až {1} A.</value>
+  </data>
+  <data name="Charger_MaxCurrent" xml:space="preserve">
+    <value>Maximum nabíječky je {0} A; musí být {1} až {2} A.</value>
+  </data>
+  <data name="Charger_ModeTooLong" xml:space="preserve">
+    <value>Režim je delší než {0} znaků.</value>
+  </data>
 </root>

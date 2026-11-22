@@ -68,7 +68,8 @@ Every mode stops by itself when the car is full or unplugged. The service always
 | [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#solax-chargers) | **X1/X3-HAC**; the other HAC variants; X1/X3-EVC | `solax` | **Verified** (X1/X3-HAC); Expected |
 | [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#huawei-scharger) | SCharger-7KS-S0, SCharger-22KT-S0 | `huawei-7ks`, `huawei-22kt` | Expected |
 | [go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#go-e-charger) | Gemini, Gemini flex, HOMEfix, HOME+ (hardware V3 or later) | `goe` | Expected |
-| Others | — | — | Not supported yet |
+| [Shelly](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#shelly-topac-portable-ev-charger) | TopAC Portable EV Charger (EVE01-11R) | `external`, with the Shelly plugin | Expected |
+| Others | — | `external`, with a plugin someone writes | Not supported yet |
 <!-- end include -->
 
 **Verified** means run on the reference installation (SolaX X3-HYB-G4 PRO, SolaX X1/X3-HAC, VW ID.4);
