@@ -1,0 +1,55 @@
+---
+title: Your charger
+description: Add your EV charger to Gleanvolt through its plugin, at any time after setup.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Gleanvolt controls your EV charger through a **plugin**: a small program for your charger's brand,
+such as the plugin for the Shelly TopAC. The plugin talks to the charger, and Gleanvolt tells the plugin
+what to do. The plugin has its own page, where you enter the charger's address and anything else it
+needs.
+
+You don't set the charger up in Gleanvolt's wizard. Start the plugin whenever you like, during setup or
+months later, and Gleanvolt uses the charger as soon as the plugin connects. Until then, Gleanvolt shows
+your solar power and your home battery, but no charging mode can be started.
+
+## Add the charger
+
+<Steps>
+
+1. **Get the provider token.** On the wizard's **Finish** step, or under **Settings → External
+   providers**, press **Make the token** if there is none, then copy it. Every plugin connects with
+   this one token.
+
+2. **Start the plugin** as its README says, with Gleanvolt's address (for example
+   `http://gleanvolt.local:8090`) and the token. It can run on the same computer as Gleanvolt or on
+   another one in your home network.
+
+3. **Open the plugin's page.** Under **Settings → External providers**, the **Charger** row shows the
+   plugin once it is connected, with an **Open** link to its page. Enter your charger's address there
+   and save.
+
+4. **Check it.** The **Charger** row says the plugin is connected, and the Overview shows the charger's
+   state. Start a charging mode on the **Charging plan** page.
+
+</Steps>
+
+## If the plugin is turned away
+
+**Settings → External providers** says why under the **Charger** row:
+
+- **The charger can't do what Gleanvolt asks.** The plugin says what its charger can do: its lowest and
+  highest current, and its phases. If **Maximum current (A)** or **Phases** on the [Car](../car/) page
+  asks for more, for example three phases on a single-phase charger, lower that setting, save and
+  restart Gleanvolt. The plugin tries again within 5 minutes.
+- **Gleanvolt remembers another plugin.** Gleanvolt lets in only the first charger plugin it accepted,
+  so a second one started by mistake can't take over your charger. To switch plugins, stop the old one
+  and press **Forget** beside it. The next plugin to connect is remembered instead.
+
+## When Gleanvolt loses the charger
+
+If the plugin stops, or reports that it can't reach the charger, for more than 2 minutes, a running
+charging mode is **suspended**: Gleanvolt sends nothing and releases the battery hold. The charger then
+follows its own settings. When the plugin is back, the mode carries on by itself. See
+[Charging plan](../../using/charging-plan/).

@@ -261,13 +261,13 @@ public class InverterDriverSelectionTests
     }
 
     [Fact]
-    public void In_setup_mode_a_charge_limit_the_charger_cannot_honour_is_a_problem_on_the_charger_step()
+    public void In_setup_mode_a_charge_limit_the_charger_cannot_honour_is_a_configuration_problem()
     {
         var status = SetupStatusEvaluator.Evaluate(
             Configuration([.. UsableSite.Settings, ("ChargeControl:MaxChargingCurrentAmps", "40")]),
             new SetupHost(TimeZoneInfo.Utc, IsWindows: false));
 
         var problem = Assert.Single(status.MissingRequired);
-        Assert.Equal(SetupArea.Charger, problem.Area);
+        Assert.Equal(SetupArea.Configuration, problem.Area);
     }
 }

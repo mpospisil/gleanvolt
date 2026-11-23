@@ -399,9 +399,6 @@
   <data name="Config_PvNoInverter" xml:space="preserve">
     <value>Není nastaven žádný střídač. Nastavte Pv:Inverter:Host.</value>
   </data>
-  <data name="Config_PvNoCharger" xml:space="preserve">
-    <value>Není nastavena žádná nabíječka. Nastavte Pv:Chargers:0:Host.</value>
-  </data>
   <data name="Config_PvOneCharger" xml:space="preserve">
     <value>Podporována je jen {0} nabíječka; Pv:Chargers jich obsahuje {1}. Konfigurace umožňuje zadat víc nabíječek, aby se nemusela měnit, až je řízení bude umět obsluhovat. Zatím to neumí.</value>
   </data>
@@ -837,5 +834,8 @@
   </data>
   <data name="Action_ChargerUnavailable" xml:space="preserve">
     <value>Dokud Gleanvolt nemůže nabíječku řídit, žádný režim nelze spustit: {0}</value>
+  </data>
+  <data name="Config_SetupChargerKey" xml:space="preserve">
+    <value>{0}: nabíječka už není součástí nastavení. Nabíječka je plugin s vlastní stránkou nastavení, který se připojuje tokenem z Nastavení → Externí zdroje dat. Klíče nabíječky z instalačního souboru odstraňte.</value>
   </data>
 </root>

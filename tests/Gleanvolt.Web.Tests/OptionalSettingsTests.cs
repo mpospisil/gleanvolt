@@ -29,7 +29,7 @@ public class OptionalSettingsTests : BunitContext
         var card = Render<NotConfiguredCard>(parameters => parameters.Add(c => c.Setting, OptionalSetting.Solcast));
 
         Assert.Contains("Solar forecast: not configured", card.Markup);
-        Assert.Equal("/wizard/solcast", card.Find("a").GetAttribute("href"));
+        Assert.Equal("/settings#solcast-editor", card.Find("a").GetAttribute("href"));
     }
 
     [Fact]

@@ -16,8 +16,7 @@ camel-cased names (`fastNoBattery`).
 **It is off by default**, because two of its endpoints write to hardware, and anything that writes is
 switched on knowingly. It shares the web UI's port (8090).
 
-**In the web UI**, on **Settings → Installation → API access** (or in the setup wizard's **Extras**
-step): switch it on, type the client's name, and **Create key** makes a random key and keeps it in the
+**In the web UI**, on **Settings → Installation → API access**: switch it on, type the client's name, and **Create key** makes a random key and keeps it in the
 secret store. The API can't be switched on without a key. **Restart** on **Settings → Health** applies
 it.
 

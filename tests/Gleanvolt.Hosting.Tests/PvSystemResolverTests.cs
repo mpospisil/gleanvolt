@@ -140,11 +140,25 @@ public class PvSystemResolverTests
     }
 
     [Fact]
-    public void NoChargerIsAStartupFailureToo()
+    public void NoChargerIsTheChargerBehindAPlugin()
     {
-        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(("Pv:Inverter:Host", "192.168.2.10")));
+        // The charger isn't part of setup (#442): whichever plugin connects to the charger hub is the charger.
+        var site = Resolve(("Pv:Inverter:Host", "192.168.2.10"));
 
-        Assert.Contains("Pv:Chargers:0:Host", error.Message);
+        var charger = Assert.Single(site.Chargers);
+        Assert.Equal("external", charger.Driver);
+        Assert.Equal("charger", charger.Id);
+    }
+
+    [Theory]
+    [InlineData("", "", "external")]
+    [InlineData("", "192.168.2.6", "solax")]
+    [InlineData("goe", "192.168.2.6", "goe")]
+    public void AnEmptyDriverIsSolaxWithAHostAndThePluginWithout(string driver, string host, string expected)
+    {
+        var site = Resolve(("Pv:Inverter:Host", "192.168.2.10"), ("Pv:Chargers:0:Driver", driver), ("Pv:Chargers:0:Host", host));
+
+        Assert.Equal(expected, Assert.Single(site.Chargers).Driver);
     }
 
     [Fact]

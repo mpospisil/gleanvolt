@@ -75,7 +75,7 @@ public class SetupModeRegistrationTests
     }
 
     [Theory]
-    [InlineData("Pv:Chargers:0:Host", "")]            // half the devices
+    [InlineData("Pv:Inverter:Host", "")]              // no inverter
     [InlineData("Pv:Inverter:Port", "70000")]         // a device that is configured wrong
     [InlineData("Vehicle:BatteryCapacityKWh", "77")]  // a key that has moved
     [InlineData("Web:PasswordHash", "")]              // no password yet
@@ -143,7 +143,6 @@ public class SetupModeRegistrationTests
             var saved = SetupDocument.From(new Dictionary<string, string>
             {
                 ["Pv:Inverter:Host"] = "192.168.1.10",
-                ["Pv:Chargers:0:Host"] = "192.168.1.11",
                 ["Pv:Latitude"] = "50.0755",
                 ["Pv:Longitude"] = "14.4378",
                 ["Web:Password"] = "correct horse",

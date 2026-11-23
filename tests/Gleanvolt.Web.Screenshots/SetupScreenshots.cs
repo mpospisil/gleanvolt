@@ -13,9 +13,9 @@ using Gleanvolt.Web.Tests;
 namespace Gleanvolt.Web.Screenshots;
 
 /// <summary>
-/// The manual's "Setting up" pictures (#329): the password page and each step of the setup wizard, on a
-/// fresh install that a search has just found a SolaX inverter and charger for. The steps after the
-/// devices show what an owner would have typed, so the reader sees a filled form rather than an empty one.
+/// The manual's "Setting up" pictures (#329): the password page and each step of the setup wizard, Inverter, Site
+/// and Finish (#442), on a fresh install that a search has just found a SolaX inverter and charger for. The site
+/// shows what an owner would have typed, so the reader sees a filled form rather than an empty one.
 /// </summary>
 public sealed class SetupScreenshots : ScreenshotTest
 {
@@ -47,6 +47,11 @@ public sealed class SetupScreenshots : ScreenshotTest
         Services.AddSingleton<IDeviceDiscovery>(_discovery);
         Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());
         Services.AddSingleton<ISetupState>(_setup);
+
+        // No token yet on a fresh install: Finish offers to make the one a charger plugin connects with (#442).
+        var providers = new FakeExternalProviders();
+        providers.Set(new ExternalProviderStatus("charger", "Charger", "/providers/charger", false, ExternalProviderState.Waiting));
+        Services.AddSingleton<IExternalProviders>(providers);
         Services.AddSingleton<IEvEditor>(new FakeEvEditor());
         Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());
         // The weather source (#424): nothing chosen yet on a new installation.
@@ -100,34 +105,27 @@ public sealed class SetupScreenshots : ScreenshotTest
         _discovery.Finish(Inverter, Charger, Router);
         SignedIn();
 
-        Capture(Step("devices"), "wizard-search", selector: "#discovery");
+        Capture(Step("inverter"), "wizard-search", selector: "#discovery");
     }
 
     [Fact]
-    public void The_devices_step_with_both_chosen()
+    public void The_inverter_step_with_it_chosen()
     {
         _discovery.Finish(Inverter, Charger, Router);
         SignedIn();
-        var page = Step("devices");
+        var page = Step("inverter");
 
-        var rows = page.FindAll("#discovery-results tbody tr");
-        rows[0].QuerySelectorAll("button").First(button => button.TextContent.Contains("inverter", StringComparison.Ordinal)).Click();
-        page.FindAll("#discovery-results tbody tr")[1].QuerySelectorAll("button")
-            .First(button => button.TextContent.Contains("charger", StringComparison.Ordinal)).Click();
+        page.FindAll("#discovery-results tbody tr")[0].QuerySelector("button")!.Click();
 
-        Capture(page, "wizard-devices", selector: Main);
+        Capture(page, "wizard-inverter", selector: Main);
     }
 
-    [Theory]
-    [InlineData("site")]
-    [InlineData("solcast")]
-    [InlineData("car")]
-    [InlineData("extras")]
-    public void A_later_step(string step)
+    [Fact]
+    public void The_site_step()
     {
         SignedIn();
 
-        Capture(Step(step), "wizard-" + step, selector: Main);
+        Capture(Step("site"), "wizard-site", selector: Main);
     }
 
     [Fact]

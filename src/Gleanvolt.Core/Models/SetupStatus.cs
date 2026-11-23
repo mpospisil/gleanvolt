@@ -64,7 +64,6 @@ public enum SetupArea
     Configuration,
     Password,
     Inverter,
-    Charger,
     Location,
     TimeZone,
     Site,

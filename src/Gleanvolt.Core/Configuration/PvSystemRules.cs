@@ -39,8 +39,18 @@ public static partial class PvSystemRules
     /// <summary>The inverter driver an empty <c>Pv:Inverter:Driver</c> means (issue #318).</summary>
     public const string DefaultInverterDriver = "solax";
 
-    /// <summary>The charger driver an empty <c>Pv:Chargers:N:Driver</c> means (issue #349).</summary>
+    /// <summary>
+    /// The charger driver an empty <c>Pv:Chargers:N:Driver</c> means when the charger has a host (issue #349): an
+    /// installation configured before the charger became a plugin keeps its SolaX charger.
+    /// </summary>
     public const string DefaultChargerDriver = "solax";
+
+    /// <summary>
+    /// The charger behind a plugin (#435), and what Gleanvolt uses when no charger is configured (#442): no charger
+    /// in <c>Pv:Chargers</c>, or one with neither a driver nor a host. The charger is whichever plugin connects to
+    /// the charger hub, set up on its own page; Gleanvolt's setup doesn't ask about it.
+    /// </summary>
+    public const string ExternalChargerDriver = "external";
 
     // As DefaultInverterDrivers, for a caller that names no charger drivers: SolaX's X3-HAC, as the host has it.
     private static readonly IReadOnlyList<EvChargerDriverInfo> DefaultChargerDrivers =
@@ -51,6 +61,12 @@ public static partial class PvSystemRules
             EvChargerTransport.Modbus,
             new ModbusDefaults(Port: 502, UnitId: 1, MinRequestInterval: TimeSpan.FromMilliseconds(250)),
             new EvChargerCapabilities(MinCurrentAmps: 6, MaxCurrentAmps: 32, PauseCurrentAmps: 0, Phases: 3, CanSwitchPhases: false, HasUseMode: true)),
+        new(
+            ExternalChargerDriver,
+            "External plugin",
+            EvChargerTransport.External,
+            null,
+            new EvChargerCapabilities(MinCurrentAmps: 6, MaxCurrentAmps: 32, PauseCurrentAmps: 0, Phases: 3, CanSwitchPhases: false, HasUseMode: false)),
     ];
 
     // What a caller that names no drivers is held to: the default, with DeviceConfig's defaults and SolaX's
@@ -213,7 +229,7 @@ public static partial class PvSystemRules
             var known = string.Join(", ", drivers.Select(candidate => candidate.Id));
             problems.Add(
                 $"{path}:Driver ('{id}') is not a charger driver this Gleanvolt knows. Known drivers: {known}. "
-                + $"Empty means {DefaultChargerDriver}.",
+                + $"Empty means {DefaultChargerDriver} with a host, and a charger plugin without one.",
                 Phrase.Of("Config.PvChargerDriver", new PhraseArg.Text(path), new PhraseArg.Text(id), new PhraseArg.Text(known),
                     new PhraseArg.Text(DefaultChargerDriver)));
         }
@@ -221,10 +237,17 @@ public static partial class PvSystemRules
         return driver;
     }
 
-    private static string NormaliseChargerDriverId(PvChargerOptions charger)
+    // Empty with a host is SolaX, as it always was; empty without one is no built-in charger at all, so the plugin's.
+    private static string NormaliseChargerDriverId(PvChargerOptions charger) => ChargerDriverId(charger.Driver, charger.Host);
+
+    /// <summary>
+    /// The charger driver <c>Pv:Chargers:0</c> names (#442): its <paramref name="driver"/>, or when that is empty,
+    /// <see cref="DefaultChargerDriver"/> with a <paramref name="host"/> and <see cref="ExternalChargerDriver"/> without.
+    /// </summary>
+    public static string ChargerDriverId(string? driver, string? host)
     {
-        var id = charger.Driver.Trim().ToLowerInvariant();
-        return id.Length == 0 ? DefaultChargerDriver : id;
+        var id = driver?.Trim().ToLowerInvariant() ?? string.Empty;
+        return id.Length > 0 ? id : string.IsNullOrWhiteSpace(host) ? ExternalChargerDriver : DefaultChargerDriver;
     }
 
     /// <summary>
@@ -385,10 +408,13 @@ public static partial class PvSystemRules
     private static IReadOnlyList<PvDeviceInfo> ResolveChargers(
         PvSystemOptions pv, IReadOnlyList<EvChargerDriverInfo> drivers, ConfigurationProblems problems)
     {
+        // No charger configured is a charger behind a plugin (#442): the charger isn't part of Gleanvolt's setup.
         if (pv.Chargers.Length == 0)
         {
-            problems.Add("No EV charger is configured. Set Pv:Chargers:0:Host.", Phrase.Of("Config.PvNoCharger"));
-            return [];
+            return [new PvDeviceInfo(DefaultChargerId, string.Empty, string.Empty, new DeviceConfig { Host = string.Empty })
+            {
+                Driver = ExternalChargerDriver,
+            }];
         }
 
         // A second charger says what the operator expects rather than what is wired: two listed means two

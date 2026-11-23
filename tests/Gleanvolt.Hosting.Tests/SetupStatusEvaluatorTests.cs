@@ -43,7 +43,8 @@ public class SetupStatusEvaluatorTests
         var status = Evaluate(Linux);
 
         Assert.False(status.Usable);
-        Assert.Equal([SetupArea.Password, SetupArea.Inverter, SetupArea.Charger], Areas(status));
+        // The charger isn't part of setup (#442): none configured is the plugin's.
+        Assert.Equal([SetupArea.Password, SetupArea.Inverter], Areas(status));
         Assert.All(status.MissingRequired, problem => Assert.NotNull(problem.Phrase));
         Assert.Equal([SetupArea.Location], status.Recommended.Select(problem => problem.Area));
     }
@@ -51,12 +52,27 @@ public class SetupStatusEvaluatorTests
     [Theory]
     [InlineData("Web:PasswordHash", SetupArea.Password)]
     [InlineData("Pv:Inverter:Host", SetupArea.Inverter)]
-    [InlineData("Pv:Chargers:0:Host", SetupArea.Charger)]
     public void Each_missing_item_is_named_on_its_own(string key, SetupArea area)
     {
         var status = Usable((key, ""));
 
         Assert.Equal([area], Areas(status));
+    }
+
+    [Fact]
+    public void A_charger_with_neither_a_driver_nor_a_host_is_the_plugins_and_blocks_nothing()
+    {
+        var status = Usable(("Pv:Chargers:0:Host", ""), ("Pv:Chargers:0:Driver", ""));
+
+        Assert.True(status.Usable);
+    }
+
+    [Fact]
+    public void A_built_in_charger_chosen_without_a_host_is_a_configuration_problem_not_a_setup_step()
+    {
+        var status = Usable(("Pv:Chargers:0:Host", ""), ("Pv:Chargers:0:Driver", "solax"));
+
+        Assert.Equal([SetupArea.Configuration], Areas(status));
     }
 
     [Fact]

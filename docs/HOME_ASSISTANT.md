@@ -107,8 +107,7 @@ the tariff table, Solcast, the setup wizard and **Stop service** stay in the web
 This and the next section are the MQTT way. Home Assistant and its broker stay where they are — on another machine, or on this one outside the
 Docker stack — and the controller connects to the broker.
 
-**In the web UI**, on **Settings → Installation → Home Assistant (MQTT)** (or in the setup wizard's
-**Extras** step): switch it on, and enter the broker's address and port, the user name and the password.
+**In the web UI**, on **Settings → Installation → Home Assistant (MQTT)**: switch it on, and enter the broker's address and port, the user name and the password.
 **Test connection** checks the broker before you save. The installation needs an id (`Pv:Id`, on the
 same page); the form says so if it is missing. Then **Restart** on **Settings → Health**. The entities
 appear in Home Assistant through its MQTT integration's discovery.

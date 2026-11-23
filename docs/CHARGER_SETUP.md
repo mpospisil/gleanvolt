@@ -39,8 +39,8 @@ voltages: a mains voltage on L1 at holding register `0x1000`. It picks the model
 - L2 and L3 live: the three-phase **22KT** (`huawei-22kt`).
 - L1 only: the single-phase **7KS** (`huawei-7ks`).
 
-A 22KT wired to one phase reads like a 7KS, so check the label. In the wizard, **Use as charger** fills in
-the brand as well as the address.
+A 22KT wired to one phase reads like a 7KS, so check the label. On **Settings → Installation**, the
+**Charger brand** drop-down sets it. (The setup wizard no longer sets up the charger, #442.)
 
 By hand, on **Settings → Installation → Charger**:
 

@@ -111,8 +111,9 @@ In the JSON, `devices` lists what answered. For each one: `host`, `port`, `unitI
 (`Inverter` or `Charger`), `model`, `driver`, `topology` and `note`. `warnings` says anything about the
 scan itself.
 
-- Pick **one inverter and one charger by their `role`**, not by the order. Show the user both, with
-  model and address, and ask them to confirm.
+- Pick **the inverter by its `role`**, not by the order. Show the user its model and address, and ask
+  them to confirm. A charger in the list is only there to tell the two apart: Gleanvolt's setup doesn't
+  configure the charger. It is a plugin, added afterwards (section 6).
 - **Swapped addresses are the mistake that matters.** Both answer Modbus on port 502, so a swapped pair
   connects without an error. It shows up later only as a battery level that never changes and solar
   showing 0. If a role is missing or doubtful, ask, and compare with the router's device list.
@@ -139,8 +140,7 @@ cat > ~/gleanvolt-site.json <<'EOF'
     "Name": "Home",
     "Latitude": 50.08,
     "Longitude": 14.44,
-    "Inverter": { "Driver": "solax", "Host": "192.168.1.10", "Port": 502, "UnitId": 1 },
-    "Chargers": [ { "Driver": "solax", "Host": "192.168.1.11", "Port": 502, "UnitId": 1 } ]
+    "Inverter": { "Driver": "solax", "Host": "192.168.1.10", "Port": 502, "UnitId": 1 }
   },
   "Controller": { "TimeZone": "Europe/Prague" },
   "ChargeControl": { "Forecast": { "BatteryCapacityKWh": 9 } },
@@ -150,7 +150,8 @@ cat > ~/gleanvolt-site.json <<'EOF'
 EOF
 ```
 
-- `Driver`, `Host`, `Port`, `UnitId` come from the device's search result. If it has a `topology`
+- **No `Chargers` block.** The charger isn't part of setup: `setup --file` refuses its keys with a message.
+- `Driver`, `Host`, `Port`, `UnitId` come from the inverter's search result. If it has a `topology`
   (a Huawei inverter behind an EMMA), add `"Topology": "emma"` to the inverter.
 - `Id` is lowercase letters, digits, `-` or `_`.
 - `Weather:Source` is `External` when the user wants the weather, or `NotProvided` when not. Gleanvolt
@@ -264,6 +265,10 @@ Everything else: [Troubleshooting](https://mpospisil.github.io/gleanvolt/latest/
 
 **What is left for the browser,** on **Settings** and the **Car** page:
 
+- **The charger:** its plugin, started with the provider token from **Settings → External providers**
+  (**Make the token** if there is none), and the charger's address entered on the plugin's own page.
+  Until it connects, no charging mode can start. See
+  [Your charger](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/charger/).
 - **The car:** battery size, phases, currents, and where its battery level comes from. See
   [Your car and its battery level](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/car/).
 - Any Solcast key the user kept to themselves.
@@ -279,20 +284,21 @@ Steps 1 and 2 of this skill still apply. Then walk the user through it, one step
 
 1. **Password.** The user opens `http://gleanvolt.local:8090` (or the machine's address with `:8090`),
    sets a password of at least 8 characters, and saves the recovery key it shows once.
-2. **Devices.** **Search**, then **Use as inverter** and **Use as charger** by the **Identified as**
-   column, then **Save** and **Next**. The table in step 3 covers a search that finds nothing. In a NAS
+2. **Inverter.** **Search**, then **Use as inverter** on the row the **Identified as** column calls the
+   inverter, then **Save** and **Next**. The table in step 3 covers a search that finds nothing. In a NAS
    container, the network must be **host**.
 3. **Site.** Latitude, longitude, time zone and the battery's usable kWh. **Save**, **Next**.
-4. **Forecast.** The user pastes the Solcast key and resource id, then **Save and fetch**. Or skip it.
-5. **Car.** Skip it here, or fill it in. It is the same as the **Car** page.
-6. **Extras.** The tariff and weather if wanted. Leave Home Assistant and API access off.
-7. **Finish.** **Restart**, then **Yes, restart it**. The Overview opens after about half a minute.
+4. **Finish.** **Make the token** under **Your charger** for the charger's plugin, then **Restart** and
+   **Yes, restart it**. The Overview opens after about half a minute. The forecast, the car, the tariff
+   and the weather are on **Settings** and the **Car** page, linked from Finish.
 
 **Each step needs Save.** Next only moves on. Then check it as in step 6.
 
 ## What to report at the end
 
-- which devices Gleanvolt uses, at which addresses, and a reminder to reserve them in the router;
+- which inverter Gleanvolt uses, at which address, and a reminder to reserve it and the charger's in the
+  router;
+- that the charger is added through its plugin, with the provider token (section 6);
 - what was set, and what is left for the browser (the car, any keys not given);
 - that charging is **Off** until the user chooses a mode. See
   [Which charging mode?](https://mpospisil.github.io/gleanvolt/latest/en/using/modes/choosing/).

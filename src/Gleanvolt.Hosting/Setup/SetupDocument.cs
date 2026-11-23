@@ -48,11 +48,14 @@ public sealed class SetupDocument
     /// <summary>The home battery's usable capacity.</summary>
     public const string HomeBatteryCapacityKWh = "ChargeControl:Forecast:BatteryCapacityKWh";
 
-    /// <summary>Every key a setup document may hold.</summary>
+    /// <summary>
+    /// Every key a setup document may hold. Not the charger's (#442): a charger is a plugin, set up on its own page,
+    /// and Gleanvolt's setup doesn't ask about it. Settings can still edit a built-in one.
+    /// </summary>
     public static IReadOnlyList<string> AllowedKeys { get; } =
     [
         WebPassword,
-        .. PvSystemSettingKeys.All,
+        .. PvSystemSettingKeys.All.Where(key => !IsChargerKey(key)),
         SolcastApiKey,
         SolcastResourceId,
         WeatherSourceKey,
@@ -75,6 +78,9 @@ public sealed class SetupDocument
         && !name.Contains(':', StringComparison.Ordinal)
             ? name
             : null;
+
+    /// <summary>Whether <paramref name="key"/> is one of the charger's, <c>Pv:Chargers:…</c>.</summary>
+    public static bool IsChargerKey(string key) => key.StartsWith("Pv:Chargers:", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Whether <paramref name="key"/> holds a secret: never written to the overrides file.</summary>
     public static bool IsSecret(string key) =>
@@ -134,6 +140,17 @@ public sealed class SetupDocument
             var notAllowed = new ConfigurationProblems();
             foreach (var key in refused)
             {
+                // Said for what it is, not as an unknown key: it was a setup key until #442.
+                if (IsChargerKey(key))
+                {
+                    notAllowed.Add(
+                        $"{key}: the charger isn't part of setup any more. A charger is a plugin, set up on its own page, "
+                        + "that connects with the provider token from Settings → External providers. Take the charger's "
+                        + "keys out of the setup file.",
+                        Phrase.Of("Config.SetupChargerKey", new PhraseArg.Text(key)));
+                    continue;
+                }
+
                 notAllowed.Add(
                     $"{key} is not a setting a setup file can hold (see `gleanvolt setup --print-schema`).",
                     Phrase.Of("Config.SetupKeyNotAllowed", new PhraseArg.Text(key)));
@@ -415,7 +432,7 @@ public sealed class SetupDocument
 
     // A device the configuration does not have yet, as opposed to one it has wrong.
     private static bool IsAbsence(Phrase? phrase) =>
-        phrase?.Key is "Config.PvNoInverter" or "Config.PvNoCharger" or "Config.PvHostRequired";
+        phrase?.Key is "Config.PvNoInverter" or "Config.PvHostRequired";
 
     // The resolver throws its problems; the car's rules return them; a value that is not a number at
     // all is the binder's own InvalidOperationException. All three end up in one list.

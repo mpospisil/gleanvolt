@@ -3,16 +3,16 @@ title: Finding your devices
 description: How the device search works, what its results mean, and how to type the addresses yourself.
 ---
 
-Gleanvolt needs to know where on your home network your inverter and your charger are. The setup
-wizard's **Search** finds them for you. This page explains what it shows, and what to do when it doesn't
-find them.
+Gleanvolt needs to know where on your home network your inverter is. The setup wizard's **Search** finds
+it for you. This page explains what it shows, and what to do when it doesn't find it. Your charger is set
+up on its plugin's own page instead: see [Your charger](../charger/).
 
 ## The search
 
-In the wizard's **Devices** step, press **Search**. Gleanvolt checks every address on your home network
-for an inverter or a charger it knows. A home network takes a minute or two.
+In the wizard's **Inverter** step, press **Search**. Gleanvolt checks every address on your home network
+for a device it knows. A home network takes a minute or two.
 
-![The search results: an inverter at 192.168.1.10 and a charger at 192.168.1.11, each with "Use as inverter" and "Use as charger" buttons, and an unidentified device at 192.168.1.1.](../../../../assets/screenshots/wizard-search.png)
+![The search results: an inverter at 192.168.1.10 and a charger at 192.168.1.11, each with a "Use as inverter" button, and an unidentified device at 192.168.1.1.](../../../../assets/screenshots/wizard-search.png)
 
 Each row is one device that answered:
 
@@ -23,8 +23,8 @@ Each row is one device that answered:
 - **not identified**: something answered, but it isn't a device Gleanvolt knows, such as your router.
   Ignore it.
 
-Press **Use as inverter** on your inverter's row, and **Use as charger** on your charger's. Then press
-**Save** below the list.
+Press **Use as inverter** on your inverter's row, then **Save** below the list. A charger is listed too, so
+you can tell the two apart, but the wizard doesn't set it up.
 
 :::tip[You can search again later]
 After setup, the wizard is still at `http://gleanvolt.local:8090/wizard`. Open it to search again, for
@@ -43,45 +43,39 @@ example after you replace a device.
 The range in **Network** is your home network's addresses, written like `192.168.1.0/24`. If your
 devices' addresses start with `192.168.1.`, that is the range to type.
 
-## Typing the addresses yourself
+## Typing the address yourself
 
-If you know the addresses, from your router's list of devices or from your installer, you don't need the
-search. Fill in the form below it:
+If you know the inverter's address, from your router's list of devices or from your installer, you don't
+need the search. Fill in the form below it:
 
-| Field | Inverter | Charger |
-|---|---|---|
-| **Brand** | SolaX or Huawei | SolaX, Huawei SCharger, go-e, or External plugin |
-| **Host** | the inverter's address, such as `192.168.1.10` | the charger's address |
-| **Port** | 502 | 502 (go-e: 80) |
-| **Unit id** | usually 1 | as the charger's settings show it |
+| Field | Inverter |
+|---|---|
+| **Brand** | SolaX or Huawei |
+| **Host** | the inverter's address, such as `192.168.1.10` |
+| **Port** | 502 |
+| **Unit id** | usually 1 |
 
 The brand fills in its usual port and unit id. A Huawei inverter behind an EMMA also needs
 **Connected through: EMMA**, and the EMMA's address as the host.
 
-**External plugin** is for a charger a plugin drives, such as the Shelly TopAC. The address fields go
-away: the plugin has the charger's address, on its own page. Start the plugin with the token from
-**Settings → External providers**; Gleanvolt accepts it after the restart, and the save checks that it
-answers.
-
-The plugin tells Gleanvolt what the charger can do. If the car's **Maximum current (A)** or **Phases**
-on the [Car](../car/) page asks for more (a higher current, or three phases on a single-phase charger),
-Gleanvolt turns the plugin away, and **Settings → External providers** says which setting to lower.
-Change it, save, and restart Gleanvolt. Gleanvolt also remembers the first charger
-plugin it accepts and lets in no other. To switch to another plugin, stop the old one and press
-**Forget** beside it under **Settings → External providers**.
+:::note[A charger built into Gleanvolt]
+**Settings → Installation** still has a **Charger** section with the built-in SolaX, Huawei SCharger and
+go-e drivers, for an installation that already uses one. They are being replaced by plugins. A new
+installation leaves the charger's brand at **External plugin** and follows [Your charger](../charger/).
+:::
 
 ## When you save
 
-Gleanvolt reads one value from each device, to check that the address answers and that the device is
+Gleanvolt reads one value from the inverter, to check that the address answers and that the device is
 what you said:
 
-- If the inverter's address answers like a charger, or the other way round, it warns you. Both use the
-  same port, so swapped addresses would connect fine and then show a frozen battery and no sun.
-- If a device doesn't answer, for example a charger that is switched off, it asks before it saves. Press
-  **Save anyway** only if you are sure the address is right.
+- If the address answers like a charger, it warns you. Both use the same port, so the charger's address
+  would connect fine and then show a frozen battery and no sun.
+- If the inverter doesn't answer, it asks before it saves. Press **Save anyway** only if you are sure the
+  address is right.
 
 ## Give your devices fixed addresses
 
 Your router hands out addresses, and it can give a device a new one after a power cut. Gleanvolt would
 then lose it. In your router's settings, look for **DHCP reservation** or **static lease**, and reserve
-the current address for the inverter and for the charger.
+the current address for the inverter, and for the charger too: its plugin needs to find it as well.
