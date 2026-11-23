@@ -1,0 +1,137 @@
+@implements IDisposable
+@inject PluginInfo Plugin
+@inject PluginCharger Charger
+@inject Gleanvolt.Providers.Client.Charger.ChargerProviderConnection Connection
+@inject TimeProvider Time
+
+@*
+    Every plugin's page: the status, what Gleanvolt asks and what the charger can do, the plugin's own view of the
+    charger (ChildContent), then the address with the search, and the recording for testers. Opening the page
+    writes nothing to the charger.
+*@
+
+<PageTitle>@Plugin.Name</PageTitle>
+
+<h1>@Plugin.Name</h1>
+
+<p id="status" class="@StatusClass">@StatusText</p>
+
+<section>
+    <h2>@SharedText.Gleanvolt</h2>
+
+    @if (Connection.Welcome is { } welcome)
+    {
+        <dl id="limits">
+            <dt>@SharedText.Range</dt>
+            <dd>@welcome.Limits.MinCurrentAmps–@welcome.Limits.MaxCurrentAmps A</dd>
+            <dt>@SharedText.Phases</dt>
+            <dd>@welcome.Limits.Phases</dd>
+            <dt>@SharedText.ChargerCan</dt>
+            <dd id="capabilities">@SharedText.CanDo.Format(Charger.Capabilities.MinCurrentAmps, Charger.Capabilities.MaxCurrentAmps, Charger.Capabilities.Phases)</dd>
+        </dl>
+
+        @if (welcome.DryRun)
+        {
+            <p class="muted" id="dry-run">@SharedText.DryRun</p>
+        }
+    }
+    else
+    {
+        <p class="muted" id="not-connected">@SharedText.NotConnected</p>
+    }
+</section>
+
+<section>
+    <h2>@SharedText.Charger</h2>
+
+    @if (Charger.LastReading is { } reading)
+    {
+        <dl id="reading">
+            <dt>@SharedText.State</dt>
+            <dd id="reading-state">@reading.Status</dd>
+            <dt>@SharedText.Power</dt>
+            <dd id="reading-power">@Watts(reading.PowerWatts)</dd>
+            <dt>@SharedText.Setpoint</dt>
+            <dd id="reading-setpoint">@(reading.CurrentAmps is { } amps ? $"{amps} A" : SharedText.NotSaid.ToString())</dd>
+            <dt>@SharedText.Allowed</dt>
+            <dd id="reading-allowed">@YesNo(reading.ChargingAllowed)</dd>
+            <dt>@SharedText.Read</dt>
+            <dd>@Local(reading.ReadAt)</dd>
+        </dl>
+    }
+    else
+    {
+        <p class="muted" id="reading-none">@SharedText.NoReadingYet</p>
+    }
+
+    @ChildContent
+</section>
+
+@Settings
+
+<AddressSection Check="Check" UnitId="UnitId" />
+
+<SearchSection />
+
+<RecordingSection />
+
+@code {
+    /// <summary>The plugin's own view of the charger, under the reading.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>The plugin's own settings (the model, a password), as sections of their own, before the address.</summary>
+    [Parameter] public RenderFragment? Settings { get; set; }
+
+    /// <summary>Reads the charger at an address before it is saved; returns what it says it is, throws when it does not answer as one.</summary>
+    [Parameter, EditorRequired] public Func<DeviceAddress, byte?, Task<string>> Check { get; set; } = default!;
+
+    /// <summary>Whether the address has a Modbus unit id.</summary>
+    [Parameter] public bool UnitId { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Charger.Changed += Refresh;
+        Connection.Welcomed += OnWelcomed;
+    }
+
+    public void Dispose()
+    {
+        Charger.Changed -= Refresh;
+        Connection.Welcomed -= OnWelcomed;
+    }
+
+    private void OnWelcomed(ChargerWelcome welcome) => Refresh();
+
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+
+    private string StatusText => Charger.Status switch
+    {
+        null => SharedText.StatusWaiting.ToString(),
+        { Healthy: true } => SharedText.StatusReading.ToString(),
+        _ => (Charger.StatusWords ?? SharedText.StatusNotReading).ToString(),
+    };
+
+    private string? StatusClass => Charger.Status switch
+    {
+        { Healthy: true } => "ok",
+        { NeedsOwner: true } => "error",
+        _ => null,
+    };
+
+    private static string YesNo(bool? value) => value switch
+    {
+        true => SharedText.Yes.ToString(),
+        false => SharedText.No.ToString(),
+        null => SharedText.NotSaid.ToString(),
+    };
+
+    private static string Watts(double watts) =>
+        watts >= 1000 ? (watts / 1000).ToString("0.00", CultureInfo.CurrentCulture) + " kW" : watts.ToString("0", CultureInfo.CurrentCulture) + " W";
+
+    private TimeZoneInfo Zone => Connection.Welcome?.TimeZone is { Length: > 0 } id && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var found)
+        ? found
+        : Time.LocalTimeZone;
+
+    private string Local(DateTimeOffset at) =>
+        TimeZoneInfo.ConvertTime(at, Zone).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+}

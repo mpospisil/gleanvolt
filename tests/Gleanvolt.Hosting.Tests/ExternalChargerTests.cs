@@ -12,7 +12,6 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Devices;
 using Gleanvolt.Hosting.Chargers;
 using Gleanvolt.Hosting.Configuration;
-using Gleanvolt.Plugin.Shelly.TopAc;
 using Gleanvolt.Providers.Client;
 using Gleanvolt.Providers.Client.Charger;
 using Gleanvolt.Providers.Contracts;
@@ -23,21 +22,21 @@ namespace Gleanvolt.Hosting.Tests;
 
 /// <summary>
 /// A charger behind a plugin (#435), end to end: the real charger hub and link on a TestServer, the driver the
-/// control loop would get, and the Shelly TopAC plugin (#429) as the provider, with the charger faked over HTTP.
-/// What the control loop sees is what <see cref="IEvChargerDriver"/> answers, and what the charger gets is
-/// <see cref="FakeTopAc.Writes"/>, so those are what is checked.
+/// control loop would get, and a plugin on the ordinary SDK whose charger is <see cref="FakeCharger"/>. What the
+/// control loop sees is what <see cref="IEvChargerDriver"/> answers, and what the charger gets is
+/// <see cref="FakeCharger.Commands"/>, so those are what is checked. The real chargers' plugins, the Shelly TopAC's
+/// among them, are tested in their own repository, gleanvolt-chargers (#443).
 /// </summary>
 public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
 {
-    private readonly FakeTopAc _topAc = new();
-    private readonly string _directory = Path.Combine(Path.GetTempPath(), "gleanvolt-charger-" + Guid.NewGuid().ToString("N"));
+    private readonly FakeCharger _charger = new();
     private readonly List<ChargerProviderConnection> _plugins = [];
 
     private WebApplication? _app;
     private string _token = string.Empty;
 
     // Read by the hub at every hello, so a test can change it before its plugin connects.
-    // The TopAC's own range: a charge control asking more is refused at the hello (#440).
+    // The fake charger's own range: a charge control asking more is refused at the hello (#440).
     private ChargeControlOptions _chargeControl = new()
     {
         MinChargingCurrentAmps = 6,
@@ -97,18 +96,13 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_directory))
-        {
-            Directory.Delete(_directory, recursive: true);
-        }
     }
 
     [Fact]
-    public async Task A_charging_TopAc_reads_through_the_plugin_as_the_driver_contract_says()
+    public async Task A_charging_charger_reads_through_the_plugin_as_the_driver_contract_says()
     {
-        _topAc.Charging(10);
-        _topAc.CurrentLimit = 10;
-        var (plugin, charger) = await StartPluginAsync();
+        _charger.Charging(10);
+        var plugin = await StartPluginAsync();
         var driver = Driver();
 
         var reading = await driver.ReadAsync();
@@ -121,104 +115,93 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
         // The welcome told the plugin the charge control's limits; the plugin told Gleanvolt the charger's ceiling.
         Assert.Equal(new ChargerLimits(6, 16, 3, 230), plugin.Limits);
         Assert.Equal(16, Link.DeviceMaxAmps);
-        Assert.Equal(PowerUnit.Kilowatts, charger.Unit);
-        Assert.Equal("Shelly TopAC", Status.ProviderName);
+        Assert.Equal("Fake charger", Status.ProviderName);
         Assert.True(Status.HasPage);
-        Assert.Empty(_topAc.Writes);
+        Assert.Empty(_charger.Commands);
     }
 
     [Fact]
-    public async Task Idle_and_a_car_waiting_read_as_available_and_preparing_and_a_held_car_is_the_chargers_doing()
+    public async Task Each_state_the_plugin_says_is_the_driver_contracts_status_of_the_same_name()
     {
         await StartPluginAsync();
         var driver = Driver();
 
-        _topAc.Idle();
+        _charger.State = ChargerState.Available;
         Assert.Equal(EvChargerStatus.Available, (await driver.ReadAsync()).Status);
 
-        _topAc.Waiting();
+        _charger.State = ChargerState.Preparing;
         Assert.Equal(EvChargerStatus.Preparing, (await driver.ReadAsync()).Status);
 
-        // The switch is off: the charger holds the car, which is never "the car is done".
-        _topAc.StartCharging = false;
-        _topAc.WorkState = "charger_complete";
+        // The charger holding the car is never "the car is done".
+        _charger.State = ChargerState.SuspendedEvse;
+        _charger.Allowed = false;
         Assert.Equal(EvChargerStatus.SuspendedEvse, (await driver.ReadAsync()).Status);
         Assert.False((await driver.ReadSettingsAsync()).ChargingAllowed);
     }
 
     [Fact]
-    public async Task A_pause_is_the_switch_off_held_by_the_plugin_and_a_setpoint_resumes_it_limit_first()
-    {
-        _topAc.Charging(10);
-        _topAc.CurrentLimit = 10;
-        await StartPluginAsync();
-        var driver = Driver();
-
-        await driver.SetChargingAllowedAsync(true, "test start");
-        await driver.SetCurrentAsync(10, 0, "test pause");
-        _topAc.WorkState = "charger_pause";
-        _topAc.PhaseCurrent = 0;
-        _topAc.TotalPowerKw = 0;
-
-        Assert.Equal(["start_charging=true", "start_charging=false"], _topAc.Writes);
-        Assert.Equal(new EvChargerSettings(true, 0), await driver.ReadSettingsAsync());
-        Assert.Equal(EvChargerStatus.SuspendedEvse, (await driver.ReadAsync()).Status);
-
-        await driver.SetCurrentAsync(0, 8, "test resume");
-
-        Assert.Equal(["start_charging=true", "start_charging=false", "current_limit=8", "start_charging=true"], _topAc.Writes);
-        Assert.Equal(new EvChargerSettings(true, 8), await driver.ReadSettingsAsync());
-    }
-
-    [Fact]
     public async Task A_setpoint_within_the_threshold_sends_nothing_and_one_above_the_charger_is_clamped_to_it()
     {
-        _topAc.CurrentLimit = 10;
+        _charger.CurrentAmps = 10;
         await StartPluginAsync();
         var driver = Driver();
         await driver.ReadAsync();
 
         await driver.SetCurrentAsync(10, 10, "steady");
-        Assert.Empty(_topAc.Writes);
+        Assert.Empty(_charger.Commands);
 
-        // Above the 16 A the TopAC said in its hello.
+        // Above the 16 A the charger said in its hello.
         await driver.SetCurrentAsync(10, 20, "more sun");
-        Assert.Equal(["current_limit=16"], _topAc.Writes);
+        Assert.Equal(["current=16"], _charger.Commands);
+    }
+
+    [Fact]
+    public async Task A_pause_is_sent_as_0_A_and_the_plugin_carries_it_out_its_own_way()
+    {
+        _charger.Charging(10);
+        await StartPluginAsync();
+        var driver = Driver();
+
+        await driver.SetChargingAllowedAsync(true, "test start");
+        await driver.SetCurrentAsync(10, 0, "test pause");
+        await driver.SetCurrentAsync(0, 8, "test resume");
+
+        Assert.Equal(["allowed=True", "current=0", "current=8"], _charger.Commands);
     }
 
     [Fact]
     public async Task In_dry_run_nothing_reaches_the_plugin_and_what_would_have_been_stands_in()
     {
-        _topAc.CurrentLimit = 10;
+        _charger.CurrentAmps = 10;
         await StartPluginAsync();
         var driver = Driver(dryRun: true);
 
         await driver.SetChargingAllowedAsync(false, "dry stop");
         await driver.SetCurrentAsync(10, 6, "dry setpoint");
 
-        Assert.Empty(_topAc.Writes);
+        Assert.Empty(_charger.Commands);
         Assert.Equal(new EvChargerSettings(false, 6), await driver.ReadSettingsAsync());
         Assert.Equal(6, (await driver.ReadAsync()).CurrentAmps);
     }
 
     [Fact]
-    public async Task A_charger_with_a_password_is_one_Gleanvolt_could_not_read_and_the_owner_is_told_why()
+    public async Task A_charger_the_plugin_cannot_read_is_one_Gleanvolt_could_not_read_and_the_owner_is_told_why()
     {
-        _topAc.Fail = HttpStatusCode.Unauthorized;
-        var (_, charger) = await StartPluginAsync(publishes: false);
+        _charger.ReadFailure = "the charger asks for a password";
+        var plugin = await StartPluginAsync(publishes: false);
 
         await Assert.ThrowsAsync<TimeoutException>(() => Driver().ReadAsync());
 
+        await plugin.ReportStatusAsync(new ProviderStatus(false, "The charger asks for a password.", NeedsOwner: true, Code: ProviderStatusCodes.Refused));
         await Eventually(() => Status.NeedsOwner, "the plugin should report that only the owner can fix it");
         Assert.Equal(ProviderStatusCodes.Refused, Status.StatusCode);
-        Assert.False(charger.Status!.Healthy);
     }
 
     [Fact]
     public async Task A_command_the_charger_refuses_fails_in_Gleanvolt_with_the_plugins_reason()
     {
         await StartPluginAsync();
-        _topAc.Fail = HttpStatusCode.InternalServerError;
+        _charger.CommandFailure = "HTTP 500 from the charger";
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => Driver().SetChargingAllowedAsync(false, "stop"));
 
@@ -231,19 +214,6 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
     {
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => Driver().ReadAsync());
         Assert.Contains("No charger plugin is connected", error.Message);
-    }
-
-    [Fact]
-    public async Task Auto_balance_on_in_the_Shelly_app_asks_the_owner_to_turn_it_off()
-    {
-        _topAc.AutoBalance = true;
-        var (_, charger) = await StartPluginAsync();
-
-        await Driver().ReadAsync();
-
-        await Eventually(() => Status.NeedsOwner, "auto balance fights the control loop");
-        Assert.Contains("Auto balance", Status.StatusMessage);
-        Assert.Equal(true, charger.OwnerSettings?.AutoBalance);
     }
 
     [Fact]
@@ -321,7 +291,7 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
     public async Task The_first_plugin_is_remembered_and_another_is_refused_even_after_it_has_gone_until_the_owner_forgets_it()
     {
         var first = await StartPluginAsync(new FixedSource(new ChargerReading(DateTimeOffset.UtcNow, ChargerState.Available, 0)));
-        Assert.Equal("shelly-topac", Status.RememberedProviderId);
+        Assert.Equal("fake-charger", Status.RememberedProviderId);
         Assert.True(Status.CanForget);
 
         await first.StopAsync(CancellationToken.None);
@@ -334,7 +304,7 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
         await Eventually(() => Status.LastRefusal is not null, "the second plugin should be refused");
         Assert.Equal(RefusalCodes.AnotherProvider, Status.LastRefusal!.Code);
         Assert.Equal("charger-sample", Status.LastRefusal.ProviderId);
-        Assert.Contains("shelly-topac", Status.LastRefusal.Reason);
+        Assert.Contains("fake-charger", Status.LastRefusal.Reason);
         Assert.False(Link.IsAttached);
 
         await Registry.ForgetAsync(ChargerContract.Kind);
@@ -355,56 +325,7 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
 
         // Closed: a new session, after the plugin's wait.
         await Eventually(() => Status.Since != connectedSince && Link.IsAttached, "the plugin should be closed and reconnect");
-        await Eventually(() => Link.IsAttached && Status.RememberedProviderId == "shelly-topac", "the plugin should reconnect and be remembered");
-    }
-
-    [Theory]
-    [InlineData("charger_free", true, ChargerState.Available)]
-    [InlineData("charger_insert", true, ChargerState.Preparing)]
-    [InlineData("charger_wait", true, ChargerState.Preparing)]
-    [InlineData("charger_wait", false, ChargerState.SuspendedEvse)]
-    [InlineData("charger_charging", true, ChargerState.Charging)]
-    [InlineData("charger_pause", true, ChargerState.SuspendedEvse)]
-    [InlineData("charger_complete", true, ChargerState.SuspendedEv)]
-    [InlineData("charger_complete", false, ChargerState.SuspendedEvse)]
-    [InlineData("charger_end", true, ChargerState.Finishing)]
-    [InlineData("charger_end", false, ChargerState.SuspendedEvse)]
-    [InlineData("charger_error", true, ChargerState.Faulted)]
-    [InlineData("charger_new_in_firmware_9", true, ChargerState.Unknown)]
-    public void Each_work_state_maps_to_one_contract_state(string workState, bool startCharging, ChargerState expected)
-    {
-        Assert.Equal(expected, ShellyCharger.StateOf(workState, startCharging));
-    }
-
-    [Fact]
-    public void Total_power_is_read_in_whichever_unit_matches_the_phases_and_the_unit_is_kept()
-    {
-        var phases = Enumerable.Repeat(new PhaseInfo(230, 10, null), 3).ToList();
-        var unit = PowerUnit.Unknown;
-
-        Assert.Equal(6900, ShellyCharger.PowerWatts(new PowerInfo(6.9, phases), ref unit), precision: 6);
-        Assert.Equal(PowerUnit.Kilowatts, unit);
-
-        unit = PowerUnit.Unknown;
-        Assert.Equal(6890, ShellyCharger.PowerWatts(new PowerInfo(6890, phases), ref unit), precision: 6);
-        Assert.Equal(PowerUnit.Watts, unit);
-
-        // Idle: too little to tell, so the unit found while charging stays.
-        var idle = Enumerable.Repeat(new PhaseInfo(230, 0, null), 3).ToList();
-        Assert.Equal(0, ShellyCharger.PowerWatts(new PowerInfo(0, idle), ref unit));
-        Assert.Equal(PowerUnit.Watts, unit);
-    }
-
-    [Theory]
-    [InlineData("192.168.1.50", "http://192.168.1.50/")]
-    [InlineData(" shelly.local:8080/ ", "http://shelly.local:8080/")]
-    [InlineData("https://192.168.1.50", "https://192.168.1.50/")]
-    [InlineData("http://192.168.1.50/rpc", null)]
-    [InlineData("ftp://192.168.1.50", null)]
-    [InlineData("", null)]
-    public void An_address_is_a_host_with_an_optional_port(string text, string? expected)
-    {
-        Assert.Equal(expected, ChargerAddressStore.Parse(text)?.AbsoluteUri);
+        await Eventually(() => Link.IsAttached && Status.RememberedProviderId == "fake-charger", "the plugin should reconnect and be remembered");
     }
 
     private static PvSystemInfo Site { get; } = new(
@@ -426,23 +347,12 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
     private IEvChargerDriver Driver(bool dryRun = false) =>
         new ExternalChargerDriverFactory(Link).Create(EvChargerConnection.External, new EvChargerDriverOptions { DryRun = dryRun });
 
-    // The Shelly plugin as Program.cs wires it, on this TestServer.
-    private async Task<(ChargerProviderConnection Plugin, ShellyCharger Charger)> StartPluginAsync(bool publishes = true)
-    {
-        var options = new ShellyOptions { DataDirectory = _directory };
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["Shelly:Host"] = "192.168.1.50" })
-            .Build();
-        var address = new ChargerAddressStore(new ProviderSecretStore(_directory), configuration);
-        var rpc = new ShellyRpcClient(new HttpClient(_topAc, disposeHandler: false), address, options);
-        var charger = new ShellyCharger(rpc, options, TimeProvider.System, NullLogger<ShellyCharger>.Instance);
-        var plugin = await StartPluginAsync(charger, publishes);
-        _ = new StatusReporter(plugin, charger, NullLogger<StatusReporter>.Instance);
-        return (plugin, charger);
-    }
+    // The fake charger behind the ordinary SDK, on this TestServer.
+    private Task<ChargerProviderConnection> StartPluginAsync(bool publishes = true) =>
+        StartPluginAsync(_charger, publishes, id: "fake-charger");
 
     private async Task<ChargerProviderConnection> StartPluginAsync(
-        IChargerSource source, bool publishes = false, bool attaches = true, string id = "shelly-topac")
+        IChargerSource source, bool publishes = false, bool attaches = true, string id = "fake-charger")
     {
         var plugin = new ChargerProviderConnection(
             Options.Create(new ProviderOptions
@@ -450,7 +360,7 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
                 Endpoint = _app!.GetTestServer().BaseAddress,
                 Token = _token,
                 ProviderId = id,
-                Name = "Shelly TopAC",
+                Name = "Fake charger",
                 Version = "1.0",
                 PageUrl = new Uri("http://localhost:8097/"),
                 InitialRetryDelay = TimeSpan.FromMilliseconds(50),
@@ -494,6 +404,56 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
         }
 
         Assert.True(condition(), because);
+    }
+
+    // A charger behind a plugin: 6-16 A on three phases, as the plugin says in its hello; what it reads is set by the
+    // test, what it is sent is kept.
+    private sealed class FakeCharger : IChargerSource
+    {
+        public ChargerCapabilities Capabilities { get; } = new(6, 16, 3);
+
+        public ChargerState State { get; set; } = ChargerState.Available;
+
+        public double PowerWatts { get; set; }
+
+        public int CurrentAmps { get; set; } = 16;
+
+        public bool Allowed { get; set; } = true;
+
+        public string? ReadFailure { get; set; }
+
+        public string? CommandFailure { get; set; }
+
+        public List<string> Commands { get; } = [];
+
+        public void Charging(int amps)
+        {
+            State = ChargerState.Charging;
+            CurrentAmps = amps;
+            PowerWatts = 3 * 230 * amps;
+        }
+
+        public Task<ChargerReading> ReadAsync(CancellationToken cancellationToken) =>
+            ReadFailure is { } failure
+                ? throw new InvalidOperationException(failure)
+                : Task.FromResult(new ChargerReading(
+                    DateTimeOffset.UtcNow, State, PowerWatts, CurrentAmps: CurrentAmps, ChargingAllowed: Allowed, MaxCurrentAmps: 16));
+
+        public Task SetCurrentAsync(int amps, CancellationToken cancellationToken) => Command($"current={amps}", () => CurrentAmps = amps);
+
+        public Task SetChargingAllowedAsync(bool allowed, CancellationToken cancellationToken) => Command($"allowed={allowed}", () => Allowed = allowed);
+
+        private Task Command(string command, Action apply)
+        {
+            if (CommandFailure is { } failure)
+            {
+                throw new InvalidOperationException(failure);
+            }
+
+            Commands.Add(command);
+            apply();
+            return Task.CompletedTask;
+        }
     }
 
     // A plugin whose charger always says the same thing, fresh, and keeps the commands it was sent.

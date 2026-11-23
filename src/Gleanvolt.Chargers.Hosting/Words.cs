@@ -1,11 +1,11 @@
 using System.Globalization;
 
-namespace Gleanvolt.Plugin.Shelly.TopAc;
+namespace Gleanvolt.Chargers;
 
 /// <summary>
-/// One text in the two languages Gleanvolt speaks (#415). The page shows the viewer's
-/// (<see cref="ToString"/>, from the culture Gleanvolt opened it with), and a status sends both
-/// (<see cref="All"/>), since one status goes to every viewer of Gleanvolt.
+/// One text in the two languages Gleanvolt speaks. The page shows the viewer's (<see cref="ToString"/>, from the
+/// culture Gleanvolt opened it with), and a status sends both (<see cref="All"/>), since one status goes to every
+/// viewer of Gleanvolt.
 /// </summary>
 /// <param name="En">English.</param>
 /// <param name="Cs">Czech.</param>

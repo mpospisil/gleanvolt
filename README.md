@@ -217,9 +217,11 @@ and **remains available under it** ([LICENSE-MIT](LICENSE-MIT)) — a licence ch
 permissions already granted. The new terms apply to everything released after that commit.
 
 **The provider SDK is MIT.** `Gleanvolt.Providers.Contracts`, `Gleanvolt.Providers.Client`,
-`Gleanvolt.Providers.Testing` and `Gleanvolt.Modbus` ([src/Gleanvolt.Providers.Contracts](src/Gleanvolt.Providers.Contracts),
+`Gleanvolt.Providers.Testing`, `Gleanvolt.Chargers.Hosting` and `Gleanvolt.Modbus`
+([src/Gleanvolt.Providers.Contracts](src/Gleanvolt.Providers.Contracts),
 [src/Gleanvolt.Providers.Client](src/Gleanvolt.Providers.Client),
-[src/Gleanvolt.Providers.Testing](src/Gleanvolt.Providers.Testing) and [src/Gleanvolt.Modbus](src/Gleanvolt.Modbus))
+[src/Gleanvolt.Providers.Testing](src/Gleanvolt.Providers.Testing),
+[src/Gleanvolt.Chargers.Hosting](src/Gleanvolt.Chargers.Hosting) and [src/Gleanvolt.Modbus](src/Gleanvolt.Modbus))
 are under the MIT License, in the `LICENSE` file in each directory, so that a plugin can be under any
 licence its author chooses. They are published on nuget.org. See [docs/PROVIDERS.md](docs/PROVIDERS.md).
 

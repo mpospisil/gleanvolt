@@ -1,4 +1,6 @@
-<Router AppAssembly="typeof(Program).Assembly">
+@inject PluginInfo Plugin
+
+<Router AppAssembly="Plugin.PageAssembly">
     <Found Context="routeData">
         <RouteView RouteData="routeData" />
     </Found>

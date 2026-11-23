@@ -79,9 +79,16 @@ installation: Gleanvolt acts on what they send.
 of the built-in volkswagen.de feed, run as a plugin, with its own page for the account and the sign-in
 (#410). It is a test of moving a car integration out of Gleanvolt, not part of the release.
 
-[`plugins/Gleanvolt.Plugin.Shelly`](../plugins/Gleanvolt.Plugin.Shelly) is the first charger plugin
-(#429, #435): the Shelly TopAC Portable EV Charger over its local RPC API, with its own page for the
-charger's address. It is not shipped.
+**The charger plugins live in a repository of their own**, [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (#443), MIT, each
+released on its own tag with an image and self-contained zips: the Shelly TopAC (moved from here, #429),
+and SolaX, Huawei and go-e, ported from the drivers built into Gleanvolt. Each is a folder of its own there,
+with its own solution and tests, laid out as a plugin in its own repository would be.
+
+**A charger plugin in your own repository** (#443) references **`Gleanvolt.Chargers.Hosting`** (MIT, on
+nuget.org with the SDK): the host, the page Gleanvolt frames and guards, the address and your own settings, a LAN
+search, and the recording for testers. The plugin implements a `PluginCharger` (its capabilities, a read, the two
+commands), a page in the shared `PluginFrame`, and a `Program.cs` that names it. Its README has a plugin in four
+files. `Gleanvolt.Providers.Testing` adds `PluginHarness` and a `FakeModbusServer` to test one without Gleanvolt.
 
 [`plugins/Gleanvolt.Plugin.OpenWeather`](../plugins/Gleanvolt.Plugin.OpenWeather) is another (#424):
 OpenWeatherMap as a weather provider, with its own page for the key, which Gleanvolt shows under

@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!--
+    What every Gleanvolt charger plugin shares, whoever writes it and in whatever repository (#443): the host
+    (configuration, the page guarded by Gleanvolt's ticket, the connection), the base of a charger and its status, the
+    page's frame and its common sections (Gleanvolt, the address, the search, the recording for testers), the setting
+    store, an address-bound Modbus device and the transport recording. A plugin keeps only its device.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AddRazorSupportForMvc>false</AddRazorSupportForMvc>
+    <RootNamespace>Gleanvolt.Chargers</RootNamespace>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Gleanvolt.Chargers.Hosting</PackageId>
+    <Description>Write a Gleanvolt charger plugin in a few files: the host, the page Gleanvolt frames, the settings, a LAN search and a recording for testers, on the Gleanvolt provider SDK. The plugin implements its charger. MIT.</Description>
+    <PackageTags>gleanvolt;ev;charger;plugin;provider</PackageTags>
+
+    <!-- MIT, like the contracts: see Gleanvolt.Providers.Contracts.csproj. -->
+    <GleanvoltMitPackage>true</GleanvoltMitPackage>
+    <PackageLicenseFile></PackageLicenseFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="LICENSE" Pack="true" PackagePath="\" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gleanvolt.Providers.Client\Gleanvolt.Providers.Client.csproj" />
+    <ProjectReference Include="..\Gleanvolt.Modbus\Gleanvolt.Modbus.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gleanvolt.Providers.Testing" />
+    <InternalsVisibleTo Include="Gleanvolt.Providers.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="..\CultureInvariant.globalconfig" />
+  </ItemGroup>
+
+</Project>

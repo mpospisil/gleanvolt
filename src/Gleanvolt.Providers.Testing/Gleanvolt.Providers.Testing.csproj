@@ -7,7 +7,7 @@
 
     <IsPackable>true</IsPackable>
     <PackageId>Gleanvolt.Providers.Testing</PackageId>
-    <Description>Test a Gleanvolt charger plugin without Gleanvolt (#439): a charger hub on a loopback port that the plugin connects to with the ordinary SDK. Read the charger, send it commands, and check every reading by the contract's rules. MIT.</Description>
+    <Description>Test a Gleanvolt charger plugin without Gleanvolt (#439): a charger hub on a loopback port that the plugin connects to with the ordinary SDK. Read the charger, send it commands, and check every reading by the contract's rules. For a plugin on Gleanvolt.Chargers.Hosting, a harness and a fake Modbus TCP charger. MIT.</Description>
     <PackageTags>gleanvolt;signalr;provider;charger;testing</PackageTags>
 
     <!-- MIT, like the contracts: see Gleanvolt.Providers.Contracts.csproj. -->
@@ -28,6 +28,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Gleanvolt.Providers.Client\Gleanvolt.Providers.Client.csproj" />
+    <!-- PluginHarness and FakeModbusServer, for a plugin built on the charger plugin host (#443). -->
+    <ProjectReference Include="..\Gleanvolt.Chargers.Hosting\Gleanvolt.Chargers.Hosting.csproj" />
   </ItemGroup>
 
   <ItemGroup>

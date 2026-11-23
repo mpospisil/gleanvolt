@@ -1,4 +1,4 @@
-/* The plugin's page (#410, #435; as the OpenWeather plugin's): plain, so it sits quietly in Gleanvolt's frame in either theme. */
+/* Every charger plugin's page: plain, so it sits quietly in Gleanvolt's frame in either theme. */
 :root {
     color-scheme: light dark;
     --text: light-dark(#1f1d1a, #ece7df);
@@ -33,3 +33,9 @@ button { font: inherit; padding: .35rem .9rem; border: 1px solid var(--accent); 
 button.secondary { background: transparent; color: var(--accent); }
 button:disabled { opacity: .5; cursor: default; }
 section { border-top: 1px solid var(--line); padding-top: .25rem; }
+a.button { display: inline-block; font: inherit; padding: .35rem .9rem; border: 1px solid var(--accent); border-radius: 4px; text-decoration: none; }
+a.button.secondary { background: transparent; color: var(--accent); }
+select { font: inherit; padding: .35rem .5rem; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: inherit; }
+ul#search-results { padding-left: 1.2rem; }
+ul#search-results li { margin: .3rem 0; }
+code { font-family: ui-monospace, monospace; }

@@ -4,6 +4,45 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-23 — The charger plugins get a repository of their own, gleanvolt-chargers (#443)
+
+**Found.** With the SDK on nuget.org (#439), contract 1.1 (#440), availability (#441) and setup without a charger (#442),
+nothing kept the charger drivers in this repository except that they were here. Every charger fix meant a Gleanvolt
+release. The one charger plugin, the Shelly TopAC, lived in `plugins/` and doubled as the test plugin for the charger hub.
+
+**Decided.**
+- **One repository for every charger plugin, `gleanvolt-chargers`, MIT,** on the SDK from nuget.org (pinned to
+  `GleanvoltSdkVersion`, 1.3.1, the first with contract 1.1). Each plugin has its own image
+  (`ghcr.io/<owner>/gleanvolt-plugin-<name>`, amd64 + arm64), its own self-contained zips (win-x64, linux-x64,
+  linux-arm64), and its own tag (`solax-v1.0.0`). A charger fix ships without a Gleanvolt release, and one plugin's
+  release ships nothing of the others.
+- **The shared plugin host is a package, `Gleanvolt.Chargers.Hosting`, MIT, released with the SDK from this
+  repository** (the owner's choice over publishing it from gleanvolt-chargers, which would need a second Trusted
+  Publishing policy). Anyone can write a charger plugin in a repository of their own, on nuget.org alone. It holds the
+  host and its guarded page, the charger base and its status, the page frame, the setting store, the Modbus device, the
+  LAN search and the recording for testers; a plugin keeps only its device. `Gleanvolt.Providers.Testing` gains
+  `PluginHarness` and `FakeModbusServer`, so such a plugin is tested without Gleanvolt too. A change to the host ships
+  with a Gleanvolt release.
+- **A solution per charger in gleanvolt-chargers:** each charger is a folder with its own `.slnx`, its plugin, its test
+  project and its README, referencing only the packages. It is laid out as a plugin in its own repository would be,
+  and can be lifted out into one unchanged.
+- **The ports keep what the drivers learnt, register for register.** SolaX reports "allowed" only for Fast and never
+  decides from a junk use-mode; Gleanvolt goes on judging the owner's intent over time. Huawei converts at the
+  welcome's phases and voltage and reports Unknown without power. go-e pauses with the force state.
+- **The register snapshot (#350) becomes each plugin's recording for testers:** every exchange, as sent and received,
+  for 15 minutes, downloaded from the page, never with a password.
+- **Shelly moved,** with two of #437's open items: the charger's password (Shelly's digest) and the recording.
+  Hardware verification stays open. `ExternalChargerTests` here now uses a fake plugin charger; the Shelly-specific
+  tests went with the plugin.
+
+**Consequences accepted.**
+- The new repository's CI restores the SDK from nuget.org, so it is red until Gleanvolt 1.3.1 is released. Until
+  then, a developer packs the SDK into `artifacts/feed/`.
+- The built-in drivers stay until #444 deprecates them and #445 removes them. Until then a fix to one is made twice.
+- Discovery here still finds chargers for the built-in drivers; each plugin has its own search.
+
+---
+
 ## 2026-11-23 — The wizard sets up only Gleanvolt: Inverter → Site → Finish, and no charger means the plugin's (#442)
 
 **Found.** The wizard had six steps: Devices (inverter and charger), Site, Forecast, Car, Extras and Finish.

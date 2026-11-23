@@ -36,6 +36,24 @@ Assert.True(done.Succeeded);
 - **`ChargerTestHubOptions`** sets the welcome (the charge control's limits, `DryRun`, the time zone), the
   token, how long to wait, and the clock the rules are checked against.
 
+**A plugin on `Gleanvolt.Chargers.Hosting`** (#443) has two more helpers:
+
+```csharp
+await using var charger = new FakeModbusServer();              // a Modbus TCP charger: fill Holding / Input
+charger.Input[0x001D] = 2;
+
+await using var harness = new PluginHarness(plugin, new Dictionary<string, string?> { ["MyCharger:Host"] = $"127.0.0.1:{charger.Port}" });
+var mine = new MyCharger(harness.Modbus(), TimeProvider.System);
+var hub = await harness.ConnectAsync(mine, new ChargerLimits(6, 16, 3, 230));
+
+var reading = await hub.ReadAsync();
+await hub.SetCurrentAsync(10);
+Assert.Equal(["0x0628=1000"], charger.Writes);
+```
+
+`PluginHarness` gives the plugin its settings in a data directory of its own, the recorder and the session, and
+`FakeClients(handler)` for an HTTP charger. `FakeModbusServer` keeps every write in order.
+
 What it doesn't do: Gleanvolt's own safeguards (the setpoint threshold, the clamp to the charger's ceiling,
 dry-run) are Gleanvolt's, not the plugin's, so they aren't here. Every command is passed on as asked.
 
