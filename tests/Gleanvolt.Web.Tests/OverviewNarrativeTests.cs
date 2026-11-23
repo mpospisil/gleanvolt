@@ -170,4 +170,34 @@ public class OverviewNarrativeTests
     [Fact]
     public void Says_nothing_of_a_restart_for_a_mode_somebody_selected() =>
         Assert.DoesNotContain("restarted", Describe(Statuses.Sample(Now, ChargeControlMode.FastNoBattery)));
+
+    [Fact]
+    public void A_suspended_mode_says_since_when_and_why_and_that_the_charger_is_unmanaged()
+    {
+        // 09:50 UTC is 11:50 in Prague in summer.
+        var text = Describe(Statuses.Sample(Now, ChargeControlMode.FastNoBattery) with
+        {
+            State = ChargeControlState.Suspended,
+            SuspendedSince = new DateTimeOffset(2026, 8, 12, 9, 50, 0, TimeSpan.Zero),
+            Charger = new Gleanvolt.Core.Models.ChargerAvailability(
+                Gleanvolt.Core.Models.ChargerAvailabilityState.NoPlugin, "No charger plugin is connected.",
+                Gleanvolt.Core.Models.Phrase.Of("Charger.NoPlugin"), new DateTimeOffset(2026, 8, 12, 9, 48, 0, TimeSpan.Zero)),
+        });
+
+        Assert.StartsWith("Fast (no battery) has been suspended since 11:50 (10 min): Gleanvolt can't control the charger. No charger plugin is connected.", text);
+        Assert.Contains("follows its own settings, so any charging now is unmanaged", text);
+    }
+
+    [Fact]
+    public void An_unavailable_charger_with_no_mode_running_is_said()
+    {
+        var text = Describe(Statuses.Sample(Now) with
+        {
+            Charger = new Gleanvolt.Core.Models.ChargerAvailability(
+                Gleanvolt.Core.Models.ChargerAvailabilityState.Error, "Gleanvolt can't read the charger: timeout",
+                Since: new DateTimeOffset(2026, 8, 12, 9, 48, 0, TimeSpan.Zero)),
+        });
+
+        Assert.EndsWith("Gleanvolt can't control the charger since 11:48: Gleanvolt can't read the charger: timeout", text);
+    }
 }

@@ -171,11 +171,49 @@ the battery hold apply as they would to a mode you picked.
   says at startup which values came from the file. A file that can't be read is logged and ignored.
   To go back to the configured values, stop Gleanvolt and delete the file.
 - **The battery hold isn't kept**: it is a command to the inverter, and it is off at every start.
+- **A charger that is still unavailable after the restart** (#441, below) doesn't use up the ten
+  minutes: the mode is taken up once the charger is back, within `ResumeWithin`.
 
 ```jsonc
 "ChargeControl": {
   "ResumeWithin": "12:00:00",                // the longest absence most modes are resumed after
+  "ChargerUnavailableAfter": "00:02:00",     // how long the charger may be gone before a mode is suspended
   "ModeStatePath": "data/charge-mode.json",  // where the running mode is kept
   "SettingsStatePath": "data/charge-settings.json" // where the changed runtime numbers are kept
 }
 ```
+
+## When the charger is unavailable
+
+Gleanvolt can control the charger only while it can reach it (#441). The charger is **unavailable**
+when:
+
+- **No plugin** (`NoPlugin`): the charger is behind a plugin and none is connected.
+- **Needs you** (`NeedsOwner`): Gleanvolt refused the plugin, because the charger can't do what
+  `ChargeControl` asks (`limits`) or another plugin is remembered, or the plugin reports that only you
+  can fix it (no address yet, a password).
+- **Error** (`Error`): the charger can't be read, or the plugin reports another problem.
+
+**A short outage changes nothing.** The charger's link drops for a poll or two many times a day, so the
+charger counts as unavailable only after `ChargeControl:ChargerUnavailableAfter` (2 minutes). Until then
+a poll reads `Unknown` and makes no decision, as it always has.
+
+**After that:**
+
+- **A running mode is suspended, not cancelled.** It stays selected, Gleanvolt commands nothing, and the
+  battery hold is released, so the house battery isn't held for a car Gleanvolt can't control. The
+  control state is `Suspended`, and the Overview says since when and why.
+- **The charger follows its own settings meanwhile.** Many start a car at full current as soon as it is
+  plugged in (see [the plug-in rule](#how-every-mode-waits-and-ends)). The Overview says the charging
+  is unmanaged, not that it stopped.
+- **When the charger is back, the mode resumes by itself**, the way it does after a restart: started as
+  a button starts it, with the restart wait and the battery hold. **Off** while suspended ends the mode,
+  and it doesn't resume.
+- **No mode can start.** The mode buttons on **Charging plan** are disabled with the reason beside them,
+  `POST /charging/start` answers `409` with the reason, and Home Assistant's start buttons are
+  unavailable. **Off** always works.
+
+`GET /api/v1/status` says `chargerAvailable`, `chargerState`, `chargerReason` and `suspendedSince`, and
+Home Assistant has a **Charger** entity
+([HOME_ASSISTANT.md](HOME_ASSISTANT.md)).
+

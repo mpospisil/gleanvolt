@@ -783,4 +783,7 @@
   <data name="ForecastReason" xml:space="preserve">
     <value>Předpověď: {0}.</value>
   </data>
+  <data name="ChargerUnavailable" xml:space="preserve">
+    <value>Žádný režim nelze spustit: Gleanvolt nemůže nabíječku řídit. {0}</value>
+  </data>
 </root>

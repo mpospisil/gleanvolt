@@ -72,6 +72,18 @@ namespace Gleanvolt.Api.Contracts;
 /// at the last poll, so a change made elsewhere shows at once. Null in the status a control action
 /// answers with: read it from GET /status.
 /// </param>
+/// <param name="ChargerAvailable">
+/// Whether Gleanvolt can control the charger (issue #441). False after it has been unavailable for longer than
+/// <c>ChargeControl:ChargerUnavailableAfter</c> (2 minutes): no charger plugin connected, a plugin refused or
+/// reporting an error, or a charger that can't be read. Meanwhile no mode can be started (409), a running one is
+/// suspended, and the charger follows its own settings.
+/// </param>
+/// <param name="ChargerState">Which: <c>available</c>, <c>noPlugin</c>, <c>needsOwner</c> or <c>error</c>.</param>
+/// <param name="ChargerReason">Why it is unavailable, in English; null while it is available.</param>
+/// <param name="SuspendedSince">
+/// When the running mode was suspended for the charger (issue #441); null while it isn't. The mode stays selected
+/// and resumes by itself when the charger is back.
+/// </param>
 public sealed record StatusResponse(
     DateTimeOffset Timestamp,
     ChargeControlMode Mode,
@@ -102,7 +114,11 @@ public sealed record StatusResponse(
     UntilFullStatusResponse? UntilFull = null,
     ForecastOriginResponse? Forecast = null,
     VehicleSourceResponse? VehicleSource = null,
-    ChargingSettingsResponse? Settings = null)
+    ChargingSettingsResponse? Settings = null,
+    bool ChargerAvailable = true,
+    ChargerAvailabilityState ChargerState = ChargerAvailabilityState.Available,
+    string? ChargerReason = null,
+    DateTimeOffset? SuspendedSince = null)
 {
     internal static StatusResponse From(
         ChargeControlStatus status,
@@ -142,7 +158,11 @@ public sealed record StatusResponse(
         status.UntilFull is { } untilFull ? new UntilFullStatusResponse(untilFull.Since, untilFull.Day) : null,
         forecast is { } held ? new ForecastOriginResponse(held.Origin.SourceId, held.Origin.Name, held.Forecast.RetrievedAt, held.ReceivedAt) : null,
         vehicleFeed is { } feed ? new VehicleSourceResponse(feed.Manufacturer, feed.DisplayName, feed.Health.State) : null,
-        settings);
+        settings,
+        status.Charger?.Available ?? true,
+        status.Charger?.State ?? ChargerAvailabilityState.Available,
+        status.Charger?.Reason,
+        status.SuspendedSince);
 }
 
 /// <summary>The feed the car is read from.</summary>

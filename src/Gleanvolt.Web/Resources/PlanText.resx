@@ -801,4 +801,7 @@
     <value>Forecast: {0}.</value>
     <comment>{0} is why the forecast says what it says, in lower case.</comment>
   </data>
+  <data name="ChargerUnavailable" xml:space="preserve">
+    <value>No mode can start: Gleanvolt can't control the charger. {0}</value>
+  </data>
 </root>

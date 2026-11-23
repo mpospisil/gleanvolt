@@ -67,7 +67,8 @@
         "requestBody": "application/json $StartChargingRequest",
         "responses": [
           "200 application/json $ControlActionResponse",
-          "400 application/problem\u002Bjson $ProblemDetails"
+          "400 application/problem\u002Bjson $ProblemDetails",
+          "409 application/problem\u002Bjson $ProblemDetails"
         ]
       }
     },
@@ -79,6 +80,7 @@
         "responses": [
           "200 application/json $ControlActionResponse",
           "400 application/problem\u002Bjson $ProblemDetails",
+          "409 application/problem\u002Bjson $ProblemDetails",
           "503 application/problem\u002Bjson $ProblemDetails"
         ]
       }
@@ -308,7 +310,8 @@
       "targetWatts": "number|string(double)? (required)"
     },
     "ChargeControlMode": "enum[off|solar|forecasted|fastNoBattery|targeted|solarGrid]",
-    "ChargeControlState": "enum[disabled|idle|charging|paused]",
+    "ChargeControlState": "enum[disabled|idle|charging|paused|suspended]",
+    "ChargerAvailabilityState": "enum[available|noPlugin|needsOwner|error]",
     "ChargingSessionEndReason": "enum[modeOff|sessionComplete|carUnplugged|serviceStopped|interrupted|targetReached|departurePassed|noSunLeftToday|chargerTakenOver|]",
     "ChargingSessionEventKind": "enum[sessionStarted|modeChanged|chargingStarted|chargingPaused|targetCurrentChanged|batteryHoldArmed|batteryHoldReleased|planUnusable|planUsable|sessionEnded|chargerStoodDown|chargerRearmed]",
     "ChargingSettingsRequest": {
@@ -658,6 +661,9 @@
       "batteryPowerWatts": "number|string(double) (required)",
       "batterySocPercent": "number|string(double) (required)",
       "carConnected": "boolean (required)",
+      "chargerAvailable": "boolean",
+      "chargerReason": "string?",
+      "chargerState": "$ChargerAvailabilityState",
       "chargerStatus": "$EvChargerStatus (required)",
       "dayPlan": "any (required)",
       "dryRun": "boolean (required)",
@@ -677,6 +683,7 @@
       "solarPowerWatts": "number|string(double) (required)",
       "state": "$ChargeControlState (required)",
       "surplusWatts": "number|string(double)? (required)",
+      "suspendedSince": "string(date-time)?",
       "targetCurrentAmps": "integer|string(int32)? (required)",
       "targetedPlan": "any (required)",
       "timestamp": "string(date-time) (required)",

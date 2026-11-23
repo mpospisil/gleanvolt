@@ -149,9 +149,13 @@ internal static class ControlEndpoints
                 + "as an HTTP error: the call was understood and the controller is in a well-defined "
                 + "state (exactly the one it was in before). Read the flag, not the status code.\n\n"
                 + "The returned status is from the last completed poll, so the powers in it will not "
-                + "reflect this action until the next one lands.")
+                + "reflect this action until the next one lands.\n\n"
+                + "While Gleanvolt can't control the charger (chargerAvailable false on the status: no "
+                + "plugin, a refused one, a charger that can't be read), nothing is started and the answer "
+                + "is 409 with the reason.")
             .Produces<ControlActionResponse>()
-            .ProducesProblem(StatusCodes.Status400BadRequest);
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         api.MapPost("/charging/start/targeted", async (
             TargetedChargeRequestBody body,
@@ -216,9 +220,11 @@ internal static class ControlEndpoints
                 + "is delivered, it may never make the plan lie about what will be.\n\n"
                 + "Send the quoted plan's 'planId' back and 'forecastMovedSinceQuote' says whether the "
                 + "forecast has been refreshed since you were shown it. Advisory only — nothing is "
-                + "stored server-side and a start never fails because of it.")
+                + "stored server-side and a start never fails because of it.\n\n"
+                + "409 while the charger is unavailable, as for POST /charging/start.")
             .Produces<ControlActionResponse>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         api.MapPost("/charging/stop", async (
@@ -457,7 +463,9 @@ internal static class ControlEndpoints
         ChargeControlStatusHolder holder,
         IFastChargeSelector fast,
         bool? forecastMovedSinceQuote = null) =>
-        Results.Ok(new ControlActionResponse(
+        result.ChargerUnavailable
+            ? ApiResults.ChargerUnavailable(result.Message ?? "The charger is unavailable.")
+            : Results.Ok(new ControlActionResponse(
             result.Succeeded,
             result.Message,
             target.Request is { } request ? TargetedRequestResponse.From(request) : null,

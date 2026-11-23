@@ -33,6 +33,14 @@ public sealed class ChargeControlOptions
     public TimeSpan ResumeWithin { get; init; } = TimeSpan.FromHours(12);
 
     /// <summary>
+    /// How long the charger may be unavailable before it counts (#441): no plugin, a plugin refused or reporting an
+    /// error, or a charger that can't be read. A shorter outage is the ordinary flaky link, a poll that reads
+    /// Unknown and no decision. After it, a running mode is suspended with the battery hold released, and no mode
+    /// can be started, until the charger is back.
+    /// </summary>
+    public TimeSpan ChargerUnavailableAfter { get; init; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>
     /// Where the running mode and what it needs are kept for <see cref="ResumeWithin"/> (#413). Relative
     /// to the content root unless absolute, beside <c>tariff.json</c> on the same bind mount.
     /// </summary>

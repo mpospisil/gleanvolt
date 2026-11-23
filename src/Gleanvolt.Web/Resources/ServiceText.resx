@@ -908,4 +908,19 @@
   <data name="Charger_Capabilities" xml:space="preserve">
     <value>The capabilities the plugin gives for its charger are not usable: {0}</value>
   </data>
+  <data name="Charger_NoPlugin" xml:space="preserve">
+    <value>No charger plugin is connected.</value>
+  </data>
+  <data name="Charger_PluginRefused" xml:space="preserve">
+    <value>Gleanvolt refused the charger plugin {0}: {1}</value>
+  </data>
+  <data name="Charger_PluginUnhealthy" xml:space="preserve">
+    <value>The charger plugin {0} reports a problem: {1}</value>
+  </data>
+  <data name="Charger_Unreadable" xml:space="preserve">
+    <value>Gleanvolt can't read the charger: {0}</value>
+  </data>
+  <data name="Action_ChargerUnavailable" xml:space="preserve">
+    <value>No mode can start while Gleanvolt can't control the charger: {0}</value>
+  </data>
 </root>

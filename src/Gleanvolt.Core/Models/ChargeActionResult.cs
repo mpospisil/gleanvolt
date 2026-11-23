@@ -13,5 +13,25 @@ public sealed record ChargeActionResult(bool Succeeded, string? Message, Phrase?
 {
     public static ChargeActionResult Success { get; } = new(true, null);
 
+    /// <summary>
+    /// True when nothing was tried because the charger is unavailable (#441): a conflict with the charger's
+    /// state rather than a write it refused. The API answers it with 409.
+    /// </summary>
+    public bool ChargerUnavailable { get; init; }
+
     public static ChargeActionResult Failed(string message, Phrase? phrase = null) => new(false, message, phrase);
+
+    /// <summary>Not started: the charger is unavailable, for <paramref name="availability"/>'s reason.</summary>
+    public static ChargeActionResult Unavailable(ChargerAvailability availability)
+    {
+        ArgumentNullException.ThrowIfNull(availability);
+        var reason = availability.Reason ?? "the charger is unavailable";
+        return new(
+            false,
+            $"No mode can start while Gleanvolt can't control the charger: {reason}",
+            Phrase.Of("Action.ChargerUnavailable", new PhraseArg.Said(availability.ReasonPhrase, reason)))
+        {
+            ChargerUnavailable = true,
+        };
+    }
 }

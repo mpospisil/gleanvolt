@@ -32,11 +32,30 @@ public static class OverviewNarrative
             sentences.Add(DashboardText.DryRun);
         }
 
+        // A mode suspended for the charger (#441) replaces the usual account: nothing is being decided, and the charger
+        // follows its own settings, which is what an owner finding it charging needs to know.
+        if (status.SuspendedSince is { } suspended)
+        {
+            sentences.Add(Localized.Format(
+                DashboardText.SuspendedForCharger,
+                ChargeModeTabs.Label(status.Mode),
+                TimeZoneInfo.ConvertTime(suspended, zone),
+                Units.Duration(status.Timestamp - suspended),
+                ChargerReason(status.Charger, zone)));
+            sentences.Add(DashboardText.ChargerUnmanaged);
+            return sentences;
+        }
+
         sentences.Add(Charging(status, zone));
 
         if (Why(status, zone) is { } why)
         {
             sentences.Add(why);
+        }
+
+        if (status.Charger is { Available: false, Since: { } since } charger)
+        {
+            sentences.Add(Localized.Format(DashboardText.ChargerUnavailable, TimeZoneInfo.ConvertTime(since, zone), ChargerReason(charger, zone)));
         }
 
         // A restart took the mode up by itself (#413): said while that mode runs, so an owner who finds it
@@ -50,6 +69,9 @@ public static class OverviewNarrative
         // the battery and the grid are doing, and saying it twice made the headline five lines long.
         return sentences;
     }
+
+    private static string ChargerReason(ChargerAvailability? charger, TimeZoneInfo zone) =>
+        charger?.Reason is { } reason ? Localized.Say(charger.ReasonPhrase, reason, zone) : string.Empty;
 
     // The car first: it is what the controller is for, and the one part of the picture that changes
     // because of a decision rather than because of the weather.

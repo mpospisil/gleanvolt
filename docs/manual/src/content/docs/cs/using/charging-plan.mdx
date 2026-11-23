@@ -30,10 +30,14 @@ Nevíte, který zvolit? Viz [Jaký režim zvolit?](../modes/choosing/).
 
 ## Co platí pro všechny režimy
 
-- **Gleanvolt se spouští s vypnutým nabíjením.** Po restartu nebo aktualizaci neběží žádný režim, dokud
-  ho nespustíte. Jedinou výjimkou je Forecasted s volbou **Do plna**, který po restartu pokračuje.
+- **Po restartu běžící režim pokračuje.** Po restartu nebo aktualizaci pokračuje režim, který běžel, i se
+  svým cílem nebo množstvím, a Přehled řekne, že byl obnoven. Neobnoví se, pokud jeho konec uplynul,
+  zatímco Gleanvolt neběžel, ani po dlouhé nepřítomnosti (12 hodin).
 - **Každý režim skončí sám**, když je auto plné nebo odpojené.
-- **Režim restart nepřežije.** Nabíjení naplánované na dnešní noc se ztratí, pokud se Gleanvolt večer
-  restartuje. Po restartu ho spusťte znovu.
+- **Nic se nespustí, dokud Gleanvolt nemůže nabíječku řídit**: není připojen plugin nabíječky, plugin byl
+  odmítnut nebo hlásí problém, nebo nabíječka 2 minuty neodpovídá. Tlačítka režimů jsou vypnutá a nad
+  nimi je důvod. Režim, který už běží, se **přeruší**: Gleanvolt nic neposílá a uvolní blokaci vybíjení baterie
+  a nabíječka se mezitím řídí svým vlastním nastavením. Až bude nabíječka zpět, režim sám pokračuje.
+  **Off** funguje vždy.
 - **Poslední slovo má ten, kdo stojí u nabíječky.** Pokud někdo během běhu režimu změní nabíječku na ní
   samé nebo v její aplikaci, Gleanvolt ji nechá být, dokud režim znovu nespustíte.

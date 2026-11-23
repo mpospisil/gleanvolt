@@ -30,10 +30,14 @@ Not sure which to choose? See [Which mode should I choose?](../modes/choosing/).
 
 ## Things that are true for every mode
 
-- **Gleanvolt starts with charging off.** After a restart or an update, no mode runs until you start one.
-  The only exception is Forecasted with **Until full**, which carries on after a restart.
+- **A restart takes the running mode up again.** After a restart or an update, the mode that was running
+  carries on, with its target or amount, and the Overview says it was resumed. It doesn't when its end
+  passed while Gleanvolt was down, or after a long absence (12 hours).
 - **Every mode stops by itself** when the car is full or unplugged.
-- **A mode doesn't survive a restart.** A charge planned for tonight is lost if Gleanvolt restarts this
-  evening. Start it again afterwards.
+- **Nothing starts while Gleanvolt can't control the charger**: no charger plugin connected, a plugin
+  that was refused or reports a problem, or a charger that doesn't answer for 2 minutes. The mode buttons
+  are disabled, with the reason above them. A mode already running is **suspended**: Gleanvolt commands
+  nothing and releases the battery hold, and the charger follows its own settings meanwhile. When the
+  charger is back, the mode carries on by itself. **Off** always works.
 - **Someone at the wallbox has the last word.** If the charger is changed on the wallbox or in its app
   while a mode runs, Gleanvolt leaves it alone until you start a mode again.

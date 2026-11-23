@@ -89,6 +89,11 @@ namespace Gleanvolt.Core.Models;
 /// When a restart took this mode up again by itself (#413), for as long as that mode runs; null once
 /// the mode changes, and for a mode somebody selected.
 /// </param>
+/// <param name="Charger">Whether Gleanvolt can control the charger (#441), as of this poll. Null from a host that doesn't say.</param>
+/// <param name="SuspendedSince">
+/// When the running mode was suspended because the charger became unavailable (#441); null while it isn't. The
+/// mode stays selected and resumes by itself when the charger is back.
+/// </param>
 public sealed record ChargeControlStatus(
     ChargeControlMode Mode,
     bool DryRun,
@@ -124,7 +129,9 @@ public sealed record ChargeControlStatus(
     bool ChargerStoodDown = false,
     DateTimeOffset? WaitUntil = null,
     UntilFullStatus? UntilFull = null,
-    DateTimeOffset? ResumedAt = null)
+    DateTimeOffset? ResumedAt = null,
+    ChargerAvailability? Charger = null,
+    DateTimeOffset? SuspendedSince = null)
 {
     /// <summary>Whether the mode ended itself this cycle; <see cref="SessionEndReason"/> says why.</summary>
     public bool SessionCompleted => SessionEndReason is not null;

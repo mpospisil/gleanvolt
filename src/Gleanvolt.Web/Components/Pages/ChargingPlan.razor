@@ -64,6 +64,14 @@
         {
             <p class="error" role="alert">@_actionError</p>
         }
+
+        @* No mode can start while the charger can't be controlled (#441); Off still works. *@
+        @if (_status?.Charger is { Available: false, Reason: { } reason } charger)
+        {
+            <p class="warning" id="charger-unavailable">
+                @Localized.Format(PlanText.ChargerUnavailable, Localized.Say(charger.ReasonPhrase, reason, Time.LocalTimeZone))
+            </p>
+        }
     </div>
 
     @if (_status?.BatteryHoldEnabled == true)
@@ -103,23 +111,23 @@
     @switch (_tab)
     {
         case ForecastedSlug:
-            <ForecastedTab Status="_status" Busy="_busy" Start="StartAsync" />
+            <ForecastedTab Status="_status" Busy="StartBlocked" Start="StartAsync" />
             break;
 
         case SolarGridSlug:
-            <SolarGridTab Status="_status" Busy="_busy" Start="StartAsync" />
+            <SolarGridTab Status="_status" Busy="StartBlocked" Start="StartAsync" />
             break;
 
         case FastSlug:
-            <FastTab Status="_status" Busy="_busy" Start="StartAsync" />
+            <FastTab Status="_status" Busy="StartBlocked" Start="StartAsync" />
             break;
 
         case TargetedSlug:
-            <TargetedTab Status="_status" Busy="_busy" Start="StartAsync" Stop="StopAsync" />
+            <TargetedTab Status="_status" Busy="StartBlocked" Start="StartAsync" Stop="StopAsync" />
             break;
 
         default:
-            <SolarTab Status="_status" Busy="_busy" Start="StartAsync" />
+            <SolarTab Status="_status" Busy="StartBlocked" Start="StartAsync" />
             break;
     }
 </section>
@@ -252,6 +260,9 @@
 
         _actionError = result.Message is { } message ? Localized.Say(result.MessagePhrase, message) : null;
     }
+
+    // The tabs' start buttons are disabled while an action runs, and while the charger can't be controlled (#441).
+    private bool StartBlocked => _busy || _status?.Charger is { Available: false };
 
     private string Now() =>
         TimeZoneInfo.ConvertTime(Time.GetUtcNow(), Time.LocalTimeZone).ToString("HH:mm");

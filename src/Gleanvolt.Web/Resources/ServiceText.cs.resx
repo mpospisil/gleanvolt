@@ -823,4 +823,19 @@
   <data name="Charger_Capabilities" xml:space="preserve">
     <value>Schopnosti, které plugin uvádí pro svou nabíječku, nejsou použitelné: {0}</value>
   </data>
+  <data name="Charger_NoPlugin" xml:space="preserve">
+    <value>Není připojen žádný plugin nabíječky.</value>
+  </data>
+  <data name="Charger_PluginRefused" xml:space="preserve">
+    <value>Gleanvolt odmítl plugin nabíječky {0}: {1}</value>
+  </data>
+  <data name="Charger_PluginUnhealthy" xml:space="preserve">
+    <value>Plugin nabíječky {0} hlásí problém: {1}</value>
+  </data>
+  <data name="Charger_Unreadable" xml:space="preserve">
+    <value>Gleanvolt nemůže číst nabíječku: {0}</value>
+  </data>
+  <data name="Action_ChargerUnavailable" xml:space="preserve">
+    <value>Dokud Gleanvolt nemůže nabíječku řídit, žádný režim nelze spustit: {0}</value>
+  </data>
 </root>

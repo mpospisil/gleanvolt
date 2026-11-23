@@ -4,6 +4,64 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-23 — Charger availability: plans disabled while the charger is unavailable, suspended and resumed (#441)
+
+**What.** The third step of #438. Gleanvolt now knows whether it can control the charger. While it can't, for
+longer than 2 minutes, a running mode is suspended with the battery hold released and resumes by itself once the
+charger is back. No mode can be started meanwhile, and the Overview, the API and Home Assistant all say why.
+
+**How.**
+- **Core:** `ChargerAvailability` (state, reason, phrase, since) and `ChargerAvailabilityState`,
+  `IChargerAvailability`, `ChargeControlState.Suspended`, `EnergyState.EvChargerReadError`,
+  `ChargeControlStatus.Charger` and `SuspendedSince`, and `ChargeActionResult.ChargerUnavailable` with
+  `Unavailable(...)`.
+- **Infrastructure:** `EnergyStateReader` puts the read's exception message in `EvChargerReadError`.
+- **Hosting:**
+  - `ChargerAvailabilityMonitor` assesses each poll. For a plugin charger: not connected (with a `LastRefusal`
+    it's `NeedsOwner`, otherwise `NoPlugin`), or `Healthy == false` (`NeedsOwner` or `Error` by the plugin's
+    `NeedsOwner`). For any charger: a read error is `Error`. The grace period comes from
+    `ChargeControlOptions.ChargerUnavailableAfter`.
+  - `PollingService.SuspendOrResumeAsync` suspends a running mode (`ReleaseControl`, the cycle skipped, the hold
+    reconciled as `Off`) and resumes it through `ChargeActions.StartAsync`. The restart resume waits for the
+    charger, bounded by `ResumeWithin`.
+  - `ChargeActions.StartAsync` refuses while the charger is unavailable.
+  - HA: a **Charger** sensor with a `reason` attribute, `charger`, `charger_reason`, `charger_available` and
+    `suspended_since` in the state payload, and the start buttons and **Activate target** gated by
+    `availability_mode: all`.
+- **API:** `chargerAvailable`, `chargerState`, `chargerReason` and `suspendedSince` on the status. A start refused
+  for the charger is a `409` problem. The OpenAPI snapshot is regenerated.
+- **Web:** `OverviewNarrative` says a mode is suspended (since when, for how long, why, and that the charger is
+  unmanaged), or that the charger is unavailable. The charging plan shows the reason and disables the tabs'
+  start buttons; Off stays enabled. Five service phrases, three Overview strings, one plan string and the
+  `Suspended` state name, in en and cs.
+- **Config:** `ChargeControl:ChargerUnavailableAfter` (`00:02:00`) in appsettings.json.
+
+**Quirks.**
+- A charger reading `Unknown` isn't an unreadable charger: Huawei's SCharger reports `Unknown` whenever it isn't
+  drawing. Only a failed read counts, hence the separate error field.
+- Home Assistant takes either `availability_topic` or an `availability` list, not both, so `Config` adds the
+  shared topic only when an entity has no list of its own.
+
+**Tests.**
+- `ChargerSuspensionLoopTests` (the real poll loop): a 90-second outage changes nothing; a long one suspends at
+  2 minutes, keeps the mode, releases the hold, and resumes with the hold re-armed when the charger is back; Off
+  while suspended doesn't resume; a start while unavailable is refused without a write.
+- `ChargerAvailabilityMonitorTests`: each state and its reason, and the grace period restarting after a good read.
+- API: the `409` and the status fields. `HaDiscoveryTests`: the Charger entity, the payload, the gated buttons.
+- Web: the Overview's sentences and the plan page's disabled starts.
+- The full solution passes in Release.
+
+**Files.** New: `src/Gleanvolt.Core/Models/ChargerAvailability.cs`, `src/Gleanvolt.Core/Interfaces/IChargerAvailability.cs`,
+`src/Gleanvolt.Hosting/Chargers/ChargerAvailabilityMonitor.cs`, `tests/Gleanvolt.Hosting.Tests/ChargerSuspensionLoopTests.cs`,
+`tests/Gleanvolt.Hosting.Tests/ChargerAvailabilityMonitorTests.cs`. Changed: Core `ChargeControlState`, `EnergyState`,
+`ChargeControlStatus`, `ChargeActionResult`; Infrastructure `EnergyStateReader`; Hosting `PollingService`, `ChargeActions`,
+`ChargeControlOptions`, `GleanvoltHostingExtensions`, `HomeAssistant/HaDiscovery`; Api `StatusContracts`,
+`ControlEndpoints`, `ApiResults`; Web `OverviewNarrative`, `ChargingPlan.razor` and the resources; Worker
+`appsettings.json`; docs `CHARGE_CONTROL.md`, `HOME_ASSISTANT.md`, `PROVIDERS.md` and the manual's overview and
+charging-plan pages (en, cs); tests as above.
+
+---
+
 ## 2026-11-23 — Charger contract 1.1: capabilities in the hello, and the first plugin remembered (#440)
 
 **What.** The second step of #438. A charger plugin now says what its charger can do, Gleanvolt checks its

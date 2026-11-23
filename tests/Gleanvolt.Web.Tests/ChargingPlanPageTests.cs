@@ -168,6 +168,23 @@ public class ChargingPlanPageTests : PageTest
     }
 
     [Fact]
+    public void While_the_charger_is_unavailable_no_mode_can_be_started_and_the_page_says_why_but_Off_still_works()
+    {
+        _holder.Set(Statuses.Sample(_time.Now) with
+        {
+            Charger = new ChargerAvailability(ChargerAvailabilityState.NoPlugin, "No charger plugin is connected.",
+                Phrase.Of("Charger.NoPlugin"), _time.Now.AddMinutes(-5)),
+        });
+
+        var page = RenderTab("solar");
+
+        Assert.Contains("No mode can start", page.Find("#charger-unavailable").TextContent);
+        Assert.Contains("No charger plugin is connected.", page.Find("#charger-unavailable").TextContent);
+        Assert.True(page.Find("#start-solar").HasAttribute("disabled"));
+        Assert.False(page.Find("#charge-off").HasAttribute("disabled"));
+    }
+
+    [Fact]
     public void Says_when_and_from_where_the_running_mode_was_started()
     {
         var page = RenderTab("solar");
