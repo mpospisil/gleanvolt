@@ -131,7 +131,8 @@ once, on nuget.org and on GitHub:
 
 1. On nuget.org, under your name → **Trusted Publishing**, add a policy owned by the account (or organization)
    that owns the `Gleanvolt.*` packages: repository owner `mpospisil`, repository `gleanvolt`, workflow file
-   `release.yml`, environment empty.
+   `release.yml`, environment empty, glob pattern `Gleanvolt.*`, and the scope that allows new packages as well
+   as new versions (the first release creates all four).
 2. On GitHub, **Settings → Secrets and variables → Actions → Variables**, add `NUGET_USER`: the nuget.org
    profile name (not the email address).
 
