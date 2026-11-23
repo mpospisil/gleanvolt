@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 
-namespace Gleanvolt.Infrastructure.Tests;
+namespace Gleanvolt.Modbus.Tests;
 
 /// <summary>
 /// A minimal Modbus TCP server on loopback, just complete enough to answer the read/write function

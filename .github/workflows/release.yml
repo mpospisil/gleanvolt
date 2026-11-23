@@ -18,10 +18,11 @@ name: Release
 #             service and purge it again
 #   release   only from here does anything permanent exist: the tag, then the release
 #
-# There is deliberately no package feed. The libraries are packed -- it is a cheap check that the
-# package metadata is coherent, and it produces the artifact if a feed is ever wanted -- but they are
-# attached to the release rather than pushed anywhere. A private consumer takes this repository as a
-# git submodule and references the projects directly, which needs no feed and no credentials.
+# The libraries are packed -- a cheap check that the package metadata is coherent -- and attached to the
+# release. Only the MIT ones, the provider SDK and the Modbus client that plugins are built on (#439), are
+# also pushed to nuget.org, so a plugin in another repository restores them without credentials. The
+# rest is under this repository's licence and goes to no feed: a consumer of the controller itself takes
+# this repository as a git submodule and references the projects directly.
 #
 # The Linux .deb packages are attached to the release too, with packaging/linux/install.sh beside them
 # under that exact name: `releases/latest/download/install.sh` is the one-line install, and it finds
@@ -152,11 +153,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # ContinuousIntegrationBuild makes the build deterministic and maps the source paths in the PDBs to
+      # the repository's, so the symbol packages pushed to nuget.org step into the source on GitHub
+      # (SourceLink). Here only: ci.yml builds as a developer does.
       - name: Build
         run: |
           dotnet build Gleanvolt.slnx --configuration Release \
             -p:BuildNumber=${{ needs.version.outputs.build }} \
             -p:SourceRevisionId=${{ github.sha }} \
+            -p:ContinuousIntegrationBuild=true \
             ${{ needs.version.outputs.suffix }}
 
       # ci.yml is the gate for a branch, but a release is permanent in a way a branch build is not.
@@ -173,7 +178,7 @@ jobs:
       - name: Pack the libraries
         run: |
           set -euo pipefail
-          for project in Gleanvolt.Devices.Abstractions Gleanvolt.Devices.Solax Gleanvolt.Devices.Huawei Gleanvolt.Devices.GoE Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting Gleanvolt.Providers.Contracts Gleanvolt.Providers.Client Gleanvolt.Providers.Server; do
+          for project in Gleanvolt.Modbus Gleanvolt.Devices.Abstractions Gleanvolt.Devices.Solax Gleanvolt.Devices.Huawei Gleanvolt.Devices.GoE Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting Gleanvolt.Providers.Contracts Gleanvolt.Providers.Client Gleanvolt.Providers.Testing Gleanvolt.Providers.Server; do
             dotnet pack "src/$project/$project.csproj" --no-build --configuration Release \
               -p:BuildNumber=${{ needs.version.outputs.build }} \
               -p:SourceRevisionId=${{ github.sha }} \
@@ -592,7 +597,7 @@ jobs:
 
           # By name, like the zips and the .debs: a missing library is named, and a new packable
           # project fails here until it is added, rather than shipping a release short of it.
-          expected="Api Core Devices.Abstractions Devices.GoE Devices.Huawei Devices.Solax Hosting Infrastructure Providers.Client Providers.Contracts Providers.Server Web"
+          expected="Api Core Devices.Abstractions Devices.GoE Devices.Huawei Devices.Solax Hosting Infrastructure Modbus Providers.Client Providers.Contracts Providers.Server Providers.Testing Web"
           for package in $expected; do
             if [ ! -f "artifacts/Gleanvolt.${package}.${VERSION}.nupkg" ]; then
               echo "No Gleanvolt.${package}.${VERSION}.nupkg; the packable projects and this list disagree." >&2
@@ -724,8 +729,9 @@ jobs:
             echo "\`ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gleanvolt-plugin-openweather:${VERSION}\`, and the \`openweather\`"
             echo "profile of the compose stack. The README inside the zip says how to run it."
             echo
-            echo "The \`.nupkg\` files are the libraries, for building on the controller directly."
-            echo "They are attached here rather than pushed to a feed."
+            echo "The \`.nupkg\` files are the libraries. The MIT ones a plugin is built on are also on nuget.org:"
+            echo "\`Gleanvolt.Providers.Contracts\`, \`Gleanvolt.Providers.Client\`, \`Gleanvolt.Providers.Testing\` and"
+            echo "\`Gleanvolt.Modbus\`, at ${VERSION}."
             echo
             echo "## Verify your download"
             echo
@@ -770,6 +776,44 @@ jobs:
             --notes-file notes.md \
             "${prerelease[@]}" \
             artifacts/*
+
+      # The MIT packages to nuget.org (#439), after the release exists: a version on nuget.org can't be taken
+      # back, only unlisted, so nothing goes there before the tag and the release do.
+      #
+      # Trusted Publishing, not a stored API key: nuget.org holds a policy for this repository and this
+      # workflow file, the job proves who it is with GitHub's OIDC token (the id-token: write above), and
+      # NuGet/login trades that for a key that lives one hour. Nothing that can push a package is kept in
+      # the repository. The login comes right before the push, so the key can't expire in between.
+      #
+      # NUGET_USER is a repository variable, the nuget.org profile name the policy belongs to; it isn't a
+      # secret. Without it both steps say so and push nothing. The symbol packages go with the packages
+      # (dotnet nuget push takes the .snupkg beside each .nupkg), and --skip-duplicate makes a re-run harmless.
+      - name: Log in to nuget.org
+        id: nuget
+        if: vars.NUGET_USER != ''
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Push the MIT packages to nuget.org
+        env:
+          NUGET_API_KEY: ${{ steps.nuget.outputs.NUGET_API_KEY }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "$NUGET_API_KEY" ]; then
+            echo "No NUGET_USER variable, so no nuget.org login; the MIT packages were not pushed to nuget.org." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          for package in Gleanvolt.Providers.Contracts Gleanvolt.Providers.Client Gleanvolt.Providers.Testing Gleanvolt.Modbus; do
+            dotnet nuget push "artifacts/${package}.${VERSION}.nupkg" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+
+          echo "Pushed the MIT packages to nuget.org at ${VERSION}." >> "$GITHUB_STEP_SUMMARY"
 
       # Publishing the image. publish-image.yml triggers on a v* tag, but GitHub does not start a
       # workflow from a push made with GITHUB_TOKEN, so without RELEASE_TAG_TOKEN the tag above is

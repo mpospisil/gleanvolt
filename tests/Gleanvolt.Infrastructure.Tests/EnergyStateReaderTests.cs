@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Devices;
 using Gleanvolt.Devices.Solax;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Infrastructure.Tests;
 

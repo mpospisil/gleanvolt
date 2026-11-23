@@ -5,6 +5,7 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Infrastructure;
 using Gleanvolt.Devices;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Hosting.Tests;
 

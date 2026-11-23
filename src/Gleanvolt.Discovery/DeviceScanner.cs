@@ -6,6 +6,7 @@ using Gleanvolt.Infrastructure.Modbus;
 using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Devices;
 using Gleanvolt.Devices.GoE;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Discovery;
 
@@ -74,7 +75,7 @@ public sealed class DeviceScanner
         _webProbe = webProbe ?? new HttpWebProbe();
         _timeProvider = timeProvider ?? TimeProvider.System;
         _clientFactory = clientFactory ?? (device => new ModbusTcpClient(
-            device, _timeProvider, _options.ConnectTimeout, _options.RequestTimeout, retries: 0));
+            device.ToEndpoint(), _timeProvider, _options.ConnectTimeout, _options.RequestTimeout, retries: 0));
         _httpClientFactory = httpClientFactory ?? (device =>
         {
             var client = ChargerHttpClients.Create(device, writable: false, NullLogger<ReadOnlyHttpHandler>.Instance);

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Gleanvolt.Modbus;
 using static System.FormattableString;
 
 namespace Gleanvolt.Devices.Solax;

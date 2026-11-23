@@ -1,8 +1,7 @@
 using System.Diagnostics;
-using Gleanvolt.Core.Models;
-using Gleanvolt.Infrastructure.Modbus;
+using Gleanvolt.Modbus;
 
-namespace Gleanvolt.Infrastructure.Tests;
+namespace Gleanvolt.Modbus.Tests;
 
 /// <summary>
 /// Exercises <see cref="ModbusTcpClient"/> against a real loopback socket (see
@@ -12,9 +11,8 @@ namespace Gleanvolt.Infrastructure.Tests;
 /// </summary>
 public class ModbusTcpClientTests
 {
-    private static DeviceConfig Device(int port, TimeSpan? minRequestInterval = null) => new()
+    private static ModbusEndpoint Device(int port, TimeSpan? minRequestInterval = null) => new("127.0.0.1")
     {
-        Host = "127.0.0.1",
         Port = port,
         UnitId = 1,
         MinRequestInterval = minRequestInterval ?? TimeSpan.Zero,
@@ -203,9 +201,8 @@ public class ModbusTcpClientTests
     {
         // Huawei's SDongle (#320): a connect every poll keeps a struggling gateway from recovering.
         var clock = new ManualClock();
-        var device = new DeviceConfig
+        var device = new ModbusEndpoint("127.0.0.1")
         {
-            Host = "127.0.0.1",
             Port = ClosedPort(),
             MinRequestInterval = TimeSpan.Zero,
             ReconnectBackoff = TimeSpan.FromSeconds(5),
@@ -233,9 +230,8 @@ public class ModbusTcpClientTests
     {
         var clock = new ManualClock();
         await using var server = new FakeModbusTcpServer();
-        var device = new DeviceConfig
+        var device = new ModbusEndpoint("127.0.0.1")
         {
-            Host = "127.0.0.1",
             Port = server.Port,
             MinRequestInterval = TimeSpan.Zero,
             ReconnectBackoff = TimeSpan.FromSeconds(5),

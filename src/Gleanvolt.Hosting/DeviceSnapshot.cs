@@ -3,6 +3,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Devices;
 using Gleanvolt.Infrastructure;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Hosting;
 

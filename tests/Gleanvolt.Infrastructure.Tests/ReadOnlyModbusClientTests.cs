@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Infrastructure.Modbus;
+using Gleanvolt.Modbus;
+using Gleanvolt.Modbus.Tests;
 
 namespace Gleanvolt.Infrastructure.Tests;
 
@@ -64,9 +66,9 @@ public class ReadOnlyModbusClientTests
     {
         // The EMMA's own unit (#322): reads reach it, on the one connection; writes reach nothing.
         await using var server = new FakeModbusTcpServer();
-        await using var tcp = new ModbusTcpClient(new Gleanvolt.Core.Models.DeviceConfig
+        await using var tcp = new ModbusTcpClient(new ModbusEndpoint("127.0.0.1")
         {
-            Host = "127.0.0.1", Port = server.Port, UnitId = 1, MinRequestInterval = TimeSpan.Zero,
+            Port = server.Port, UnitId = 1, MinRequestInterval = TimeSpan.Zero,
         });
         var emma = new ReadOnlyModbusClient(tcp, NullLogger<ReadOnlyModbusClient>.Instance).ForUnit(0);
 

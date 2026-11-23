@@ -1,5 +1,6 @@
 using Gleanvolt.Devices.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Devices.Huawei.Tests;
 

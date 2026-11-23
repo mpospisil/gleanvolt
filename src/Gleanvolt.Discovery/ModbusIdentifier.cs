@@ -4,6 +4,7 @@ using Gleanvolt.Infrastructure.RegisterMaps;
 using Gleanvolt.Devices;
 using Gleanvolt.Devices.Huawei;
 using Gleanvolt.Devices.Solax;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Discovery;
 

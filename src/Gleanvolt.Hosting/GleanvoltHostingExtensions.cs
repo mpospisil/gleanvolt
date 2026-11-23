@@ -39,6 +39,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Gleanvolt.Devices;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Hosting;
 
@@ -269,7 +270,7 @@ public static class GleanvoltHostingExtensions
                 var batteryHold = provider.GetRequiredService<IOptions<BatteryHoldOptions>>().Value;
                 return WriteProof(
                     provider,
-                    new ModbusTcpClient(site.Inverter.Connection),
+                    new ModbusTcpClient(site.Inverter.Connection.ToEndpoint()),
                     batteryHold.Enabled && !batteryHold.DryRun);
             });
 
@@ -285,7 +286,7 @@ public static class GleanvoltHostingExtensions
                     // Writable unless dry-run: the service always boots in Off, but Home Assistant can select
                     // a controlling mode at any time, so the client has to be ready for it.
                     var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
-                    return WriteProof(provider, new ModbusTcpClient(charger.Connection), !chargeControl.DryRun);
+                    return WriteProof(provider, new ModbusTcpClient(charger.Connection.ToEndpoint()), !chargeControl.DryRun);
                 });
             }
 

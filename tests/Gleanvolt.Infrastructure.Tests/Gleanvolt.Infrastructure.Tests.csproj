@@ -28,6 +28,11 @@
     <None Update="Fixtures\**\*.html" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- The fake Modbus device lives with the client's own tests (#439); the read-only wrapper's tests use it too. -->
+  <ItemGroup>
+    <Compile Include="..\Gleanvolt.Modbus.Tests\FakeModbusTcpServer.cs" Link="FakeModbusTcpServer.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Gleanvolt.Infrastructure\Gleanvolt.Infrastructure.csproj" />
   </ItemGroup>

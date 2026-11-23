@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Gleanvolt.Modbus</PackageId>
+    <Description>A Modbus TCP client that keeps its connection healthy (#439): one request at a time, spaced, a teardown after any failed exchange, late replies read past, and a reconnect backoff for gateways that recover slowly. What Gleanvolt and its charger plugins talk to Modbus devices with. MIT.</Description>
+    <PackageTags>gleanvolt;modbus;modbus-tcp;nmodbus;ev-charger;inverter</PackageTags>
+
+    <!--
+      MIT, like the provider SDK (see Gleanvolt.Providers.Contracts.csproj): a charger plugin is written
+      under its own licence, and talks to its device with this. The licence and readme are this
+      directory's own; Directory.Build.targets leaves the repository's out when this is set.
+    -->
+    <GleanvoltMitPackage>true</GleanvoltMitPackage>
+    <PackageLicenseFile></PackageLicenseFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="LICENSE" Pack="true" PackagePath="\" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NModbus" Version="3.0.83" />
+  </ItemGroup>
+
+  <!-- Formatting and parsing name their culture here: see the file for why (#290). -->
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="..\CultureInvariant.globalconfig" />
+  </ItemGroup>
+
+</Project>

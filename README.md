@@ -215,11 +215,12 @@ Source code up to and including commit `00de500` (tag `mit-final`) was published
 and **remains available under it** ([LICENSE-MIT](LICENSE-MIT)) — a licence change cannot withdraw
 permissions already granted. The new terms apply to everything released after that commit.
 
-**The provider contracts and client SDK are MIT.** `Gleanvolt.Providers.Contracts` and
-`Gleanvolt.Providers.Client` ([src/Gleanvolt.Providers.Contracts](src/Gleanvolt.Providers.Contracts) and
-[src/Gleanvolt.Providers.Client](src/Gleanvolt.Providers.Client)) are under the MIT License, in the
-`LICENSE` file in each directory, so that a program that supplies data to Gleanvolt can be under any
-licence its author chooses. See [docs/PROVIDERS.md](docs/PROVIDERS.md).
+**The provider SDK is MIT.** `Gleanvolt.Providers.Contracts`, `Gleanvolt.Providers.Client`,
+`Gleanvolt.Providers.Testing` and `Gleanvolt.Modbus` ([src/Gleanvolt.Providers.Contracts](src/Gleanvolt.Providers.Contracts),
+[src/Gleanvolt.Providers.Client](src/Gleanvolt.Providers.Client),
+[src/Gleanvolt.Providers.Testing](src/Gleanvolt.Providers.Testing) and [src/Gleanvolt.Modbus](src/Gleanvolt.Modbus))
+are under the MIT License, in the `LICENSE` file in each directory, so that a plugin can be under any
+licence its author chooses. They are published on nuget.org. See [docs/PROVIDERS.md](docs/PROVIDERS.md).
 
 Third-party components keep their own licences, and nothing here restricts them — every dependency is
 permissive (MIT or Apache-2.0), with the versions, copyright holders and full licence texts listed in

@@ -1,3 +1,5 @@
+using Gleanvolt.Modbus;
+
 namespace Gleanvolt.Core.Models;
 
 public sealed class DeviceConfig
@@ -31,5 +33,14 @@ public sealed class DeviceConfig
     public TimeSpan ReconnectBackoff { get; init; } = TimeSpan.Zero;
 
     /// <summary>The longest <see cref="ReconnectBackoff"/> grows to.</summary>
-    public static TimeSpan MaxReconnectBackoff { get; } = TimeSpan.FromMinutes(2);
+    public static TimeSpan MaxReconnectBackoff => ModbusEndpoint.MaxReconnectBackoff;
+
+    /// <summary>The same device as the Modbus client takes it (#439).</summary>
+    public ModbusEndpoint ToEndpoint() => new(Host)
+    {
+        Port = Port,
+        UnitId = UnitId,
+        MinRequestInterval = MinRequestInterval,
+        ReconnectBackoff = ReconnectBackoff,
+    };
 }

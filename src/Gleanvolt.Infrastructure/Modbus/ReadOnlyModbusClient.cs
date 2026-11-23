@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Gleanvolt.Devices;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Infrastructure.Modbus;
 
