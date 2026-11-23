@@ -1,0 +1,41 @@
+/* Every charger plugin's page: plain, so it sits quietly in Gleanvolt's frame in either theme. */
+:root {
+    color-scheme: light dark;
+    --text: light-dark(#1f1d1a, #ece7df);
+    --muted: light-dark(#6b655c, #a59d91);
+    --ground: light-dark(#ffffff, #1b1916);
+    --line: light-dark(#ddd6cb, #3a362f);
+    --accent: light-dark(#2f5d8a, #8db6e0);
+    --error: light-dark(#a3271f, #f08a80);
+    --ok: light-dark(#2e6b34, #8fcf95);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+}
+
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+body { margin: 0; padding: 1rem; color: var(--text); background: var(--ground); }
+h1 { font-size: 1.25rem; margin: 0 0 .75rem; }
+h2 { font-size: 1rem; margin: 1.5rem 0 .5rem; }
+p { margin: .4rem 0; }
+.muted { color: var(--muted); }
+.error { color: var(--error); }
+.ok { color: var(--ok); }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; margin: .5rem 0; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+label { display: block; margin: .5rem 0 .2rem; }
+input { font: inherit; width: 100%; max-width: 24rem; box-sizing: border-box; padding: .35rem .5rem; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: inherit; }
+.actions { display: flex; flex-wrap: wrap; gap: .5rem; margin: .75rem 0; }
+button { font: inherit; padding: .35rem .9rem; border: 1px solid var(--accent); border-radius: 4px; background: var(--accent); color: var(--ground); cursor: pointer; }
+button.secondary { background: transparent; color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+section { border-top: 1px solid var(--line); padding-top: .25rem; }
+a.button { display: inline-block; font: inherit; padding: .35rem .9rem; border: 1px solid var(--accent); border-radius: 4px; text-decoration: none; }
+a.button.secondary { background: transparent; color: var(--accent); }
+select { font: inherit; padding: .35rem .5rem; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: inherit; }
+ul#search-results { padding-left: 1.2rem; }
+ul#search-results li { margin: .3rem 0; }
+code { font-family: ui-monospace, monospace; }

@@ -9,11 +9,19 @@ Reverse-chronological. Newest entry at the top.
 **What.** The fifth step of #438. The charger plugins now live in
 [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers), and the Shelly plugin left this repository.
 
-**In gleanvolt-chargers** (MIT):
-- `Gleanvolt.Chargers.Shared`: `PluginHost`, `PluginCharger` with `StatusReporter` and `GleanvoltSession`,
-  `PluginSettings`/`SavedSetting`/`DeviceAddress`, `ModbusDevice`, `LanScan` with `IChargerSearch`, `DeviceRecorder`
-  with `RecordingModbusClient` and `RecordingHandler`, and the page's `PluginFrame` and sections, in English and Czech.
-- `Gleanvolt.Plugin.Solax` (8098), `.Huawei` (8099), `.GoE` (8100), `.Shelly` (8097).
+**New MIT package here, `Gleanvolt.Chargers.Hosting`** (`src/Gleanvolt.Chargers.Hosting`, packed and pushed to
+nuget.org with the SDK; the release now has fifteen packages):
+- `PluginHost`, `PluginCharger` with `StatusReporter` and `GleanvoltSession`, and
+  `PluginSettings`/`SavedSetting`/`DeviceAddress`.
+- `ModbusDevice`, and `LanScan` with `IChargerSearch`.
+- `DeviceRecorder` with `RecordingModbusClient` and `RecordingHandler`.
+- The page's `PluginFrame` and its sections, in English and Czech.
+- Its README has a plugin in four files. `Gleanvolt.Providers.Testing` gains `PluginHarness` and `FakeModbusServer`.
+- `ChargersHostingTests` in Providers.Tests. The Dockerfiles, the solution, `release.yml` (pack, expected list, nuget.org
+  push, notes), RELEASING and README are updated.
+
+**In gleanvolt-chargers** (MIT), a folder and a solution per charger, each on the packages alone: `solax/` (8098),
+`huawei/` (8099), `goe/` (8100), `shelly/` (8097), each with `src/Gleanvolt.Plugin.<Name>`, `tests/` and a README.
 - One `docker/Dockerfile` for all four, CI (build, test, images), and a release workflow on `<name>-v<version>` tags.
 - `THIRD-PARTY-NOTICES.md` carries the SolaX register map's Apache-2.0 attribution.
 

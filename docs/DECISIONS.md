@@ -16,9 +16,16 @@ release. The one charger plugin, the Shelly TopAC, lived in `plugins/` and doubl
   (`ghcr.io/<owner>/gleanvolt-plugin-<name>`, amd64 + arm64), its own self-contained zips (win-x64, linux-x64,
   linux-arm64), and its own tag (`solax-v1.0.0`). A charger fix ships without a Gleanvolt release, and one plugin's
   release ships nothing of the others.
-- **A shared library there, `Gleanvolt.Chargers.Shared`,** not a NuGet package. It holds the host and its guarded page,
-  the charger base and its status, the page frame, the address store, the LAN search and the recording for testers. A
-  plugin keeps only its device. It isn't published, because it isn't a contract: the SDK is.
+- **The shared plugin host is a package, `Gleanvolt.Chargers.Hosting`, MIT, released with the SDK from this
+  repository** (the owner's choice over publishing it from gleanvolt-chargers, which would need a second Trusted
+  Publishing policy). Anyone can write a charger plugin in a repository of their own, on nuget.org alone. It holds the
+  host and its guarded page, the charger base and its status, the page frame, the setting store, the Modbus device, the
+  LAN search and the recording for testers; a plugin keeps only its device. `Gleanvolt.Providers.Testing` gains
+  `PluginHarness` and `FakeModbusServer`, so such a plugin is tested without Gleanvolt too. A change to the host ships
+  with a Gleanvolt release.
+- **A solution per charger in gleanvolt-chargers:** each charger is a folder with its own `.slnx`, its plugin, its test
+  project and its README, referencing only the packages. It is laid out as a plugin in its own repository would be,
+  and can be lifted out into one unchanged.
 - **The ports keep what the drivers learnt, register for register.** SolaX reports "allowed" only for Fast and never
   decides from a junk use-mode; Gleanvolt goes on judging the owner's intent over time. Huawei converts at the
   welcome's phases and voltage and reports Unknown without power. go-e pauses with the force state.

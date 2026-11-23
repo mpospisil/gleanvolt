@@ -1,0 +1,43 @@
+@implements IDisposable
+@inject DeviceRecorder Recorder
+@inject TimeProvider Time
+
+@*
+    The recording for testers: every exchange with the charger for a while, downloadable as JSON from /recording.
+*@
+
+<section id="recording-section">
+    <h2>@SharedText.RecordingHeading</h2>
+    <p class="muted">@SharedText.RecordingIntro.Format((int)DeviceRecorder.Duration.TotalMinutes)</p>
+
+    @if (Recorder.Until is { } until)
+    {
+        <p id="recording-state">@SharedText.Recording.Format(Recorder.Count, TimeZoneInfo.ConvertTime(until, Time.LocalTimeZone).ToString("HH:mm", CultureInfo.InvariantCulture))</p>
+        <div class="actions">
+            <button type="button" id="recording-stop" class="secondary" @onclick="Recorder.Stop">@SharedText.StopRecording</button>
+        </div>
+    }
+    else
+    {
+        @if (Recorder.Count > 0)
+        {
+            <p id="recording-state">@SharedText.Recorded.Format(Recorder.Count)</p>
+        }
+
+        <div class="actions">
+            <button type="button" id="recording-start" @onclick="Recorder.Start">@SharedText.StartRecording</button>
+            @if (Recorder.Count > 0)
+            {
+                <a id="recording-download" class="button secondary" href="recording" download>@SharedText.Download</a>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    protected override void OnInitialized() => Recorder.Changed += Refresh;
+
+    public void Dispose() => Recorder.Changed -= Refresh;
+
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+}
