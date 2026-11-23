@@ -137,8 +137,9 @@ can run Home Assistant and an MQTT broker beside it. See
 
 Open **`http://gleanvolt.local:8090`** from any device on the same network, or
 `http://<the machine's address>:8090` where `.local` names don't work. Choose a password, then the
-**setup wizard** searches your network for the inverter and the charger and asks for the site and,
-optionally, a Solcast solar forecast, the car and the grid tariff. See
+**setup wizard** searches your network for the inverter and asks for the site. The charger is a plugin,
+started with the provider token the wizard's last step makes; the solar forecast, the car and the grid
+tariff are on Settings. See
 [The setup wizard](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/setup-wizard/) in the manual. Prefer a terminal? The `setup` command
 does the same ([command line](docs/WEB_UI.md#setting-up-from-the-command-line)).
 

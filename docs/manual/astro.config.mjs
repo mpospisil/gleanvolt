@@ -43,6 +43,7 @@ export default defineConfig({
           items: [
             { slug: 'setting-up/setup-wizard' },
             { slug: 'setting-up/finding-devices' },
+            { slug: 'setting-up/charger' },
             { slug: 'setting-up/solar-forecast' },
             { slug: 'setting-up/weather' },
             { slug: 'setting-up/grid-tariff' },

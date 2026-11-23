@@ -161,7 +161,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
         var address = $"{host}:{port}";
 
         // A charger behind a plugin (#435) has no address: its probe is a reading through the connected plugin.
-        if (role == PvDeviceRole.Charger && ChargerDriverFactory(driver) is { Transport: EvChargerTransport.External } plugin)
+        if (role == PvDeviceRole.Charger && ChargerDriverFactory(driver, host) is { Transport: EvChargerTransport.External } plugin)
         {
             return await ProbePluginAsync(plugin, cancellationToken).ConfigureAwait(false);
         }
@@ -172,7 +172,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
         try
         {
             // A charger reached over HTTP (go-e, #352) is probed over HTTP, on a client that passes only reads.
-            if (role == PvDeviceRole.Charger && ChargerDriverFactory(driver) is { Transport: EvChargerTransport.Http } httpFamily)
+            if (role == PvDeviceRole.Charger && ChargerDriverFactory(driver, host) is { Transport: EvChargerTransport.Http } httpFamily)
             {
                 using var http = _httpClientFactory(new DeviceConfig { Host = host, Port = port, UnitId = unitId });
                 var apiProbe = await httpFamily.Create(EvChargerConnection.Over(http), new EvChargerDriverOptions { DryRun = true })
@@ -212,7 +212,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
             }
 
             // The charger's probe is its driver's too (#349), on a client that cannot write.
-            var charger = ChargerDriverFactory(driver).Create(
+            var charger = ChargerDriverFactory(driver, host).Create(
                 EvChargerConnection.Over(new ReadOnlyModbusClient(client, NullLogger<ReadOnlyModbusClient>.Instance)),
                 new EvChargerDriverOptions { DryRun = true });
             return ChargerProbeResult(address, await charger.ProbeAsync(timeout.Token).ConfigureAwait(false));
@@ -271,9 +271,9 @@ public sealed class PvSystemEditor : IPvSystemEditor
     }
 
     // As for the inverter: an id this host does not have probes with the default, and the save says why.
-    private IEvChargerDriverFactory ChargerDriverFactory(string? id)
+    private IEvChargerDriverFactory ChargerDriverFactory(string? id, string? host)
     {
-        var wanted = string.IsNullOrWhiteSpace(id) ? PvSystemRules.DefaultChargerDriver : id.Trim().ToLowerInvariant();
+        var wanted = PvSystemRules.ChargerDriverId(id, host);
         return _chargerDrivers.FirstOrDefault(candidate => candidate.Id == wanted)
             ?? _chargerDrivers.FirstOrDefault(candidate => candidate.Id == PvSystemRules.DefaultChargerDriver)
             ?? _chargerDrivers[0];

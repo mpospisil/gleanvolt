@@ -86,8 +86,8 @@ public sealed class SetupDocumentTests : IDisposable
     [Fact]
     public void A_step_is_checked_against_what_was_saved_before_it()
     {
-        // Devices alone: the location is not this step's business, so it is not demanded here.
-        var problems = Document(("Pv:Inverter:Host", "192.168.1.10"), ("Pv:Chargers:0:Host", "192.168.1.11"))
+        // The inverter alone: the location is not this step's business, so it is not demanded here.
+        var problems = Document(("Pv:Inverter:Host", "192.168.1.10"))
             .Validate(Target().Configuration);
 
         Assert.Empty(problems);
@@ -98,7 +98,6 @@ public sealed class SetupDocumentTests : IDisposable
     {
         var result = Document(
             ("Pv:Inverter:Host", "192.168.1.10"),
-            ("Pv:Chargers:0:Host", "192.168.1.11"),
             ("Pv:Latitude", "50.0755"),
             ("Pv:Longitude", "14.4378"),
             ("Controller:TimeZone", "Europe/Prague"),
@@ -208,13 +207,12 @@ public sealed class SetupDocumentTests : IDisposable
     {
         var document = SetupDocument.FromJson("""
             {
-              "Pv": { "Inverter": { "Host": "192.168.1.10" }, "Chargers": [ { "Host": "192.168.1.11" } ] },
+              "Pv": { "Inverter": { "Host": "192.168.1.10" } },
               "Controller": { "TimeZone": "Europe/Prague" }
             }
             """);
 
         Assert.Equal("192.168.1.10", document.Values["Pv:Inverter:Host"]);
-        Assert.Equal("192.168.1.11", document.Values["Pv:Chargers:0:Host"]);
         Assert.Empty(document.Validate(Target().Configuration));
     }
 

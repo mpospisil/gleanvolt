@@ -427,9 +427,6 @@
   <data name="Config_PvNoInverter" xml:space="preserve">
     <value>No inverter is configured. Set Pv:Inverter:Host.</value>
   </data>
-  <data name="Config_PvNoCharger" xml:space="preserve">
-    <value>No EV charger is configured. Set Pv:Chargers:0:Host.</value>
-  </data>
   <data name="Config_PvOneCharger" xml:space="preserve">
     <value>Only {0} EV charger is supported; Pv:Chargers has {1}. The configuration can describe more, so it will not need to change when the control logic supports more — which it does not yet.</value>
   </data>
@@ -922,5 +919,8 @@
   </data>
   <data name="Action_ChargerUnavailable" xml:space="preserve">
     <value>No mode can start while Gleanvolt can't control the charger: {0}</value>
+  </data>
+  <data name="Config_SetupChargerKey" xml:space="preserve">
+    <value>{0}: the charger isn't part of setup any more. A charger is a plugin, set up on its own page, that connects with the provider token from Settings → External providers. Take the charger's keys out of the setup file.</value>
   </data>
 </root>

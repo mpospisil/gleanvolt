@@ -95,7 +95,9 @@ Installation**. The keys below are the reference behind those forms.
 }
 ```
 
-- **`Driver` picks how a device is spoken to; `Model` is only a label.** Empty means `solax`. The
+- **`Driver` picks how a device is spoken to; `Model` is only a label.** Empty means `solax`, except for a
+  charger with no `Host`, or no charger at all: that is the charger behind a plugin (`external`, #442),
+  which is what a new installation has. The
   driver fills in `Port` and `UnitId` when they are left out. On Settings these are the **Inverter
   brand** and **Charger brand** drop-downs. Which models each driver covers is in
   [Supported PV systems](SUPPORTED_PV_SYSTEMS.md).

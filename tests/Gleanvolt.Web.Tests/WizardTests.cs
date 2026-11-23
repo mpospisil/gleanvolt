@@ -11,7 +11,8 @@ namespace Gleanvolt.Web.Tests;
 
 /// <summary>
 /// #302: the setup wizard is Settings in a guided order. It reuses the forms, offers what a device
-/// search found without assuming roles, and ends by starting the controller.
+/// search found, and ends by starting the controller. Since #442 it sets up only Gleanvolt itself: Inverter, Site,
+/// Finish, and Finish says how to add a charger plugin.
 /// </summary>
 public class WizardTests : PageTest
 {
@@ -19,6 +20,7 @@ public class WizardTests : PageTest
     private readonly FakeDiscovery _discovery = new();
     private readonly FakeServiceShutdown _shutdown = new();
     private readonly SwitchableSetup _setup = new();
+    private readonly FakeExternalProviders _providers = new();
 
     public WizardTests()
     {
@@ -26,6 +28,8 @@ public class WizardTests : PageTest
         Services.AddSingleton<IDeviceDiscovery>(_discovery);
         Services.AddSingleton<IServiceShutdown>(_shutdown);
         Services.AddSingleton<ISetupState>(_setup);
+        Services.AddSingleton<IExternalProviders>(_providers);
+        _providers.Set(new ExternalProviderStatus("charger", "Charger", "/providers/charger", false, ExternalProviderState.Waiting));
         Services.AddSingleton<IEvEditor>(new FakeEvEditor());
         Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());
         Services.AddSingleton<IWeatherSourceSelection>(new FakeWeatherSourceSelection());
@@ -45,12 +49,20 @@ public class WizardTests : PageTest
     private static string Field(string key) => "#pv-" + key.Replace(':', '-');
 
     [Fact]
-    public void The_devices_step_shows_only_the_device_fields()
+    public void The_wizard_is_inverter_site_and_finish()
     {
-        var page = Step("devices");
+        var steps = Step("inverter").FindAll(".wizard-steps a").Select(link => link.GetAttribute("href"));
+
+        Assert.Equal(["/wizard/inverter", "/wizard/site", "/wizard/finish"], steps);
+    }
+
+    [Fact]
+    public void The_inverter_step_shows_only_the_inverters_fields()
+    {
+        var page = Step("inverter");
 
         Assert.NotNull(page.Find(Field(PvSystemSettingKeys.InverterHost)));
-        Assert.NotNull(page.Find(Field(PvSystemSettingKeys.ChargerHost)));
+        Assert.Empty(page.FindAll(Field(PvSystemSettingKeys.ChargerHost)));
         Assert.Empty(page.FindAll(Field(PvSystemSettingKeys.Latitude)));
         Assert.Empty(page.FindAll(Field(PvSystemSettingKeys.HomeBatteryCapacityKWh)));
     }
@@ -67,26 +79,25 @@ public class WizardTests : PageTest
     }
 
     [Fact]
-    public void An_unknown_step_starts_at_the_devices()
+    public void An_unknown_step_starts_at_the_inverter()
     {
         Assert.NotNull(Step("nonsense").Find("#discovery"));
     }
 
-    [Fact]
-    public void The_extras_step_sets_the_weather_source_home_assistant_and_the_api()
+    [Theory]
+    [InlineData("devices", "#discovery")]
+    [InlineData("solcast", "#wizard-finish")]
+    [InlineData("car", "#wizard-finish")]
+    [InlineData("extras", "#wizard-finish")]
+    public void An_address_from_before_442_lands_on_the_step_that_took_it_over(string step, string expected)
     {
-        var extras = Step("extras");
-
-        Assert.NotNull(extras.Find("#weather-source-choice"));
-        Assert.Empty(extras.FindAll("#weather-api-key"));
-        Assert.NotNull(extras.Find("#mqtt-brokerhost"));
-        Assert.NotNull(extras.Find("#api-enabled"));
+        Assert.NotNull(Step(step).Find(expected));
     }
 
     [Fact]
     public void A_search_suggests_this_machines_subnet_and_starts_on_the_button()
     {
-        var page = Step("devices");
+        var page = Step("inverter");
 
         Assert.Equal("192.168.1.0/24", page.Find("#discovery-subnet").GetAttribute("placeholder"));
 
@@ -98,15 +109,19 @@ public class WizardTests : PageTest
     }
 
     [Fact]
-    public void Progress_and_devices_arrive_live()
+    public void Found_devices_are_listed_but_only_offered_as_the_inverter()
     {
-        var page = Step("devices");
+        var page = Step("inverter");
         page.Find("#discovery-scan").Click();
 
-        _discovery.Finish(Inverter, Charger);
+        _discovery.Finish(Inverter, Charger, Inverter with { Host = "192.168.1.30", Port = 80, UnitId = null, Role = PvDeviceRole.Charger, Driver = "wallco" });
 
-        page.WaitForAssertion(() => Assert.Equal(2, page.FindAll("#discovery-results tbody tr").Count));
-        Assert.Contains("2 answered", page.Find("#discovery-progress").TextContent);
+        page.WaitForAssertion(() => Assert.Equal(3, page.FindAll("#discovery-results tbody tr").Count));
+        var rows = page.FindAll("#discovery-results tbody tr");
+        Assert.Single(rows[0].QuerySelectorAll("button"));
+        Assert.Single(rows[1].QuerySelectorAll("button"));
+        Assert.Empty(rows[2].QuerySelectorAll("button"));
+        Assert.DoesNotContain(page.FindAll("button"), button => button.TextContent.Contains("charger", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -116,7 +131,7 @@ public class WizardTests : PageTest
         var behindEmma = new FoundDevice("192.168.1.20", 502, 1, PvDeviceRole.Inverter, "SUN2000-10K-MAP0", null, true, "note",
             Driver: "acme", Topology: "emma");
         _discovery.Finish(behindEmma);
-        var page = Step("devices");
+        var page = Step("inverter");
 
         page.Find("#discovery-results tbody tr button").Click();
 
@@ -132,46 +147,11 @@ public class WizardTests : PageTest
     }
 
     [Fact]
-    public void Choosing_a_found_charger_of_another_family_brings_its_brand_and_leaves_an_http_chargers_unit_id_alone()
-    {
-        // A go-e as the scan reports it (#353): over HTTP, so no unit id; the fake editor's second family stands in.
-        var goe = new FoundDevice("192.168.1.30", 80, null, PvDeviceRole.Charger, "go-e Charger", null, true, "note", Driver: "wallco");
-        _discovery.Finish(goe);
-        var page = Step("devices");
-
-        // Not Modbus, so it is offered only as the charger.
-        Assert.Single(page.Find("#discovery-results tbody tr").QuerySelectorAll("button")).Click();
-
-        Assert.Equal("wallco", page.Find(Field(PvSystemSettingKeys.ChargerDriver)).GetAttribute("value"));
-        Assert.Equal("192.168.1.30", page.Find(Field(PvSystemSettingKeys.ChargerHost)).GetAttribute("value"));
-        Assert.Equal("80", page.Find(Field(PvSystemSettingKeys.ChargerPort)).GetAttribute("value"));
-
-        page.Find("#pv-save").Click();
-
-        var saved = Assert.Single(_pv.Saves);
-        Assert.Equal("wallco", saved[PvSystemSettingKeys.ChargerDriver]);
-        Assert.False(saved.ContainsKey(PvSystemSettingKeys.ChargerUnitId));
-    }
-
-    [Fact]
-    public void A_found_inverter_chosen_as_the_charger_brings_no_charger_brand()
-    {
-        var huawei = new FoundDevice("192.168.1.20", 502, 1, PvDeviceRole.Inverter, "SUN2000-10K-MAP0", null, true, "note", Driver: "acme");
-        _discovery.Finish(huawei);
-        var page = Step("devices");
-
-        page.Find("#discovery-results tbody tr").QuerySelectorAll("button")[1].Click();   // as charger, against its role
-        page.Find("#pv-save").Click();
-
-        Assert.False(Assert.Single(_pv.Saves).ContainsKey(PvSystemSettingKeys.ChargerDriver));
-    }
-
-    [Fact]
     public void Choosing_a_found_inverter_of_the_configured_family_is_no_driver_edit()
     {
         var solax = Inverter with { Driver = "solax" };
         _discovery.Finish(solax);
-        var page = Step("devices");
+        var page = Step("inverter");
 
         page.Find("#discovery-results tbody tr button").Click();
         page.Find("#pv-save").Click();
@@ -182,17 +162,14 @@ public class WizardTests : PageTest
     }
 
     [Fact]
-    public void Choosing_a_found_device_fills_the_address_and_saves_nothing()
+    public void Choosing_a_found_inverter_fills_its_address_and_saves_nothing_until_saved()
     {
         _discovery.Finish(Inverter, Charger);
-        var page = Step("devices");
+        var page = Step("inverter");
 
-        page.FindAll("#discovery-results tbody tr")[0].QuerySelector("button")!.Click();   // inverter row, as inverter
-        page.FindAll("#discovery-results tbody tr")[1].QuerySelectorAll("button")[1].Click(); // charger row, as charger
+        page.FindAll("#discovery-results tbody tr")[0].QuerySelector("button")!.Click();
 
         Assert.Equal("192.168.1.10", page.Find(Field(PvSystemSettingKeys.InverterHost)).GetAttribute("value"));
-        Assert.Equal("192.168.1.11", page.Find(Field(PvSystemSettingKeys.ChargerHost)).GetAttribute("value"));
-        Assert.Equal("3", page.Find(Field(PvSystemSettingKeys.ChargerUnitId)).GetAttribute("value"));
         Assert.Empty(_pv.Saves);
         Assert.Empty(page.FindAll("#discovery-role-warning"));
 
@@ -200,27 +177,26 @@ public class WizardTests : PageTest
 
         var saved = Assert.Single(_pv.Saves);
         Assert.Equal("192.168.1.10", saved[PvSystemSettingKeys.InverterHost]);
-        Assert.Equal("192.168.1.11", saved[PvSystemSettingKeys.ChargerHost]);
+        Assert.False(saved.ContainsKey(PvSystemSettingKeys.ChargerHost));
     }
 
     [Fact]
-    public void A_role_the_device_did_not_claim_is_allowed_but_said()
+    public void A_charger_chosen_as_the_inverter_is_allowed_but_said()
     {
         _discovery.Finish(Inverter, Charger);
-        var page = Step("devices");
+        var page = Step("inverter");
 
-        // The inverter's address, chosen as the charger.
-        page.FindAll("#discovery-results tbody tr")[0].QuerySelectorAll("button")[1].Click();
+        page.FindAll("#discovery-results tbody tr")[1].QuerySelector("button")!.Click();
 
-        Assert.Contains("identified itself as an inverter", page.Find("#discovery-role-warning").TextContent);
-        Assert.Equal("192.168.1.10", page.Find(Field(PvSystemSettingKeys.ChargerHost)).GetAttribute("value"));
+        Assert.Contains("identified itself as a charger", page.Find("#discovery-role-warning").TextContent);
+        Assert.Equal("192.168.1.11", page.Find(Field(PvSystemSettingKeys.InverterHost)).GetAttribute("value"));
     }
 
     [Fact]
     public void A_refused_start_says_why()
     {
         _discovery.Refusal = new DiscoveryStart(false, "'8.8.8.0/24' is not a private network.");
-        var page = Step("devices");
+        var page = Step("inverter");
 
         page.Find("#discovery-subnet").Change("8.8.8.0/24");
         page.Find("#discovery-scan").Click();
@@ -238,9 +214,49 @@ public class WizardTests : PageTest
         var finish = Step("finish").Find("#wizard-finish");
 
         Assert.Contains("No inverter is configured", finish.TextContent);
-        Assert.NotNull(finish.QuerySelector("a[href='/wizard/devices']"));
+        Assert.NotNull(finish.QuerySelector("a[href='/wizard/inverter']"));
         Assert.Contains("Solar forecast", finish.TextContent);
         Assert.Null(finish.QuerySelector("#restart"));
+    }
+
+    [Fact]
+    public void What_left_the_wizard_is_listed_on_finish_with_links_to_where_it_lives()
+    {
+        _setup.Status = new SetupStatus([], [OptionalSetting.Solcast, OptionalSetting.Ev, OptionalSetting.Tariff, OptionalSetting.Mqtt, OptionalSetting.Weather]);
+
+        var links = Step("finish").FindAll(".optional-checklist a").Select(link => link.GetAttribute("href")).ToList();
+
+        Assert.Equal(
+            ["/settings#solcast-editor", "/car#car-editor", "/settings#tariff-editor", "/settings#mqtt-editor", "/settings#weather-editor"],
+            links);
+    }
+
+    [Fact]
+    public void Finish_says_how_to_add_a_charger_and_makes_the_token_it_connects_with()
+    {
+        var page = Step("finish");
+        var charger = page.Find("#wizard-charger");
+
+        Assert.Contains("through a plugin", charger.TextContent);
+        Assert.Contains("setting-up/charger", charger.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Empty(page.FindAll("#wizard-charger-token"));
+
+        page.Find("#wizard-charger-make-token").Click();
+
+        Assert.Equal(1, _providers.TokensMade);
+        page.WaitForAssertion(() => Assert.NotNull(page.Find("#wizard-charger-token")));
+        Assert.Empty(page.FindAll("#wizard-charger-make-token"));
+    }
+
+    [Fact]
+    public void Finish_shows_a_token_that_exists()
+    {
+        _providers.Token = "gvp_" + new string('x', 43);
+
+        var page = Step("finish");
+
+        Assert.NotNull(page.Find("#wizard-charger-token"));
+        Assert.Empty(page.FindAll("#wizard-charger-make-token"));
     }
 
     [Fact]
@@ -288,18 +304,16 @@ public class WizardTests : PageTest
     }
 
     [Fact]
-    public void Optional_steps_can_be_skipped_and_required_ones_say_next()
+    public void Every_step_but_the_last_says_next()
     {
-        Assert.Contains("skip", Step("solcast").Find("#wizard-next").TextContent);
-        Assert.Equal("/wizard/car", Step("solcast").Find("#wizard-next").GetAttribute("href"));
-        Assert.DoesNotContain("skip", Step("devices").Find("#wizard-next").TextContent);
+        Assert.Equal("/wizard/site", Step("inverter").Find("#wizard-next").GetAttribute("href"));
+        Assert.Equal("/wizard/finish", Step("site").Find("#wizard-next").GetAttribute("href"));
         Assert.Empty(Step("finish").FindAll("#wizard-next"));
     }
 
     [Theory]
-    [InlineData("devices")]
+    [InlineData("inverter")]
     [InlineData("site")]
-    [InlineData("extras")]
     [InlineData("finish")]
     public void Every_string_comes_from_a_resource(string step)
     {

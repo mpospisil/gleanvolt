@@ -4,7 +4,7 @@
 @rendermode InteractiveServer
 @inject ISetupState Setup
 @inject IServiceShutdown Shutdown
-@inject IEvEditor Cars
+@inject IExternalProviders Providers
 @inject NavigationManager Navigation
 
 @*
@@ -14,8 +14,12 @@
 
     The password comes before this page, on /setup, which is where the recovery key is shown. Each step
     is its own address, so a reload stays on it, and each saves as it goes: closing the browser halfway
-    loses nothing that was saved. The devices are what the controller needs; the site's location and time
-    zone are asked for but do not hold the start back; everything after them can be skipped.
+    loses nothing that was saved. The inverter is what the controller needs; the site's location and time
+    zone are asked for but do not hold the start back.
+
+    Gleanvolt sets up only itself (#442): Inverter, Site, Finish. The charger is a plugin with its own setup
+    on its own page, so Finish says how to add one and shows the token it connects with. Solcast, the car and
+    the extras are on Settings, and Finish lists them as optional with links there.
 *@
 
 <SiteTitle Page="@SetupText.WizardTitle" />
@@ -33,34 +37,15 @@
 
 @switch (_step)
 {
-    case WizardStep.Devices:
-        <p class="muted">@SetupText.DevicesIntro</p>
-        <DeviceDiscoveryPanel OnChosen="Choose" />
-        <PvSystemEditorForm Sections="DeviceSections" Suggested="_suggested" OnSaved="StateHasChanged" />
+    case WizardStep.Inverter:
+        <p class="muted">@SetupText.InverterIntro</p>
+        <DeviceDiscoveryPanel OnChosen="Choose" InverterOnly="true" />
+        <PvSystemEditorForm Sections="InverterSections" Suggested="_suggested" OnSaved="StateHasChanged" />
         break;
 
     case WizardStep.Site:
         <p class="muted">@SetupText.SiteIntro</p>
         <PvSystemEditorForm Sections="SiteSections" OnSaved="StateHasChanged" />
-        break;
-
-    case WizardStep.Solcast:
-        <p class="muted">@SetupText.SolcastIntro</p>
-        <SolcastAccountForm OfferSource="false" />
-        break;
-
-    case WizardStep.Car:
-        <p class="muted">@SetupText.CarIntro</p>
-        <CarEditorForm />
-        <VehicleAccount Feed="_runningFeed" />
-        break;
-
-    case WizardStep.Extras:
-        <p class="muted">@SetupText.ExtrasIntro</p>
-        <TariffEditorForm />
-        <WeatherForm InWizard="true" />
-        <MqttEditorForm />
-        <ApiEditorForm />
         break;
 
     default:
@@ -102,6 +87,31 @@
                 </div>
             }
 
+            @* The charger (#442): a plugin, set up on its own page, connecting with the token. Not a step: it
+               isn't Gleanvolt's to set up, and it can be added now or any time later. *@
+            <div id="wizard-charger">
+                <h3>@SetupText.ChargerTitle</h3>
+                <p>@SetupText.ChargerPlugin</p>
+
+                @if (Providers.ReadToken() is { } token)
+                {
+                    <p class="muted">@SetupText.ChargerToken</p>
+                    <div id="wizard-charger-token"><Secret Value="@token" /></div>
+                }
+                else if (Providers.All.Count > 0)
+                {
+                    <p class="muted">@SetupText.ChargerNoToken</p>
+                    <button type="button" class="secondary" id="wizard-charger-make-token" disabled="@_busy" @onclick="MakeTokenAsync">
+                        @SetupText.ChargerMakeToken
+                    </button>
+                }
+
+                <p class="muted">
+                    @SetupText.ChargerLater
+                    @(" ")<ManualLink Page="setting-up/charger">@SetupText.ChargerManual</ManualLink>
+                </p>
+            </div>
+
             @if (status.MissingOptional.Count > 0)
             {
                 <p class="muted">@SetupText.FinishOptional</p>
@@ -129,7 +139,7 @@
     @if (Next is { } next)
     {
         <a class="button-link" id="wizard-next" href="@Href(next)">
-            @(Skippable(_step) ? SetupText.NextOrSkip : SetupText.Next)
+            @SetupText.Next
         </a>
     }
 </div>
@@ -140,29 +150,51 @@
 
     [Parameter] public string? Step { get; set; }
 
-    private static readonly WizardStep[] Steps =
-        [WizardStep.Devices, WizardStep.Site, WizardStep.Solcast, WizardStep.Car, WizardStep.Extras, WizardStep.Finish];
+    private static readonly WizardStep[] Steps = [WizardStep.Inverter, WizardStep.Site, WizardStep.Finish];
 
-    private static readonly PvEditorSection[] DeviceSections = [PvEditorSection.Inverter, PvEditorSection.Charger];
+    private static readonly PvEditorSection[] InverterSections = [PvEditorSection.Inverter];
 
     private static readonly PvEditorSection[] SiteSections =
         [PvEditorSection.Identity, PvEditorSection.Location, PvEditorSection.HomeBattery, PvEditorSection.Capacity];
 
     private WizardStep _step;
     private IReadOnlyDictionary<string, string>? _suggested;
-    private VehicleFeed _runningFeed;
+    private bool _busy;
 
-    protected override void OnInitialized() => _runningFeed = Cars.Read().RunningFeed;
+    protected override void OnParametersSet() => _step = StepNamed(Step);
 
-    protected override void OnParametersSet() =>
-        _step = Enum.TryParse<WizardStep>(Step, ignoreCase: true, out var step) ? step : WizardStep.Devices;
+    // An address from before #442 still lands somewhere sensible: the devices are the inverter now, and what
+    // left the wizard is listed on Finish, with links to Settings.
+    private static WizardStep StepNamed(string? name) => name?.ToLowerInvariant() switch
+    {
+        "devices" => WizardStep.Inverter,
+        "solcast" or "car" or "extras" => WizardStep.Finish,
+        _ => Enum.TryParse<WizardStep>(name, ignoreCase: true, out var step) ? step : WizardStep.Inverter,
+    };
+
+    private async Task MakeTokenAsync()
+    {
+        _busy = true;
+
+        try
+        {
+            await Providers.CreateTokenAsync();
+        }
+        catch (InvalidOperationException)
+        {
+            // The token panel on Settings says why; here the button simply stays.
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 
     private WizardStep? Previous => Array.IndexOf(Steps, _step) is var index and > 0 ? Steps[index - 1] : null;
 
     private WizardStep? Next => Array.IndexOf(Steps, _step) is var index && index < Steps.Length - 1 ? Steps[index + 1] : null;
 
-    // A choice from the search fills the address fields; both roles add up, so choosing the inverter
-    // and then the charger leaves both filled.
+    // A choice from the search fills the inverter's address fields.
     private void Choose(IReadOnlyDictionary<string, string> fields)
     {
         var merged = new Dictionary<string, string>(_suggested ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
@@ -174,34 +206,26 @@
         _suggested = merged;
     }
 
-    private static bool Skippable(WizardStep step) => step is WizardStep.Solcast or WizardStep.Car or WizardStep.Extras;
-
     private static string Href(WizardStep step) => $"{Path}/{step.ToString().ToLowerInvariant()}";
 
     private static WizardStep StepFor(SetupArea area) => area switch
     {
-        SetupArea.Inverter or SetupArea.Charger => WizardStep.Devices,
+        SetupArea.Inverter => WizardStep.Inverter,
         SetupArea.Password => WizardStep.Finish,
         _ => WizardStep.Site,
     };
 
     private static string Name(WizardStep step) => step switch
     {
-        WizardStep.Devices => SetupText.StepDevices,
+        WizardStep.Inverter => SetupText.StepInverter,
         WizardStep.Site => SetupText.StepSite,
-        WizardStep.Solcast => SetupText.StepSolcast,
-        WizardStep.Car => SetupText.StepCar,
-        WizardStep.Extras => SetupText.StepExtras,
         _ => SetupText.StepFinish,
     };
 
     private enum WizardStep
     {
-        Devices,
+        Inverter,
         Site,
-        Solcast,
-        Car,
-        Extras,
         Finish,
     }
 }

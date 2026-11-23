@@ -83,21 +83,23 @@ Gleanvolt at startup, with the reason in the console and the log and exit code 7
 `/wizard`. Every step is one of the forms Settings uses, with the same checks and the same file, so a step skipped now can be done later on Settings.
 Each step saves as it goes, so a reload or a closed browser loses nothing that was saved.
 
-1. **Devices.** **Search** looks for inverters and chargers on this machine's own subnet (or a private
-   range you type, at most a /22) and lists what each one identified as. Choose **Use as inverter** or
-   **Use as charger**: Gleanvolt never assigns the roles itself, and warns when you pick a role the
-   device did not claim. Addresses can also be typed in. Saving reads one value from each device to
-   check it.
+Gleanvolt sets up only itself (#442): **Inverter → Site → Finish**.
+
+1. **Inverter.** **Search** looks for the devices it knows on this machine's own subnet (or a private
+   range you type, at most a /22) and lists what each one identified as. Only **Use as inverter** is
+   offered; a charger is listed so the two can be told apart, and choosing it warns. The address can also
+   be typed in. Saving reads one value from the inverter to check it.
 2. **Site.** Location and time zone (recommended), the home battery's usable capacity and charge
    efficiency, the array's details.
-3. **Forecast** (optional). The Solcast account. In setup mode a save only stores it, so setup spends
-   none of the day's Solcast calls.
-4. **Car** (optional). The car's battery and limits, and the account its state of charge comes from.
-5. **Extras** (optional). The tariff, the weather source, the Home Assistant (MQTT) link and the
-   API with its keys.
-6. **Finish.** What is still missing, each with a link to its step; the recommended and optional
-   settings not yet set; and **Start Gleanvolt**, which restarts it out of setup mode and then opens
-   the Overview.
+3. **Finish.** What is still missing, each with a link to its step; the recommended settings not yet set;
+   **Your charger**, which says the charger is a plugin set up on its own page, shows the provider token
+   (or **Make the token**) and links to the manual; the optional settings not yet set (Solcast, the car,
+   the tariff, MQTT, the weather), each linking to Settings or the Car page; and **Start Gleanvolt**, which
+   restarts it out of setup mode and then opens the Overview.
+
+The charger isn't required: with none configured, the charger is whichever plugin connects to the charger
+hub, now or later. Until one does, no charging mode starts ([CHARGE_CONTROL.md](CHARGE_CONTROL.md#when-the-charger-is-unavailable)).
+An address from before #442 (`/wizard/devices`, `/solcast`, `/car`, `/extras`) lands on Inverter or Finish.
 
 Optional settings never block anything. A page that needs one says it is not configured and how to
 set it up.
@@ -429,8 +431,7 @@ A setup file is shaped like `appsettings.json`, with only the keys the wizard se
     "Id": "home-roof",
     "Latitude": 50.0755,
     "Longitude": 14.4378,
-    "Inverter": { "Host": "192.168.1.10" },
-    "Chargers": [ { "Host": "192.168.1.11" } ]
+    "Inverter": { "Host": "192.168.1.10" }
   },
   "Controller": { "TimeZone": "Europe/Prague" },
   "ChargeControl": { "Forecast": { "BatteryCapacityKWh": 9 } },
@@ -441,7 +442,9 @@ A setup file is shaped like `appsettings.json`, with only the keys the wizard se
 }
 ```
 
-Anything else is refused by name. An empty value removes a saved one, so `.env` applies again.
+Anything else is refused by name. The charger's keys (`Pv:Chargers:…`) are refused with a message saying
+why: the charger is a plugin, not part of setup (#442), and the interactive `setup` no longer asks for it.
+An empty value removes a saved one, so `.env` applies again.
 **Secrets may be in the file**: the web password is saved as a hash, and the rest go to the secret
 store, never to the overrides file. A file holding secrets that every user on the machine can read is
 refused until it is private (`chmod 600`), and after applying it the command reminds you that the file

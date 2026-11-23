@@ -62,7 +62,7 @@ public sealed class CliTests : IDisposable
     private const string Site = """
         {
           "Pv": { "Id": "home-roof", "Latitude": 50.0755, "Longitude": 14.4378,
-                  "Inverter": { "Host": "192.168.1.10" }, "Chargers": [ { "Host": "192.168.1.11" } ] },
+                  "Inverter": { "Host": "192.168.1.10" } },
           "Controller": { "TimeZone": "Europe/Prague" },
           "Web": { "Password": "correct horse" },
           "Solcast": { "ApiKey": "solcast-secret", "ResourceId": "abcd-1234" },
@@ -243,18 +243,20 @@ public sealed class CliTests : IDisposable
             new DiscoveredDevice("192.168.1.11", 502, 3, DiscoveryFinding.SolaxDevice, PvDeviceRole.Charger, "X3-HAC", null, "C31", SupportTier.Verified, true, ""),
         ];
 
-        // Password twice; search yes; take both suggestions; the site; skip the optional ones; save.
+        // Password twice; search yes; take the inverter's suggestion; the site; skip the optional ones; save.
+        // No charger prompt (#442): the charger is a plugin, and the setup says so.
         var input = string.Join('\n',
-            "correct horse", "correct horse", "y", "", "", "50.0755", "14.4378", "Europe/Prague", "9", "", "", "y") + "\n";
+            "correct horse", "correct horse", "y", "", "50.0755", "14.4378", "Europe/Prague", "9", "", "", "y") + "\n";
 
         Assert.Equal(0, await Run(Context(input), "setup"));
 
         var stored = PvSystemOverrides.Read(OverridesPath);
         Assert.Equal("192.168.1.10", stored["Pv:Inverter:Host"]);
-        Assert.Equal("192.168.1.11", stored["Pv:Chargers:0:Host"]);
-        Assert.Equal("3", stored["Pv:Chargers:0:UnitId"]);
+        Assert.False(stored.ContainsKey("Pv:Chargers:0:Host"));
         Assert.Equal("9", stored["ChargeControl:Forecast:BatteryCapacityKWh"]);
         Assert.Contains("X3-HAC", _out.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("Charger address", _out.ToString(), StringComparison.Ordinal);
+        Assert.Contains("The charger is a plugin", _out.ToString(), StringComparison.Ordinal);
         Assert.Contains("Recovery key:", _out.ToString(), StringComparison.Ordinal);
     }
 
@@ -262,7 +264,7 @@ public sealed class CliTests : IDisposable
     public async Task An_external_weather_source_asks_for_no_key()
     {
         var external = string.Join('\n',
-            "n", "192.168.1.10", "192.168.1.11", "50", "14", "Europe/Prague", "", "", "External", "y") + "\n";
+            "n", "192.168.1.10", "50", "14", "Europe/Prague", "", "", "External", "y") + "\n";
 
         Assert.Equal(0, await Run(Context(external, current: (WebPasswordStore.Key, "hash")), "setup"));
 
@@ -275,16 +277,29 @@ public sealed class CliTests : IDisposable
     {
         _found =
         [
-            new DiscoveredDevice("192.168.1.10", 502, 1, DiscoveryFinding.SolaxDevice, PvDeviceRole.Inverter, "X3-HYB-G4 PRO", null, null, SupportTier.Verified, true, ""),
+            new DiscoveredDevice("192.168.1.11", 502, 3, DiscoveryFinding.SolaxDevice, PvDeviceRole.Charger, "X3-HAC", null, null, SupportTier.Verified, true, ""),
         ];
 
-        // A password exists, so no password prompt. The inverter's address typed as the charger.
-        var input = string.Join('\n', "y", "", "192.168.1.10", "50", "14", "Europe/Prague", "", "", "", "y") + "\n";
+        // A password exists, so no password prompt. The charger's address typed as the inverter.
+        var input = string.Join('\n', "y", "192.168.1.11", "50", "14", "Europe/Prague", "", "", "", "y") + "\n";
 
         Assert.Equal(0, await Run(Context(input, current: (WebPasswordStore.Key, "hash")), "setup"));
 
-        Assert.Contains("identified itself as the inverter", _out.ToString(), StringComparison.Ordinal);
-        Assert.Equal("192.168.1.10", PvSystemOverrides.Read(OverridesPath)["Pv:Chargers:0:Host"]);
+        Assert.Contains("identified itself as the charger", _out.ToString(), StringComparison.Ordinal);
+        Assert.Equal("192.168.1.11", PvSystemOverrides.Read(OverridesPath)["Pv:Inverter:Host"]);
+    }
+
+    [Fact]
+    public async Task A_setup_file_with_the_chargers_keys_is_refused_with_why()
+    {
+        var file = File("""
+            { "Pv": { "Inverter": { "Host": "192.168.1.10" }, "Chargers": [ { "Host": "192.168.1.11" } ] } }
+            """);
+
+        Assert.Equal(1, await Run(Context(current: (WebPasswordStore.Key, "hash")), "setup", "--file", file));
+
+        Assert.Contains("Pv:Chargers:0:Host: the charger isn't part of setup any more", _error.ToString(), StringComparison.Ordinal);
+        Assert.False(System.IO.File.Exists(OverridesPath));
     }
 
     [Fact]
@@ -304,7 +319,7 @@ public sealed class CliTests : IDisposable
         using var schema = JsonDocument.Parse(_out.ToString());
         var properties = schema.RootElement.GetProperty("properties");
 
-        Assert.Equal("array", properties.GetProperty("Pv").GetProperty("properties").GetProperty("Chargers").GetProperty("type").GetString());
+        Assert.False(properties.GetProperty("Pv").GetProperty("properties").TryGetProperty("Chargers", out _));
         Assert.True(properties.GetProperty("Web").GetProperty("properties").GetProperty("Password").GetProperty("writeOnly").GetBoolean());
         Assert.Equal(JsonValueKind.Object,
             properties.GetProperty("Api").GetProperty("properties").GetProperty("Keys").GetProperty("additionalProperties").ValueKind);

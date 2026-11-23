@@ -299,11 +299,11 @@ public static class GleanvoltCli
                 console.Out.WriteLine();
             }
 
-            // 2. The devices, with the same search the wizard offers.
-            console.Out.WriteLine("Devices");
+            // 2. The inverter, with the same search the wizard offers. The charger isn't part of setup (#442).
+            console.Out.WriteLine("Inverter");
             var found = new List<DiscoveredDevice>();
 
-            if (Confirm(console, "Search the network for the inverter and charger? It takes a minute or two.", true))
+            if (Confirm(console, "Search the network for the inverter? It takes a minute or two.", true))
             {
                 console.Out.WriteLine("Searching…");
                 found = [.. (await context.Platform.Discover(cancellationToken).ConfigureAwait(false))
@@ -324,8 +324,6 @@ public static class GleanvoltCli
 
             ChooseDevice(console, configuration, values, found, PvDeviceRole.Inverter,
                 PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId);
-            ChooseDevice(console, configuration, values, found, PvDeviceRole.Charger,
-                PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId);
             console.Out.WriteLine();
 
             // 3. The site.
@@ -350,6 +348,9 @@ public static class GleanvoltCli
                 "Weather: NotProvided or External (the OpenWeather plugin, or another provider)");
 
             console.Out.WriteLine("The car, the tariff, Home Assistant and the API are set on Settings, or with setup --file.");
+            console.Out.WriteLine(
+                "The charger is a plugin with its own setup page. Start it with the provider token from Settings → "
+                + "External providers; Gleanvolt uses it as soon as it connects.");
             console.Out.WriteLine();
         }
         catch (EndOfInput)

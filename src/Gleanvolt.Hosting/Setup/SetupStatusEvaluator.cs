@@ -174,11 +174,13 @@ public static class SetupStatusEvaluator
     }
 
     // Which step of a setup a resolver problem belongs to, from the key it names. Coarse on purpose:
-    // the wizard needs to know which page to send someone to, not to parse the sentence.
+    // the wizard needs to know which page to send someone to, not to parse the sentence. The charger isn't part of
+    // setup (#442): a built-in charger configured wrong, or limits it can't meet, is a configuration problem,
+    // fixed on Settings.
     private static SetupArea AreaOf(string problem) =>
         problem.Contains("Pv:Inverter", StringComparison.Ordinal) ? SetupArea.Inverter
         : problem.Contains("Pv:Chargers", StringComparison.Ordinal) || problem.Contains("EV charger", StringComparison.Ordinal)
-            || problem.StartsWith("ChargeControl:", StringComparison.Ordinal) ? SetupArea.Charger
+            || problem.StartsWith("ChargeControl:", StringComparison.Ordinal) ? SetupArea.Configuration
         : problem.Contains("Pv:Latitude", StringComparison.Ordinal) || problem.Contains("Pv:Longitude", StringComparison.Ordinal) ? SetupArea.Location
         : SetupArea.Site;
 }

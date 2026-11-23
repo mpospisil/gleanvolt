@@ -4,6 +4,42 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-23 — The wizard sets up only Gleanvolt: Inverter → Site → Finish, and no charger means the plugin's (#442)
+
+**Found.** The wizard had six steps: Devices (inverter and charger), Site, Forecast, Car, Extras and Finish.
+`PvSystemRules` required a charger, so a fresh install couldn't start without one. With every charger becoming a
+plugin with its own setup (#438), Gleanvolt has nothing to ask about the charger. The plugin connects whenever
+it is started, and #441 already handles a charger that isn't there. Forecast, Car and Extras were Settings
+forms repeated in the wizard.
+
+**Decided.**
+- **The wizard is Inverter → Site → Finish.** Inverter is the old Devices step without the charger. The search
+  still lists a charger it finds, so the two can be told apart, but offers only **Use as inverter**. Forecast,
+  Car and Extras leave the wizard. Finish lists them as optional, each linking to its Settings section or the
+  Car page.
+- **No charger configured is the charger behind a plugin.** No `Pv:Chargers` entry, or one with neither a
+  driver nor a host, resolves to the `external` driver. An empty driver *with* a host is still SolaX, so every
+  existing installation (the Pi's included) keeps its charger unchanged. A built-in driver chosen explicitly
+  without a host is still an error. `PvSystemRules.ChargerDriverId(driver, host)` is the one rule, used by the
+  resolver, the Settings form and the editor's probe.
+- **`SetupArea.Charger` is gone,** and so is the `Config.PvNoCharger` problem. A built-in charger configured
+  wrong, or limits it can't meet, is a `Configuration` problem, fixed on Settings.
+- **Finish says how to add a charger:** a plugin with its own page, the provider token (or **Make the token**),
+  and a link to a new manual page, *Your charger*. No per-platform commands and no catalog in Gleanvolt.
+- **`gleanvolt setup` asks only for the inverter and the site.** A setup file with `Pv:Chargers:…` keys is
+  refused with a message saying why, not as an unknown key. `--print-schema` no longer lists them.
+- **Settings → Installation keeps its Charger section** for the built-in drivers until they are removed
+  (#444, #445). A fresh install shows **External plugin** there.
+
+**Consequences accepted.**
+- A fresh install starts with the charger hub on and no plugin: the charger is `NoPlugin`, and no mode starts
+  until one connects (#441).
+- Old wizard addresses (`/wizard/devices`, `/solcast`, `/car`, `/extras`) land on Inverter or Finish.
+- The shipped `appsettings.json` and compose file still carry a charger entry with the model
+  "SolaX X1/X3-HAC" and no host. It resolves to the plugin; the model is only a label.
+
+---
+
 ## 2026-11-23 — The charger's availability: a running mode is suspended, not cancelled, and nothing starts without the charger (#441)
 
 **Found.** With every charger behind a plugin (#438) and the charger out of setup (#442), Gleanvolt can run with

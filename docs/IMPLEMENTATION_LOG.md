@@ -4,6 +4,59 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-23 — The wizard becomes Inverter → Site → Finish, and the charger leaves setup (#442)
+
+**What.** The fourth step of #438. Gleanvolt sets up only itself. A fresh install goes through Inverter, Site and
+Finish and starts without a charger, and a charger plugin started afterwards is used without returning to the
+wizard.
+
+**How.**
+- **Core:**
+  - `PvSystemRules`: `ExternalChargerDriver` (`external`) and `ChargerDriverId(driver, host)`.
+  - `ResolveChargers` returns an implicit external charger when none is configured, and an empty driver
+    without a host is external.
+  - The default driver list has the external entry.
+  - `SetupArea.Charger` is removed.
+- **Hosting:**
+  - `SetupStatusEvaluator` files charger and `ChargeControl` problems under `Configuration`.
+  - `PvSystemEditor`'s probe picks the driver by the same rule.
+  - `SetupDocument.AllowedKeys` leaves out `Pv:Chargers:…` and refuses them with `Config.SetupChargerKey`.
+  - The interactive `setup` drops the charger prompt and says how a charger is added.
+- **Web:**
+  - `Wizard.razor` has three steps, maps the old step names, and Finish's **Your charger** shows the token
+    or **Make the token** and a `ManualLink` to `setting-up/charger`.
+  - `DeviceDiscoveryPanel.InverterOnly`.
+  - `OptionalSettings.Where` links to Settings and the Car page.
+  - `PvSystemEditorForm` reads an empty driver by the host-aware rule.
+  - New and removed SetupText strings and the new phrase, in en and cs.
+- **Manual:** *The setup wizard* and *Finding your devices* rewritten (en, cs). A new *Your charger* page (en, cs)
+  in the sidebar. Screenshots regenerated: `wizard-inverter` replaces `wizard-devices`; `wizard-solcast`, `-car`
+  and `-extras` are gone.
+- **Docs:** README, `WEB_UI.md`, `CONFIGURATION.md`, `CHARGER_SETUP.md`, `DOCKER.md`, `HTTP_API.md`,
+  `HOME_ASSISTANT.md`, and the `gleanvolt-setup` agent skill (no `Chargers` in the file, the plugin afterwards,
+  the three-step wizard).
+
+**Quirks.**
+- An empty driver had to stay SolaX when a host is set. The Pi's `.env` sets only `EV_CHARGER_HOST`, so a plain
+  "empty means external" would have switched the live charger to the plugin hub.
+- The Settings form's driver drop-down reads the host too. Otherwise a fresh install would show SolaX with empty
+  address fields, which a save would then refuse.
+
+**Tests.**
+- `WizardTests` rewritten for three steps:
+  - the inverter-only search;
+  - the old addresses;
+  - Finish's charger section and token;
+  - the optional links.
+- `SetupStatusEvaluatorTests`: no charger is required, and an explicit built-in charger without a host is a
+  configuration problem.
+- `PvSystemResolverTests`: no charger is the plugin's, and empty means SolaX only with a host.
+- `CliTests`/`SetupDocumentTests`: no charger prompt, and a file with charger keys refused with why.
+- `SetupModeRegistrationTests`, `OptionalSettingsTests` and the setup screenshots are updated.
+- The full solution passes in Release, and the manual builds with every link resolving.
+
+---
+
 ## 2026-11-23 — Charger availability: plans disabled while the charger is unavailable, suspended and resumed (#441)
 
 **What.** The third step of #438. Gleanvolt now knows whether it can control the charger. While it can't, for

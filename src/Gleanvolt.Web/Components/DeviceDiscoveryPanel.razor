@@ -94,10 +94,13 @@
                                 {
                                     <button type="button" class="@(device.Role == PvDeviceRole.Inverter ? "primary" : "secondary")"
                                             @onclick="() => Use(device, PvDeviceRole.Inverter)">@SetupText.UseAsInverter</button>
-                                    <button type="button" class="@(device.Role == PvDeviceRole.Charger ? "primary" : "secondary")"
-                                            @onclick="() => Use(device, PvDeviceRole.Charger)">@SetupText.UseAsCharger</button>
+                                    @if (!InverterOnly)
+                                    {
+                                        <button type="button" class="@(device.Role == PvDeviceRole.Charger ? "primary" : "secondary")"
+                                                @onclick="() => Use(device, PvDeviceRole.Charger)">@SetupText.UseAsCharger</button>
+                                    }
                                 }
-                                else if (device is { Role: PvDeviceRole.Charger, Driver: not null })
+                                else if (!InverterOnly && device is { Role: PvDeviceRole.Charger, Driver: not null })
                                 {
                                     @* A charger found over HTTP (go-e, #353): no Modbus, so it can only be the charger. *@
                                     <button type="button" class="primary"
@@ -127,6 +130,12 @@
     /// Raised with the address fields a choice fills in: host, port and unit id of the role chosen.
     /// </summary>
     [Parameter] public EventCallback<IReadOnlyDictionary<string, string>> OnChosen { get; set; }
+
+    /// <summary>
+    /// Offer only "use as inverter": the wizard's Inverter step (#442), where the charger isn't Gleanvolt's to set
+    /// up. A found charger is still listed, so a swapped pair can be told apart.
+    /// </summary>
+    [Parameter] public bool InverterOnly { get; set; }
 
     private DiscoverySuggestion _suggestion = new([], []);
     private string _subnet = "";

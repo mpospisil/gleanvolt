@@ -1,0 +1,52 @@
+---
+title: Vaše nabíječka
+description: Přidejte nabíječku elektromobilu do Gleanvoltu přes její plugin, kdykoli po nastavení.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+Gleanvolt řídí nabíječku elektromobilu přes **plugin**: malý program pro značku vaší nabíječky, například
+plugin pro Shelly TopAC. Plugin komunikuje s nabíječkou a Gleanvolt říká pluginu, co má dělat. Plugin má
+vlastní stránku, kde zadáte adresu nabíječky a cokoli dalšího, co potřebuje.
+
+Nabíječku nenastavujete v průvodci Gleanvoltu. Plugin spusťte, kdy chcete, během nastavení nebo
+o měsíce později, a Gleanvolt začne nabíječku používat, jakmile se plugin připojí. Do té doby Gleanvolt
+ukazuje výkon slunce a domácí baterii, ale žádný režim nabíjení nelze spustit.
+
+## Přidání nabíječky
+
+<Steps>
+
+1. **Získejte token pro zdroje dat.** V kroku průvodce **Dokončení** nebo v **Nastavení → Externí zdroje
+   dat** klikněte na **Vytvořit token**, pokud žádný není, a zkopírujte ho. Všechny pluginy se připojují
+   tímto jedním tokenem.
+
+2. **Spusťte plugin** podle jeho README, s adresou Gleanvoltu (například `http://gleanvolt.local:8090`)
+   a tokenem. Může běžet na stejném počítači jako Gleanvolt nebo na jiném v domácí síti.
+
+3. **Otevřete stránku pluginu.** V **Nastavení → Externí zdroje dat** řádek **Nabíječka** ukáže plugin,
+   jakmile se připojí, s odkazem **Otevřít** na jeho stránku. Zadejte tam adresu nabíječky a uložte.
+
+4. **Zkontrolujte to.** Řádek **Nabíječka** říká, že je plugin připojený, a Přehled ukazuje stav
+   nabíječky. Režim nabíjení spustíte na stránce **Plán nabíjení**.
+
+</Steps>
+
+## Když je plugin odmítnut
+
+**Nastavení → Externí zdroje dat** napíše pod řádek **Nabíječka**, proč:
+
+- **Nabíječka neumí to, co Gleanvolt chce.** Plugin sdělí, co jeho nabíječka umí: nejnižší a nejvyšší
+  proud a počet fází. Pokud **Maximální proud (A)** nebo **Fáze** na stránce [Auto](../car/) chtějí víc,
+  například tři fáze u jednofázové nabíječky, nastavení snižte, uložte a Gleanvolt restartujte. Plugin to
+  do 5 minut zkusí znovu.
+- **Gleanvolt si pamatuje jiný plugin.** Gleanvolt pustí jen první plugin nabíječky, který přijal, aby
+  nabíječku nepřevzal druhý, omylem spuštěný. Chcete-li plugin vyměnit, zastavte starý a klikněte vedle
+  něj na **Zapomenout**. Zapamatován bude plugin, který se připojí jako další.
+
+## Když Gleanvolt nabíječku ztratí
+
+Pokud se plugin zastaví nebo hlásí, že se k nabíječce nedostane, déle než 2 minuty, běžící režim
+nabíjení se **přeruší**: Gleanvolt nic neposílá a uvolní blokaci vybíjení baterie. Nabíječka se pak řídí
+svým vlastním nastavením. Až bude plugin zpět, režim sám pokračuje. Viz
+[Plán nabíjení](../../using/charging-plan/).

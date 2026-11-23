@@ -445,11 +445,13 @@
     // The charger's driver, as the inverter's (#349): empty means the default, as in configuration.
     private string SelectedChargerDriverId => NormaliseChargerDriver(_values.GetValueOrDefault(PvSystemSettingKeys.ChargerDriver));
 
+    // Empty means SolaX with a host and the plugin's charger without one (#442), as the rules read it.
+    private string ChargerHostValue => _values.GetValueOrDefault(PvSystemSettingKeys.ChargerHost) ?? string.Empty;
+
     private EvChargerDriverInfo? SelectedChargerDriver =>
         Editor.ChargerDrivers.FirstOrDefault(driver => driver.Id == SelectedChargerDriverId);
 
-    private static string NormaliseChargerDriver(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? PvSystemRules.DefaultChargerDriver : value.Trim().ToLowerInvariant();
+    private string NormaliseChargerDriver(string? value) => PvSystemRules.ChargerDriverId(value, ChargerHostValue);
 
     private void SelectChargerDriver(string id)
     {
