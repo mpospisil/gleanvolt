@@ -22,6 +22,7 @@ public sealed class ChargeActions : IChargeActions
     private readonly IChargeControlModeSelector _mode;
     private readonly FastChargingController _fast;
     private readonly ILogger<ChargeActions> _logger;
+    private readonly IChargerAvailability? _availability;
 
     /// <param name="fast">
     /// Read for one number: the current the fast mode runs at. Taken from the controller itself rather
@@ -32,8 +33,10 @@ public sealed class ChargeActions : IChargeActions
         IEvChargerControl charger,
         IChargeControlModeSelector mode,
         FastChargingController fast,
-        ILogger<ChargeActions> logger)
+        ILogger<ChargeActions> logger,
+        IChargerAvailability? availability = null)
     {
+        _availability = availability;
         _charger = charger;
         _mode = mode;
         _fast = fast;
@@ -47,6 +50,13 @@ public sealed class ChargeActions : IChargeActions
         {
             throw new ArgumentOutOfRangeException(
                 nameof(mode), mode, $"Off is not a strategy to start; call {nameof(StopAsync)} instead.");
+        }
+
+        // Nothing is tried on a charger Gleanvolt can't control (#441): the mode would only be suspended at once.
+        if (_availability?.Current is { Available: false } unavailable)
+        {
+            _logger.LogWarning("{Mode} was not started by {Source}: the charger is unavailable ({Reason}).", mode, source, unavailable.Reason);
+            return ChargeActionResult.Unavailable(unavailable);
         }
 
         // The charger first: a mode selected over a charger that refused Fast would sit Idle and say

@@ -38,6 +38,22 @@ public sealed class ControlEndpointTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task A_start_while_the_charger_is_unavailable_is_a_409_with_the_reason()
+    {
+        var client = await _host.StartAsync();
+        _host.Status.Set(Fixtures.Status());
+        _host.Actions.NextResult = ChargeActionResult.Unavailable(new ChargerAvailability(
+            ChargerAvailabilityState.NoPlugin, "No charger plugin is connected.", Since: Fixtures.Now));
+
+        var response = await client.PostAsJsonAsync("/api/v1/charging/start", new { mode = "solar" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var problem = await response.ReadAsync();
+        Assert.Equal("Charger unavailable", problem.Text("title"));
+        Assert.Contains("No charger plugin is connected.", problem.Text("detail"));
+    }
+
+    [Fact]
     public async Task Refuses_off_as_a_mode_to_start()
     {
         var client = await _host.StartAsync();

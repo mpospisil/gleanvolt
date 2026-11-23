@@ -14,4 +14,10 @@ public enum ChargeControlState
 
     /// <summary>Held control but suspended charging (surplus below the minimum).</summary>
     Paused,
+
+    /// <summary>
+    /// A mode is selected, but the charger has been unavailable for longer than the grace period (#441): nothing is
+    /// commanded and the battery hold is released until it is back, when the mode resumes.
+    /// </summary>
+    Suspended,
 }

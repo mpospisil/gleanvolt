@@ -558,4 +558,13 @@
     <value>The external forecast provider {0} is disconnected. This forecast is its last, received {1}.</value>
     <comment>{0} the provider's name; {1} a time, or a day and time.</comment>
   </data>
+  <data name="SuspendedForCharger" xml:space="preserve">
+    <value>{0} has been suspended since {1:HH:mm} ({2}): Gleanvolt can't control the charger. {3}</value>
+  </data>
+  <data name="ChargerUnmanaged" xml:space="preserve">
+    <value>Meanwhile the charger follows its own settings, so any charging now is unmanaged. The mode resumes by itself when the charger is back.</value>
+  </data>
+  <data name="ChargerUnavailable" xml:space="preserve">
+    <value>Gleanvolt can't control the charger since {0:HH:mm}: {1}</value>
+  </data>
 </root>

@@ -36,6 +36,15 @@ internal static class ApiResults
         detail: detail,
         statusCode: StatusCodes.Status400BadRequest);
 
+    /// <summary>
+    /// Nothing was started because Gleanvolt can't control the charger (#441): no plugin, a refused one, a charger
+    /// that can't be read. Not a refused write, which is a 200 with succeeded=false: nothing was tried.
+    /// </summary>
+    internal static IResult ChargerUnavailable(string detail) => Results.Problem(
+        title: "Charger unavailable",
+        detail: detail,
+        statusCode: StatusCodes.Status409Conflict);
+
     /// <summary>Nothing by that identifier.</summary>
     internal static IResult NotFound(string detail) => Results.Problem(
         title: "Not found",

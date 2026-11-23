@@ -4,6 +4,48 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-23 — The charger's availability: a running mode is suspended, not cancelled, and nothing starts without the charger (#441)
+
+**Found.** With every charger behind a plugin (#438) and the charger out of setup (#442), Gleanvolt can run with
+no plugin connected, a refused one, or a plugin that reports an error. Until now a charger that couldn't be read
+was only a poll that reads Unknown and makes no decision. That was right for the SolaX link's dropouts (about 45 a
+day, mostly a poll or two), but wrong for an outage lasting hours. A running mode kept the battery hold armed
+for a car Gleanvolt couldn't control, and a mode could be started onto nothing.
+
+**Decided.**
+- **One availability, in one place:** `IChargerAvailability` (Core), implemented by `ChargerAvailabilityMonitor`
+  and fed by every poll. Four states, the ones Home Assistant shows: `Available`, `NoPlugin`, `NeedsOwner`
+  (refused, or the plugin asks for its owner) and `Error` (unreadable, or the plugin reports a problem). Each
+  comes with a reason in English and as a phrase. The control loop, the start action, the web UI, the API and
+  Home Assistant all read it.
+- **The read error travels in `EnergyState.EvChargerReadError`**, so an unreadable charger is told apart from
+  Huawei's legitimate `Unknown` status.
+- **A grace period, `ChargeControl:ChargerUnavailableAfter` (2 minutes),** applied once, in the monitor. A
+  shorter outage reads as available, so the dropouts behave as before. The outage's start is kept through a
+  change of reason.
+- **Suspend, not cancel.** The mode stays selected and the cycle is skipped (state `Suspended`). The hold is
+  reconciled as for `Off`, which releases every hold a mode armed, and the coordinator releases its claim. When
+  the charger is back, the mode is started through `IChargeActions.StartAsync`, the path the restart resume
+  (#413) and a button use, so the charger is allowed again, the restart wait applies and the mode's first cycle
+  re-arms its hold. Off while suspended ends it. The mode file keeps the mode, so a restart while suspended
+  resumes too, and the restart resume waits for the charger instead of using up its ten minutes.
+- **Starting is refused at the one way in, `ChargeActions.StartAsync`.** `ChargeActionResult.ChargerUnavailable`
+  marks it, the API answers `409`, the web UI disables the start buttons with the reason, and Home Assistant's
+  start buttons get a second availability condition on the state payload (`charger_available`).
+- **This applies to every charger driver, built-in ones included**: an unreadable SolaX for 2 minutes suspends
+  the mode too. That is the point of the grace period, and the built-ins are leaving anyway (#444).
+
+**Consequences accepted.**
+- While suspended, the charger follows its own settings, and many start a car at full current on plug-in.
+  Gleanvolt says the charging is unmanaged; it can't stop what it can't reach.
+- The plans keep metering while suspended (a targeted request's delivered energy counts what the charger
+  delivered unmanaged), so a resumed target doesn't promise again what the car already has.
+- The **Charger** entity isn't in the Home Assistant integration yet; the API carries what it needs.
+- The Targeted tab's **Cancel** shares the start buttons' disabled state while the charger is unavailable; the
+  header's **Off** still stops it.
+
+---
+
 ## 2026-11-23 — Charger contract 1.1: the charger's capabilities in the hello, the limits checked there, and the first plugin remembered (#440)
 
 **Found.** `ExternalChargerDriver` took every plugin's charger to be 6 to 32 A on three phases, which is wrong

@@ -326,6 +326,58 @@ public class HaDiscoveryTests
     }
 
     [Fact]
+    public void TheChargerEntityCarriesItsStateAndTheReason()
+    {
+        var message = Discovery.DiscoveryMessages()
+            .Single(m => m.Topic == "homeassistant/sensor/solax_controller/charger/config");
+
+        using var json = JsonDocument.Parse(message.Payload);
+        var config = json.RootElement;
+
+        Assert.Equal("Charger", config.GetProperty("name").GetString());
+        Assert.Equal("{{ value_json.charger }}", config.GetProperty("value_template").GetString());
+        Assert.Contains("charger_reason", config.GetProperty("json_attributes_template").GetString());
+    }
+
+    [Fact]
+    public void StateJson_SaysWhetherTheChargerCanBeControlled()
+    {
+        using var available = JsonDocument.Parse(Discovery.StateJson(Status()));
+        Assert.Equal("Available", available.RootElement.GetProperty("charger").GetString());
+        Assert.True(available.RootElement.GetProperty("charger_available").GetBoolean());
+
+        using var unavailable = JsonDocument.Parse(Discovery.StateJson(Status() with
+        {
+            Charger = new ChargerAvailability(ChargerAvailabilityState.NoPlugin, "No charger plugin is connected."),
+        }));
+        Assert.Equal("NoPlugin", unavailable.RootElement.GetProperty("charger").GetString());
+        Assert.False(unavailable.RootElement.GetProperty("charger_available").GetBoolean());
+        Assert.Equal("No charger plugin is connected.", unavailable.RootElement.GetProperty("charger_reason").GetString());
+    }
+
+    [Fact]
+    public void TheStartButtonsAreUnavailableWhileTheChargerIs_ButChargeOffIsNot()
+    {
+        var messages = Discovery.DiscoveryMessages().ToList();
+
+        foreach (var objectId in HaDiscovery.StartButtons.Select(button => button.ObjectId).Append("activate_target"))
+        {
+            using var json = JsonDocument.Parse(messages.Single(m => m.Topic == $"homeassistant/button/solax_controller/{objectId}/config").Payload);
+            var config = json.RootElement;
+
+            Assert.Equal("all", config.GetProperty("availability_mode").GetString());
+            Assert.False(config.TryGetProperty("availability_topic", out _));
+            var conditions = config.GetProperty("availability").EnumerateArray().ToList();
+            Assert.Equal(2, conditions.Count);
+            Assert.Contains("charger_available", conditions[1].GetProperty("value_template").GetString());
+        }
+
+        using var off = JsonDocument.Parse(messages.Single(m => m.Topic == $"homeassistant/button/solax_controller/{HaDiscovery.ChargeOffButton}/config").Payload);
+        Assert.True(off.RootElement.TryGetProperty("availability_topic", out _));
+        Assert.False(off.RootElement.TryGetProperty("availability", out _));
+    }
+
+    [Fact]
     public void NoVehicleFeed_PublishesNoCarFeedEntity()
     {
         // An installation with no manufacturer update service has nothing to report, and an entity

@@ -540,4 +540,13 @@
   <data name="ForecastFromDisconnected" xml:space="preserve">
     <value>Externí zdroj předpovědi {0} je odpojený. Toto je jeho poslední předpověď, přijatá {1}.</value>
   </data>
+  <data name="SuspendedForCharger" xml:space="preserve">
+    <value>Režim {0} je přerušen od {1:HH:mm} ({2}): Gleanvolt nemůže nabíječku řídit. {3}</value>
+  </data>
+  <data name="ChargerUnmanaged" xml:space="preserve">
+    <value>Nabíječka se mezitím řídí svým vlastním nastavením, takže případné nabíjení teď nikdo neřídí. Režim se sám obnoví, až bude nabíječka zpět.</value>
+  </data>
+  <data name="ChargerUnavailable" xml:space="preserve">
+    <value>Gleanvolt nemůže nabíječku řídit od {0:HH:mm}: {1}</value>
+  </data>
 </root>

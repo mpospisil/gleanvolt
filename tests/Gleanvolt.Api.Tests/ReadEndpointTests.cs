@@ -35,6 +35,40 @@ public sealed class ReadEndpointTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Status_says_whether_the_charger_can_be_controlled_and_since_when_a_mode_is_suspended()
+    {
+        var client = await _host.StartAsync();
+        var since = Fixtures.Now.AddMinutes(-5);
+        _host.Status.Set(Fixtures.Status() with
+        {
+            State = ChargeControlState.Suspended,
+            Charger = new ChargerAvailability(ChargerAvailabilityState.Error, "Gleanvolt can't read the charger: timeout", Since: since),
+            SuspendedSince = since.AddMinutes(2),
+        });
+
+        var body = await (await client.GetAsync("/api/v1/status")).ReadAsync();
+
+        Assert.Equal("suspended", body.Text("state"));
+        Assert.False(body.GetProperty("chargerAvailable").GetBoolean());
+        Assert.Equal("error", body.Text("chargerState"));
+        Assert.Equal("Gleanvolt can't read the charger: timeout", body.Text("chargerReason"));
+        Assert.Equal(since.AddMinutes(2), body.GetProperty("suspendedSince").GetDateTimeOffset());
+    }
+
+    [Fact]
+    public async Task Status_reads_the_charger_as_available_by_default()
+    {
+        var client = await _host.StartAsync();
+        _host.Status.Set(Fixtures.Status());
+
+        var body = await (await client.GetAsync("/api/v1/status")).ReadAsync();
+
+        Assert.True(body.GetProperty("chargerAvailable").GetBoolean());
+        Assert.Equal("available", body.Text("chargerState"));
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("chargerReason").ValueKind);
+    }
+
+    [Fact]
     public async Task Status_names_where_the_forecast_came_from()
     {
         var client = await _host.StartAsync();

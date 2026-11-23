@@ -20,7 +20,10 @@ public sealed record EnergyState(
     // What the grid meter itself read, set only while GridPowerWatts has been replaced by an estimate
     // because the meter is blind on a phase (PvSystemInfo.UnmeteredGridPhase). Null means GridPowerWatts
     // is the meter. Kept for the log, so the correction can always be read against what it corrected.
-    double? MeteredGridPowerWatts = null)
+    double? MeteredGridPowerWatts = null,
+    // Why the charger couldn't be read this poll, in English, or null when it was. The charger's figures above are
+    // then the Unknown placeholder. Read by the charger's availability (#441).
+    string? EvChargerReadError = null)
 {
     /// <summary>
     /// Household consumption excluding the EV charger, the battery, and PV -- the "Other Loads"

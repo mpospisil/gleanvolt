@@ -385,7 +385,7 @@ public sealed class HaDiscovery
         // have been set by hand.
         foreach (var (objectId, _, name, icon) in StartButtons)
         {
-            yield return Button(objectId, name, icon);
+            yield return Button(objectId, name, icon, needsCharger: true);
         }
 
         yield return Button(ChargeOffButton, "Charge off", "mdi:stop-circle-outline");
@@ -522,7 +522,7 @@ public sealed class HaDiscovery
         // Pressing this is what makes the two above real: it sets the request and then starts the mode,
         // the same order and the same seam the web page uses. The object id is unchanged from #80 on
         // purpose -- existing dashboards and automations keep working across this upgrade.
-        yield return Button("activate_target", "Activate target", "mdi:play-circle-outline");
+        yield return Button("activate_target", "Activate target", "mdi:play-circle-outline", needsCharger: true);
 
         yield return Sensor("target_plan_state", "Target plan state", template: Optional("target_reason"), icon: "mdi:text-box-outline");
         // Alongside target_solar rather than instead of it: the pair is the point. A zero solar share
@@ -640,6 +640,17 @@ public sealed class HaDiscovery
             });
         }
 
+        // Whether Gleanvolt can control the charger (#441), with the reason as an attribute, as the car feed does.
+        yield return Config("sensor", "charger", new Dictionary<string, object?>
+        {
+            ["name"] = "Charger",
+            ["state_topic"] = StateTopic,
+            ["value_template"] = "{{ value_json.charger }}",
+            ["json_attributes_topic"] = StateTopic,
+            ["json_attributes_template"] = "{{ {'reason': value_json.charger_reason} | to_json }}",
+            ["icon"] = "mdi:ev-plug-type2",
+        });
+
         yield return Config("binary_sensor", "holding_control", new Dictionary<string, object?>
         {
             ["name"] = "Charging now",
@@ -708,6 +719,10 @@ public sealed class HaDiscovery
             ["tomorrow_kwh"] = s.TomorrowForecastWh is null ? null : Math.Round(s.TomorrowForecastWh.Value / 1000, 1),
             ["car_feed"] = vehicleFeed?.State.ToString(),
             ["car_feed_reason"] = vehicleFeed?.Message,
+            ["charger"] = (s.Charger?.State ?? ChargerAvailabilityState.Available).ToString(),
+            ["charger_reason"] = s.Charger?.Reason,
+            ["charger_available"] = s.Charger?.Available ?? true,
+            ["suspended_since"] = s.SuspendedSince,
         };
 
         // The plan block is present only in the forecast-driven mode; in the others the entities go
@@ -842,14 +857,34 @@ public sealed class HaDiscovery
 
     // A press and nothing else: an MQTT button has no state topic, so what a dashboard shows after a
     // press is whatever the entities it acted on report next.
-    private (string Topic, string Payload) Button(string objectId, string name, string icon) =>
-        Config("button", objectId, new Dictionary<string, object?>
+    // A start button is also unavailable while the charger is (#441): Home Assistant greys it out rather than
+    // offering a press that is refused. Both conditions must hold, the service online and the charger available.
+    private (string Topic, string Payload) Button(string objectId, string name, string icon, bool needsCharger = false)
+    {
+        var config = new Dictionary<string, object?>
         {
             ["name"] = name,
             ["command_topic"] = ButtonCommandTopic(objectId),
             ["payload_press"] = PayloadPress,
             ["icon"] = icon,
-        });
+        };
+
+        if (needsCharger)
+        {
+            config["availability"] = new object[]
+            {
+                new Dictionary<string, string> { ["topic"] = AvailabilityTopic },
+                new Dictionary<string, string>
+                {
+                    ["topic"] = StateTopic,
+                    ["value_template"] = "{{ '" + PayloadOnline + "' if value_json.charger_available | default(true) else '" + PayloadOffline + "' }}",
+                },
+            };
+            config["availability_mode"] = "all";
+        }
+
+        return Config("button", objectId, config);
+    }
 
     // A free-text control. Home Assistant has no datetime platform over MQTT discovery, so the
     // departure arrives as text and is parsed here; the pattern only keeps the obvious typos out of
@@ -912,7 +947,13 @@ public sealed class HaDiscovery
     private (string Topic, string Payload) Config(string component, string objectId, Dictionary<string, object?> config)
     {
         config["unique_id"] = $"{_deviceId}_{objectId}";
-        config["availability_topic"] = AvailabilityTopic;
+
+        // An entity with its own list of conditions (#441) carries it instead: Home Assistant takes one or the other.
+        if (!config.ContainsKey("availability"))
+        {
+            config["availability_topic"] = AvailabilityTopic;
+        }
+
         config["payload_available"] = PayloadOnline;
         config["payload_not_available"] = PayloadOffline;
         config["device"] = _device;

@@ -59,7 +59,7 @@ public sealed class EnergyStateReader : IEnergyStateReader
     public async Task<EnergyState> ReadAsync(CancellationToken cancellationToken = default)
     {
         var inverter = await _inverter.ReadAsync(cancellationToken).ConfigureAwait(false);
-        var evCharger = await ReadEvChargerAsync(cancellationToken).ConfigureAwait(false);
+        var (evCharger, evChargerError) = await ReadEvChargerAsync(cancellationToken).ConfigureAwait(false);
 
         var state = new EnergyState(
             DateTimeOffset.UtcNow,
@@ -72,6 +72,7 @@ public sealed class EnergyStateReader : IEnergyStateReader
         {
             ChargeMode = evCharger.Mode,
             ChargeCurrentAmps = evCharger.CurrentAmps,
+            EvChargerReadError = evChargerError,
         };
 
         return _unmeteredGridPhase is { } blind && inverter.InverterOutputPerPhase is { } inverterOutput
@@ -96,7 +97,7 @@ public sealed class EnergyStateReader : IEnergyStateReader
     // inverter telemetry that was just read successfully. So everything charger-shaped is
     // best-effort, the connect included: a charger that cannot be read is reported Unknown, which is
     // the absence of information and never a car that is gone (IsCarKnownDisconnected).
-    private async Task<EvChargerReading> ReadEvChargerAsync(CancellationToken cancellationToken)
+    private async Task<(EvChargerReading Reading, string? Error)> ReadEvChargerAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -108,7 +109,7 @@ public sealed class EnergyStateReader : IEnergyStateReader
                 _logger.LogInformation("EV charger is reachable again; its telemetry is live.");
             }
 
-            return reading;
+            return (reading, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -124,7 +125,7 @@ public sealed class EnergyStateReader : IEnergyStateReader
                     EvChargerStatus.Unknown);
             }
 
-            return Unreachable;
+            return (Unreachable, ex.Message);
         }
     }
 

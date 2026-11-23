@@ -762,6 +762,13 @@ time and in order: a stop must not overtake the setpoint before it.
 `needsOwner` when only the owner can fix it: no address, a password the plugin can't send, a setting on
 the charger that fights the control loop.
 
+**When the charger is unavailable** (#441). No plugin connected, a refused hello, `healthy: false`, or reads
+that fail make the charger unavailable once it has lasted 2 minutes (`ChargeControl:ChargerUnavailableAfter`).
+Gleanvolt then suspends a running mode, releases the battery hold, and starts no mode until the charger is
+back, when the mode resumes by itself. So report `healthy: false` only for something that stops the charger
+being controlled, and `healthy: true` again as soon as it is fixed. See
+[When the charger is unavailable](CHARGE_CONTROL.md#when-the-charger-is-unavailable).
+
 **What Gleanvolt does with it.** Everything a built-in charger driver does: the Overview, the charging
 modes, sessions, Home Assistant. **Settings → External providers** shows the session, the remembered
 plugin with **Forget**, the last refusal, and links to the plugin's page. There is no register snapshot.

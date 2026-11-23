@@ -752,6 +752,8 @@ public static class GleanvoltHostingExtensions
         // The one way controlled charging is started or stopped (issue #89): the button surfaces call
         // this, it writes the charger's use-mode, and only then does the mode above move. Nothing else
         // writes the use-mode, and nothing here writes anything until somebody presses something.
+        services.AddSingleton<ChargerAvailabilityMonitor>();
+        services.AddSingleton<IChargerAvailability>(provider => provider.GetRequiredService<ChargerAvailabilityMonitor>());
         services.AddSingleton<IChargeActions, ChargeActions>();
         services.AddSingleton<ChargeControlStatusHolder>();
 

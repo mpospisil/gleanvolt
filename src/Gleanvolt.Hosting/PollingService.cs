@@ -3,6 +3,7 @@ using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Core.Strategies;
+using Gleanvolt.Hosting.Chargers;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Fast;
 using Gleanvolt.Hosting.Forecasting;
@@ -79,9 +80,16 @@ public sealed class PollingService : BackgroundService
     private ChargeControlMode? _resuming;
     private DateTimeOffset? _resumeUntil;
     private static readonly TimeSpan ResumeWindow = TimeSpan.FromMinutes(10);
+    private DateTimeOffset _resumeStartedAt;
 
     // The mode a restart took up, and when, for the Overview to say so until the mode changes.
     private (ChargeControlMode Mode, DateTimeOffset At)? _resumed;
+
+    // Whether the charger can be controlled (#441), and the mode suspended while it can't, since when. A suspended
+    // mode stays selected: nothing is commanded and the hold is let go, and it is started again, the way a restart
+    // takes a mode up, once the charger is back. Null for a host without the monitor: always available.
+    private readonly ChargerAvailabilityMonitor? _charger;
+    private (ChargeControlMode Mode, DateTimeOffset At)? _suspended;
 
     private readonly ILogger<PollingService> _logger;
     private readonly TimeProvider _timeProvider;
@@ -134,8 +142,10 @@ public sealed class PollingService : BackgroundService
         ILowTariffSettings? lowTariff = null,
         IUntilFullSettings? untilFull = null,
         UntilFullSessionFile? untilFullSession = null,
-        ChargeModeFile? modeFile = null)
+        ChargeModeFile? modeFile = null,
+        ChargerAvailabilityMonitor? charger = null)
     {
+        _charger = charger;
         _untilFull = untilFull;
         _untilFullSession = untilFullSession;
         _modeFile = modeFile;
@@ -212,6 +222,7 @@ public sealed class PollingService : BackgroundService
             try
             {
                 var state = await _energyStateReader.ReadAsync(stoppingToken);
+                var charger = _charger?.Observe(state) ?? ChargerAvailability.Ready;
 
                 _logger.LogInformation(
                     "SOC={BatterySocPercent}% BatteryPower={BatteryPowerWatts}W Solar={SolarPowerWatts}W Grid={GridPowerWatts}W{GridMeterDetail} EvCharger={EvChargerStatus} EvMode={EvChargeMode} EvCurrent={EvChargeCurrentAmps} EvPower={EvChargerPowerWatts}W",
@@ -249,10 +260,11 @@ public sealed class PollingService : BackgroundService
                 // energy the car already has.
                 var fastCharge = Planned("fast charge progress", () => _fastCharge.Update(state));
 
-                await ResumeAsync(stoppingToken);
+                await ResumeAsync(charger, stoppingToken);
 
                 var mode = _mode.Mode;
                 OnModeEntry(mode);
+                var suspended = await SuspendOrResumeAsync(mode, charger, state.Timestamp, stoppingToken);
 
                 // Only for the three modes that wait for sun, each against its own minimum: unlike the
                 // three above there is no meter here that has to keep running across a mode switch, and
@@ -264,7 +276,13 @@ public sealed class PollingService : BackgroundService
                 var untilFull = mode == ChargeControlMode.Forecasted && _untilFull?.UntilFull == true;
 
                 ChargeControlCycleResult result;
-                if (mode is ChargeControlMode.Solar or ChargeControlMode.Forecasted or ChargeControlMode.FastNoBattery
+                if (suspended)
+                {
+                    // Nothing is commanded to a charger Gleanvolt can't control; the plug is still watched.
+                    _chargingControl.TrackWhileReleased(state);
+                    result = new ChargeControlCycleResult(ChargeControlState.Suspended, null, null, HoldingControl: false);
+                }
+                else if (mode is ChargeControlMode.Solar or ChargeControlMode.Forecasted or ChargeControlMode.FastNoBattery
                     or ChargeControlMode.Targeted or ChargeControlMode.SolarGrid)
                 {
                     result = await _chargingControl.RunCycleAsync(
@@ -317,8 +335,10 @@ public sealed class PollingService : BackgroundService
 
                 // Charging as it stands after the block above, so a mode that has just ended itself lets
                 // go of a bridge hold in this cycle instead of holding it through the release dwell.
+                // A suspended mode holds nothing (#441): the house battery isn't held for a car Gleanvolt can't
+                // control. Off releases every hold a mode armed; the mode's own first cycle re-arms it on resume.
                 var hold = await ApplyBatteryHoldAsync(
-                    state, mode, targetedPlan, fastCharge,
+                    state, suspended ? ChargeControlMode.Off : mode, targetedPlan, fastCharge,
                     charging: result.State == ChargeControlState.Charging,
                     gridBridging: result.GridBridgeWatts > 0,
                     stoppingToken);
@@ -375,7 +395,9 @@ public sealed class PollingService : BackgroundService
                     UntilFull: untilFull && _untilFullSession?.Since is { } since
                         ? new UntilFullStatus(since, _untilFullSession.Day(state.Timestamp) ?? 1)
                         : null,
-                    ResumedAt: _resumed?.At));
+                    ResumedAt: _resumed?.At,
+                    Charger: charger,
+                    SuspendedSince: _suspended?.At));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -466,6 +488,7 @@ public sealed class PollingService : BackgroundService
         }
 
         _resuming = saved.Mode;
+        _resumeStartedAt = now;
         _resumeUntil = now + ResumeWindow;
     }
 
@@ -476,10 +499,18 @@ public sealed class PollingService : BackgroundService
     /// hold. Tried every poll until it lands, the owner picks a mode, or <see cref="ResumeWindow"/> runs
     /// out; until then the mode file is left as it was.
     /// </summary>
-    private async Task ResumeAsync(CancellationToken cancellationToken)
+    private async Task ResumeAsync(ChargerAvailability charger, CancellationToken cancellationToken)
     {
         if (_resumeUntil is not { } until || _resuming is not { } mode)
         {
+            return;
+        }
+
+        if (!charger.Available && _mode.Mode == ChargeControlMode.Off)
+        {
+            // Not tried, and the window waits (#441): a charger that is not back yet after the restart is the
+            // charger's outage, not a refusal, and the mode is taken up once it is back. Bounded by ResumeWithin.
+            _resumeUntil = Min(_timeProvider.GetUtcNow() + ResumeWindow, _resumeStartedAt + _resumeWithin + ResumeWindow);
             return;
         }
 
@@ -512,6 +543,62 @@ public sealed class PollingService : BackgroundService
             _logger.LogWarning("Could not resume {Mode} yet ({Reason}); trying again next poll.", mode, started.Message);
         }
     }
+
+    /// <summary>
+    /// Suspends the running mode while the charger is unavailable, and starts it again once it is back (#441).
+    /// True while it is suspended. Suspending releases the coordinator's claim, as switching Off does, so the
+    /// resumed mode starts fresh, through the same start a button press and a restart use: the charger allowed
+    /// again, the restart-wait rule for a paused car, the hold re-armed by the mode's own first cycle.
+    /// </summary>
+    private async Task<bool> SuspendOrResumeAsync(
+        ChargeControlMode mode, ChargerAvailability charger, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (mode == ChargeControlMode.Off)
+        {
+            if (_suspended is { } ended)
+            {
+                _logger.LogInformation("The suspended {Mode} was switched off; it will not resume.", ended.Mode);
+                _suspended = null;
+            }
+
+            return false;
+        }
+
+        if (!charger.Available)
+        {
+            if (_suspended is null)
+            {
+                _logger.LogWarning(
+                    "{Mode} is suspended: {Reason} Nothing is commanded and the battery hold is released until the charger is "
+                    + "back; meanwhile the charger follows its own settings.",
+                    mode, charger.Reason);
+                _suspended = (mode, now);
+                _chargingControl.ReleaseControl();
+            }
+
+            return true;
+        }
+
+        if (_suspended is not { } suspended)
+        {
+            return false;
+        }
+
+        var started = await _chargeActions.StartAsync(mode, "the charger being available again", cancellationToken);
+
+        if (!started.Succeeded)
+        {
+            _logger.LogWarning("Could not resume the suspended {Mode} yet ({Reason}); trying again next poll.", mode, started.Message);
+            return true;
+        }
+
+        _logger.LogInformation(
+            "Resumed {Mode} after the charger was unavailable for {Minutes:F0} min.", mode, (now - suspended.At).TotalMinutes);
+        _suspended = null;
+        return false;
+    }
+
+    private static DateTimeOffset Min(DateTimeOffset a, DateTimeOffset b) => a < b ? a : b;
 
     private void StopResuming()
     {

@@ -546,4 +546,7 @@
   <data name="TariffFromDisconnected" xml:space="preserve">
     <value>{0} (zdroj {1} je odpojený; jeho okna platí do {2})</value>
   </data>
+  <data name="ChargeControlState_Suspended" xml:space="preserve">
+    <value>Přerušeno</value>
+  </data>
 </root>
