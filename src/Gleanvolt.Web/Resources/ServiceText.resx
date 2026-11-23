@@ -899,4 +899,13 @@
   <data name="Charger_ModeTooLong" xml:space="preserve">
     <value>The mode is longer than {0} characters.</value>
   </data>
+  <data name="Provider_Remembered" xml:space="preserve">
+    <value>Gleanvolt remembers the plugin {0} and lets in no other until you press Forget on Settings → External providers.</value>
+  </data>
+  <data name="Provider_AnotherConnected" xml:space="preserve">
+    <value>Another plugin, {0} ({1}), is connected. Only one is active at a time.</value>
+  </data>
+  <data name="Charger_Capabilities" xml:space="preserve">
+    <value>The capabilities the plugin gives for its charger are not usable: {0}</value>
+  </data>
 </root>

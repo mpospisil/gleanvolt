@@ -9,8 +9,12 @@ public static class ChargerContract
     /// <summary>Changes only when an older provider would be misread.</summary>
     public const int Major = 1;
 
-    /// <summary>Grows with every addition an older provider can ignore.</summary>
-    public const int Minor = 0;
+    /// <summary>
+    /// Grows with every addition an older provider can ignore. 1.1 (#440): the hello carries the charger's
+    /// <see cref="ChargerCapabilities"/>, checked against the charge control's limits, and the first plugin is
+    /// remembered.
+    /// </summary>
+    public const int Minor = 1;
 
     /// <summary>The hub's path on Gleanvolt's web port.</summary>
     public const string HubPath = "/providers/charger";
@@ -83,6 +87,55 @@ public sealed record ChargerWelcome : Welcome
 
     /// <summary>The installation's IANA time zone, e.g. "Europe/Prague".</summary>
     public string TimeZone { get; init; } = string.Empty;
+}
+
+/// <summary>
+/// What the charger can do, in the hello's <see cref="ProviderHello.Charger"/> (charger 1.1, #440). Gleanvolt checks
+/// its charge control's limits against it before it accepts the hello, and never sends a setpoint above
+/// <see cref="MaxCurrentAmps"/>. A 1.0 plugin, which sends none, is taken as <see cref="Default"/>.
+/// </summary>
+/// <param name="MinCurrentAmps">The lowest current the charger charges at, 1 to 80; below it, it pauses.</param>
+/// <param name="MaxCurrentAmps">The highest current it takes, from <paramref name="MinCurrentAmps"/> to 80.</param>
+/// <param name="Phases">The phases it supplies, 1 to 3.</param>
+/// <param name="PauseCurrentAmps">The setpoint that pauses it without ending the session; 0 for a charger that pauses another way. Below the minimum.</param>
+/// <param name="CanSwitchPhases">Whether it can switch between one phase and three while charging. Informational for now.</param>
+public sealed record ChargerCapabilities(
+    int MinCurrentAmps,
+    int MaxCurrentAmps,
+    int Phases,
+    int PauseCurrentAmps = 0,
+    bool CanSwitchPhases = false)
+{
+    /// <summary>What a plugin that says nothing is taken to be: 6 to 32 A on three phases, as charger 1.0 assumed.</summary>
+    public static ChargerCapabilities Default { get; } = new(6, 32, 3);
+
+    /// <summary>What is wrong with these capabilities, in English: empty when they are usable.</summary>
+    public IReadOnlyList<string> Check()
+    {
+        var problems = new List<string>();
+
+        if (MinCurrentAmps is < 1 or > ChargerReadingRules.MaxCurrentAmps)
+        {
+            problems.Add($"The minimum current is {MinCurrentAmps} A; it must be 1 to {ChargerReadingRules.MaxCurrentAmps} A.");
+        }
+
+        if (MaxCurrentAmps < MinCurrentAmps || MaxCurrentAmps > ChargerReadingRules.MaxCurrentAmps)
+        {
+            problems.Add($"The maximum current is {MaxCurrentAmps} A; it must be from the minimum ({MinCurrentAmps} A) to {ChargerReadingRules.MaxCurrentAmps} A.");
+        }
+
+        if (Phases is < 1 or > 3)
+        {
+            problems.Add($"The charger has {Phases} phases; it must be 1 to 3.");
+        }
+
+        if (PauseCurrentAmps < 0 || PauseCurrentAmps >= MinCurrentAmps)
+        {
+            problems.Add($"The pause current is {PauseCurrentAmps} A; it must be 0 or more and below the minimum ({MinCurrentAmps} A).");
+        }
+
+        return problems;
+    }
 }
 
 /// <summary>What Gleanvolt's charge control is configured to do (<c>ChargeControl</c>).</summary>

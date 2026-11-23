@@ -83,6 +83,31 @@
                         <td><code>@status.HubPath</code></td>
                         <td class="@(status.State == ExternalProviderState.Connected ? null : "muted")">
                             @ExternalProviderStateText.Describe(status, Time.LocalTimeZone)
+
+                            @* The last plugin turned away (#440): its limits, or another than the one remembered. *@
+                            @if (status.LastRefusal is { } refusal)
+                            {
+                                <div class="warning" id="external-providers-@(status.Kind)-refused">
+                                    @Localized.Format(SettingsText.ExternalRefused, refusal.ProviderName,
+                                        ExternalProviderStateText.When(refusal.At, Time.LocalTimeZone), Reason(refusal))
+                                </div>
+                            }
+
+                            @* A kind that lets in only the plugin it remembers (#440): the charger. *@
+                            @if (status.RememberedProviderId is { } remembered)
+                            {
+                                <div class="muted" id="external-providers-@(status.Kind)-remembered">
+                                    @Localized.Format(SettingsText.ExternalRemembered, remembered)
+                                </div>
+
+                                @if (!ReadOnly)
+                                {
+                                    <button type="button" class="secondary" id="external-providers-@(status.Kind)-forget"
+                                            title="@SettingsText.ExternalForgetHint" disabled="@_busy" @onclick="() => ForgetAsync(status.Kind)">
+                                        @SettingsText.ExternalForget
+                                    </button>
+                                }
+                            }
                         </td>
                         <td>
                             @* The provider's own page (#410), through Gleanvolt's redirect that adds the ticket. *@
@@ -140,6 +165,31 @@
             _busy = false;
         }
     }
+
+    private async Task ForgetAsync(string kind)
+    {
+        if (ReadOnly || _busy)
+        {
+            return;
+        }
+
+        _busy = true;
+
+        try
+        {
+            await Providers.ForgetAsync(kind);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    // The refusal in the page's language: each sentence from its phrase, or the English when there is none.
+    private string Reason(ExternalProviderRefusal refusal) =>
+        refusal.Phrases is { Count: > 0 } phrases
+            ? string.Join(" ", phrases.Select(phrase => Localized.Say(phrase, refusal.Reason, Time.LocalTimeZone)))
+            : refusal.Reason;
 
     // The kind in the page's language; a kind this page does not know by name keeps its English one.
     private static string KindName(ExternalProviderStatus status) => status.Kind switch

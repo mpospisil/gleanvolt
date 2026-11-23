@@ -29,6 +29,10 @@ Assert.True(done.Succeeded);
 - **`SetCurrentAsync`** and **`SetChargingAllowedAsync`** send a command and wait for its `CommandDone`.
 - **`Readings`**, **`Refusals`**, **`Status`** and **`Hello`** keep everything the plugin sent, published
   unprompted or not.
+- **The hello is checked as Gleanvolt checks it** (charger 1.1): the charger's `Capabilities` against the
+  options' `Limits` (`ChargerLimitsRules`), refused with `limits` when they don't fit. The first plugin
+  accepted is remembered, and another id is refused with `another-provider` until **`Forget()`**.
+  **`LastRefusal`** says why a hello was refused.
 - **`ChargerTestHubOptions`** sets the welcome (the charge control's limits, `DryRun`, the time zone), the
   token, how long to wait, and the clock the rules are checked against.
 

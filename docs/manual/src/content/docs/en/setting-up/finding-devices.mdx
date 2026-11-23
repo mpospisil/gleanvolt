@@ -63,6 +63,13 @@ away: the plugin has the charger's address, on its own page. Start the plugin wi
 **Settings → External providers**; Gleanvolt accepts it after the restart, and the save checks that it
 answers.
 
+The plugin tells Gleanvolt what the charger can do. If the car's **Maximum current (A)** or **Phases**
+on the [Car](../car/) page asks for more (a higher current, or three phases on a single-phase charger),
+Gleanvolt turns the plugin away, and **Settings → External providers** says which setting to lower.
+Change it, save, and restart Gleanvolt. Gleanvolt also remembers the first charger
+plugin it accepts and lets in no other. To switch to another plugin, stop the old one and press
+**Forget** beside it under **Settings → External providers**.
+
 ## When you save
 
 Gleanvolt reads one value from each device, to check that the address answers and that the device is

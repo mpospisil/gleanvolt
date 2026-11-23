@@ -135,7 +135,64 @@ public sealed class ChargerTestHubTests : IAsyncLifetime
         await Assert.ThrowsAsync<InvalidOperationException>(() => _hub.ReadAsync());
     }
 
-    private async Task<FakeCharger> StartPluginAsync(string? token = null)
+    [Fact]
+    public async Task The_hello_carries_the_chargers_capabilities()
+    {
+        await StartPluginAsync(capabilities: new ChargerCapabilities(6, 32, 1));
+
+        var hello = await _hub.WaitForHelloAsync();
+
+        Assert.Equal(new ChargerCapabilities(6, 32, 1), hello.Charger);
+        Assert.Equal(new ChargerCapabilities(6, 32, 1), _hub.Capabilities);
+        Assert.Equal("fake-charger", _hub.RememberedProviderId);
+    }
+
+    [Fact]
+    public async Task A_charger_short_of_the_limits_is_refused_with_limits()
+    {
+        // The hub's charge control wants 6-20 A on one phase.
+        await StartPluginAsync(capabilities: new ChargerCapabilities(6, 16, 1));
+
+        while (_hub.LastRefusal is null)
+        {
+            await Task.Delay(20);
+        }
+
+        Assert.Equal(RefusalCodes.Limits, _hub.LastRefusal.Value.Code);
+        Assert.Contains("ChargeControl:MaxChargingCurrentAmps (20 A)", _hub.LastRefusal.Value.Reason);
+        Assert.False(_hub.IsAttached);
+    }
+
+    [Fact]
+    public async Task Another_plugin_is_refused_until_the_remembered_one_is_forgotten()
+    {
+        await StartPluginAsync();
+        await _hub.WaitForHelloAsync();
+        await _plugin!.StopAsync();
+        _plugin.Dispose();
+
+        while (_hub.IsAttached)
+        {
+            await Task.Delay(20);
+        }
+
+        await StartPluginAsync(id: "another-charger");
+
+        while (_hub.LastRefusal is null)
+        {
+            await Task.Delay(20);
+        }
+
+        Assert.Equal(RefusalCodes.AnotherProvider, _hub.LastRefusal.Value.Code);
+
+        _hub.Forget();
+        var hello = await _hub.WaitForHelloAsync();
+
+        Assert.Equal("another-charger", hello.ProviderId);
+        Assert.Equal("another-charger", _hub.RememberedProviderId);
+    }
+
+    private async Task<FakeCharger> StartPluginAsync(string? token = null, ChargerCapabilities? capabilities = null, string id = "fake-charger")
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Logging.ClearProviders();
@@ -143,20 +200,25 @@ public sealed class ChargerTestHubTests : IAsyncLifetime
         {
             _hub.Configure(options);
             options.Token = token ?? options.Token;
-            options.ProviderId = "fake-charger";
+            options.ProviderId = id;
             options.Name = "Fake charger";
             options.InitialRetryDelay = TimeSpan.FromMilliseconds(100);
+            options.RefusedRetryDelay = TimeSpan.FromMilliseconds(100);
         });
 
         _plugin = builder.Build();
+        var charger = (FakeCharger)_plugin.Services.GetRequiredService<IChargerSource>();
+        charger.Capabilities = capabilities ?? charger.Capabilities;
         await _plugin.StartAsync();
-        return (FakeCharger)_plugin.Services.GetRequiredService<IChargerSource>();
+        return charger;
     }
 
     private ChargerProviderConnection PluginConnection() => _plugin!.Services.GetRequiredService<ChargerProviderConnection>();
 
     private sealed class FakeCharger : IChargerSource
     {
+        public ChargerCapabilities Capabilities { get; set; } = new(6, 32, 1);
+
         public ChargerState State { get; set; } = ChargerState.Available;
 
         public double PowerWatts { get; set; }

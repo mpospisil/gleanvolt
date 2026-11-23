@@ -4,6 +4,47 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-23 — Charger contract 1.1: the charger's capabilities in the hello, the limits checked there, and the first plugin remembered (#440)
+
+**Found.** `ExternalChargerDriver` took every plugin's charger to be 6 to 32 A on three phases, which is wrong
+for a single-phase charger such as Huawei's 7KS. `ChargeControl`'s limits were checked at startup against a
+driver list compiled into Gleanvolt, and once every charger is a plugin (#438) that list says nothing about the
+charger. Any plugin with the token could also take over the charger hub whenever the remembered one was not
+connected, a sample started by mistake included, and this kind writes to a device.
+
+**Decided.**
+- **The hello carries the charger's capabilities** in a typed `charger` field (`ChargerCapabilities`:
+  `minCurrentAmps`, `maxCurrentAmps`, `phases`, `pauseCurrentAmps`, `canSwitchPhases`), not in the hello's
+  `capabilities`, which is already the list of feature names every kind shares. A 1.0 plugin that sends none is
+  taken as `ChargerCapabilities.Default`, the old 6 to 32 A on three phases. Charger contract 1.1.
+- **The SDK asks `IChargerSource.Capabilities`**, a required member, at every hello, rather than an option set
+  once at registration (as the issue proposed). A plugin learns its model on its own page (#442/#443), so what it
+  can do may only be known after it started, and the next reconnect sends the new answer.
+- **The limits are checked at the hello**, by `PvSystemRules.CheckChargeLimits`, the rule the built-in drivers
+  are checked by at startup. A mismatch is refused with the new code **`limits`**, and the reason names the
+  setting. Startup no longer checks a plugin's charger. `ChargerLimitsRules` in the contracts gives the same
+  English for a plugin's tests, and a test keeps the two in step.
+- **The first plugin is remembered** as `ExternalCharger:PluginId` in the overrides file. Any other id is
+  refused with `another-provider`, connected or not, until the owner presses **Forget** on Settings → External
+  providers. Forget also closes the remembered plugin's session, so the next hello wins. The mechanism is in
+  `Gleanvolt.Providers.Server` for any kind (`ProviderKind.RemembersProvider`, `IRememberedProviders`), and
+  only the charger turns it on.
+- **The last refused hello is kept** in each kind's status (`LastRefusal`, with phrases) and shown on Settings
+  and in the API. Otherwise a `limits` refusal would only be in the plugin's log.
+
+**Consequences accepted.**
+- A Shelly TopAC under the default `ChargeControl:MaxChargingCurrentAmps` of 20 A is now refused: the TopAC
+  says 16 A. The owner lowers the setting on the Car page and restarts. This is the check working, and the
+  plugin's README says so.
+- A refused plugin retries after the SDK's `RefusedRetryDelay` (5 minutes), so a plugin started after Forget,
+  or after the limits are fixed, can take up to 5 minutes to get in.
+- `ExternalCharger__PluginId` set in the environment pins a plugin, and Forget then lasts only until the next
+  start, because the environment is read again then.
+- `canSwitchPhases` and `pauseCurrentAmps` are carried and checked but not acted on yet: nothing in Gleanvolt
+  switches phases, and a pause is still 0 A.
+
+---
+
 ## 2026-11-23 — The plugin SDK on nuget.org, with a test hub and the Modbus client, all MIT (#439)
 
 **Found.** Charger plugins are to live in a repository of their own (#438), and every charger, the SolaX and

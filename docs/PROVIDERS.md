@@ -61,9 +61,10 @@ A weather provider uses `AddGleanvoltWeatherProvider<T>` and an `IWeatherSource`
 `GetReadingAsync(WeatherSite site, …)` returns a `WeatherData`, or null when it has nothing (no key yet,
 the service down: say why with `ReportStatusAsync`). Its connection is `WeatherProviderConnection`.
 
-A charger provider uses `AddGleanvoltChargerProvider<T>` and an `IChargerSource` with three methods:
-`ReadAsync` returns a `ChargerReading` (throw when the charger can't be read), `SetCurrentAsync(amps, …)`
-and `SetChargingAllowedAsync(allowed, …)` carry out Gleanvolt's commands (throw when the charger refuses).
+A charger provider uses `AddGleanvoltChargerProvider<T>` and an `IChargerSource`. Its `Capabilities`
+are the charger's current range and phases, sent in every hello (#440). `ReadAsync` returns a
+`ChargerReading` (throw when the charger can't be read). `SetCurrentAsync(amps, …)` and
+`SetChargingAllowedAsync(allowed, …)` carry out Gleanvolt's commands (throw when the charger refuses).
 The SDK answers every request, says how each command ended, and runs one call to the charger at a time.
 Its connection is `ChargerProviderConnection`.
 
@@ -102,7 +103,9 @@ var done = await hub.SetCurrentAsync(10);     // SetCurrent → CommandDone
 ```
 
 Every reading is checked by `ChargerReadingRules` in the contracts, the same limits Gleanvolt refuses a
-reading by, and a reading that breaks them fails the read with each problem listed. Gleanvolt's own
+reading by, and a reading that breaks them fails the read with each problem listed. The hello is checked
+as Gleanvolt checks it (#440): the capabilities against the hub's `Limits` by `ChargerLimitsRules`, and the
+first plugin is remembered until `hub.Forget()`. `hub.LastRefusal` says why a hello was refused. Gleanvolt's own
 safeguards (the threshold, the clamp, dry-run) are not in the test hub: they are Gleanvolt's, and a plugin
 carries out what it is sent.
 
@@ -153,7 +156,8 @@ token gets `401` before any connection is made.
 
 **One session per kind.** The same provider id reconnecting replaces its old session, since a
 reconnect can arrive before the old connection has timed out. A different provider id is refused
-while one is connected.
+while one is connected. The charger kind goes further and remembers its plugin (see
+[The charger kind](#the-charger-kind)).
 
 **Refusals.** A refused hello comes back as a `Welcome` with `accepted: false`, a `reasonCode` and an
 English `reason`, and Gleanvolt closes the connection. Wait before trying again: a refusal only
@@ -164,12 +168,17 @@ changes when somebody changes a setting. The SDK waits 5 minutes.
 | `disabled` | The owner hasn't turned the kind on. |
 | `wrong-kind` | The connection was authenticated for another kind's hub. Not sent since one token serves every kind (#406). |
 | `contract-major` | The provider speaks another major version of the contract. |
-| `another-provider` | A different provider is connected for this kind. |
-| `invalid` | The id or the name is missing or malformed. |
+| `another-provider` | A different provider is connected for this kind. For the charger, also any plugin other than the one Gleanvolt remembers, connected or not. |
+| `limits` | Charger 1.1: the charger can't do what `ChargeControl` is set to. The reason names the setting. |
+| `invalid` | The id or the name is missing or malformed, or the charger's capabilities make no sense. |
 
 **Goodbye.** Before Gleanvolt closes a session itself, it sends `Goodbye(reasonCode, reason)`: the kind
 was turned off (`disabled`), a newer connection of the same provider replaced this one (`replaced`),
-or the owner made a new token (`token-replaced`), which closes every kind's session.
+or the owner made a new token (`token-replaced`), which closes every kind's session. For the charger,
+the owner pressed **Forget** (`forgotten`).
+
+**Settings → External providers** shows the last refused hello of each kind since the start, with its
+reason, until one is accepted. It is also in the API's `GET /api/providers` as `lastRefusal`.
 
 **Requests.** Gleanvolt never waits for a provider inside a call. When it wants fresh data, it sends a
 request with an id, and the provider answers with an ordinary publish that quotes that id. A request
@@ -328,11 +337,12 @@ and the `Welcome` says which version the host speaks.
 | `solar-forecast` | 1 | 3 |
 | `vehicle` | 1 | 3 |
 | `weather` | 1 | 0 |
-| `charger` | 1 | 0 |
+| `charger` | 1 | 1 |
 
 The minors grew with `pageUrl` in the hello (#410). Vehicle 1.2 added the charging session (#414).
 All three went up by one with the status's `code` and `messages` (#415). The weather kind (#424) and the
-charger kind (#435) started at 1.0 with all of these.
+charger kind (#435) started at 1.0 with all of these. Charger 1.1 added the charger's capabilities in the
+hello, the `limits` refusal and the remembered plugin (#440).
 
 ## The tariff kind
 
@@ -653,15 +663,49 @@ after a restart. The charger then needs no address in Gleanvolt; the plugin has 
 **Gleanvolt keeps the safeguards on its side.** The driver contract's rules hold whatever the plugin does:
 
 - A setpoint is sent only when it moved by `ChargeControl:CurrentChangeThresholdAmps` from what the last
-  reading said, and never above the reading's `maxCurrentAmps`.
+  reading said. It is never above the hello's `maxCurrentAmps`, and never above a reading's `maxCurrentAmps`
+  when the reading gives one.
 - In `ChargeControl:DryRun` **no command is sent**. What would have been sent stands in for the charger's
   own values, as for every driver. The welcome says `dryRun`, for the plugin's page.
 - A read that isn't answered in time, or is refused, is a charger Gleanvolt couldn't read: the poll
   reports **unknown**, never a car that is gone, and the control loop makes no decision on it.
 
-**`Hello(hello)` → `ChargerWelcome`.** On top of the common fields: the charge control's `limits`
-(`minCurrentAmps`, `maxCurrentAmps`, `phases`, `nominalVoltage`), `dryRun`, and the installation's
-`timeZone`.
+**`Hello(hello)` → `ChargerWelcome`.** Since 1.1 (#440) the hello carries what the charger can do, in
+`charger`:
+
+```json
+{
+  "providerId": "huawei-scharger",
+  "name": "Huawei SCharger 7KS",
+  "version": "1.0.0",
+  "contractMajor": 1,
+  "contractMinor": 1,
+  "charger": { "minCurrentAmps": 6, "maxCurrentAmps": 32, "phases": 1, "pauseCurrentAmps": 0, "canSwitchPhases": false }
+}
+```
+
+`minCurrentAmps` 1 to 80, `maxCurrentAmps` from the minimum to 80, `phases` 1 to 3, `pauseCurrentAmps` 0
+or more and below the minimum. Anything else is refused as `invalid`. A 1.0 plugin, which sends no
+`charger`, is taken as 6 to 32 A on three phases, as 1.0 assumed.
+
+Gleanvolt checks `ChargeControl` against it before it accepts the hello, by the rule it checks a
+built-in driver by at startup. A minimum below the charger's, a maximum above it, or more phases than it
+supplies is refused with **`limits`**, and the reason names the setting:
+`ChargeControl:Phases (3) is more than the Huawei SCharger 7KS charger supplies (1).` Change the setting
+(or the plugin's capabilities) and let the plugin reconnect. `ChargerLimitsRules` in the contracts words
+the same check.
+
+**The first plugin is remembered.** The first charger plugin Gleanvolt accepts is remembered in the
+overrides file as `ExternalCharger:PluginId`. From then on any other plugin id is refused with
+`another-provider`, whether the remembered one is connected or not: a second plugin started by mistake,
+a sample, must not write to the charger. The same id reconnecting is accepted as always. To change
+plugins, stop the old one and press **Forget** beside it on **Settings → External providers**. That
+closes its session if it is still connected, and the next plugin to say hello is remembered. A refused
+plugin tries again 5 minutes later with the SDK's defaults. Setting `ExternalCharger__PluginId` in the
+environment pins a plugin; Forget then lasts only until the next start.
+
+The `ChargerWelcome` adds to the common fields: the charge control's `limits` (`minCurrentAmps`,
+`maxCurrentAmps`, `phases`, `nominalVoltage`), `dryRun`, and the installation's `timeZone`.
 
 **`RefreshRequested(request)`**, from Gleanvolt, asks for the charger's state now: on every poll of the
 control loop, every few seconds while it runs. Answer with `Publish`, with `inReplyTo` set to
@@ -719,8 +763,8 @@ time and in order: a stop must not overtake the setpoint before it.
 the charger that fights the control loop.
 
 **What Gleanvolt does with it.** Everything a built-in charger driver does: the Overview, the charging
-modes, sessions, Home Assistant. **Settings → External providers** shows the session and links to the
-plugin's page. There is no register snapshot.
+modes, sessions, Home Assistant. **Settings → External providers** shows the session, the remembered
+plugin with **Forget**, the last refusal, and links to the plugin's page. There is no register snapshot.
 
 ## The protocol, for a client in another language
 

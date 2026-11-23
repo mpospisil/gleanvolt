@@ -4,6 +4,64 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-23 — Charger contract 1.1: capabilities in the hello, and the first plugin remembered (#440)
+
+**What.** The second step of #438. A charger plugin now says what its charger can do, Gleanvolt checks its
+charge control against that at the hello (not at startup), and Gleanvolt lets in only the first charger plugin
+it accepted until the owner forgets it.
+
+**How.**
+- **Contracts:** `ChargerCapabilities` (with `Default` and `Check()`), `ProviderHello.Charger`, the refusal code
+  `RefusalCodes.Limits`, `ChargerLimitsRules` (the English limits check). `ChargerContract.Minor` is 1.
+- **SDK:** `IChargerSource.Capabilities` (required). `ProviderConnection.OnHello` lets a kind add to the hello,
+  and `ChargerProviderConnection` adds the capabilities, logging an error if they are unusable.
+- **Provider server:** `ProviderHub` gets two hooks, `Admit(hello)` (a kind's own checks, with phrases for the
+  UI) and `OnAttached(hello)`. `ProviderKind.RemembersProvider` and `IRememberedProviders` (in memory unless the
+  host registers a store): `ProviderSessions.Attach` refuses any other id than the remembered one and remembers
+  the first. `ForgetAsync` forgets it and closes the session with `Goodbye("forgotten")`. Every refused hello
+  except `disabled` is kept as `ExternalProviderStatus.LastRefusal` and logged.
+- **Hosting:** `ChargerHub.Admit` checks the capabilities (`invalid`) and `ChargeControl` against them by
+  `PvSystemRules.CheckChargeLimits` (`limits`). `OnAttached` hands the capabilities to `ExternalChargerLink`.
+  `ExternalChargerDriver.Capabilities` comes from the link, and the ceiling is the lowest of the hello's maximum,
+  a reading's `maxCurrentAmps` and 80. `ChargerDrivers.CheckLimits` skips a plugin's charger at startup.
+  `RememberedProviders` keeps `ExternalCharger:PluginId` in the overrides file under its lock.
+- **Core and API:** `ExternalProviderStatus.RememberedProviderId`, `LastRefusal` (`ExternalProviderRefusal`),
+  `IExternalProviders.ForgetAsync` (a default no-op). `GET /api/providers` adds `rememberedProviderId` and
+  `lastRefusal`; the OpenAPI snapshot is regenerated.
+- **Web:** Settings → External providers shows the remembered plugin with **Forget** (only with a login) and the
+  last refusal, in the viewer's language. New phrases `Provider.Remembered`, `Provider.AnotherConnected` and
+  `Charger.Capabilities`, and four Settings strings, in English and Czech.
+- **Testing package:** `ChargerTestHub` checks capabilities and limits as Gleanvolt does, remembers the first
+  plugin, and adds `Capabilities`, `RememberedProviderId`, `LastRefusal` and `Forget()`.
+- **Shelly plugin:** sends 6 A up to `Shelly:MaxCurrentAmps` on three phases.
+
+**Quirks.**
+- The hello's `capabilities` name was taken: it has been a list of feature names since 1.0, "empty for now". The
+  charger's own go in `charger`, to stay compatible on the wire.
+- The Shelly-based end-to-end tests had run with `ChargeControl` at 20 A against a 16 A TopAC. That is now a
+  `limits` refusal, so the test host uses 16 A.
+
+**Tests.** `ExternalChargerTests`: a single-phase 6–32 A plugin controlled within its range, a `limits`
+refusal naming both settings, unusable capabilities refused as `invalid`, a second plugin refused after the first
+has gone and let in after Forget, and Forget closing the remembered plugin's session.
+`ChargerLimitsRulesTests`: the contract rule and the startup rule give the same English, the capability bounds,
+and startup skipping a plugin's charger. `RememberedProvidersTests`: survives a restart, and Forget removes only
+its key. `ChargerTestHubTests`: capabilities in the hello, `limits`, remembering and `Forget()`.
+`ExternalProvidersFormTests`: the remembered plugin and Forget, no Forget without a login, a refusal in the
+page's language. The full solution passes in Release.
+
+**Files.** New: `src/Gleanvolt.Providers.Contracts/ChargerLimitsRules.cs`,
+`src/Gleanvolt.Hosting/Chargers/RememberedProviders.cs`, `tests/Gleanvolt.Hosting.Tests/ChargerLimitsRulesTests.cs`,
+`tests/Gleanvolt.Hosting.Tests/RememberedProvidersTests.cs`. Changed: Contracts `Charger.cs` and `Handshake.cs`;
+Client `ProviderConnection.cs` and `Charger/ChargerProvider.cs`; Server `ProviderHub.cs`, `ProviderSessions.cs`,
+`ProviderKind.cs` and `ExternalProviderRegistry.cs`; Hosting `ChargerHub.cs`, `ExternalChargerDriver.cs`,
+`ExternalChargerLink.cs`, `ChargerDrivers.cs` and `GleanvoltHostingExtensions.cs`; Core `IExternalProviders.cs`;
+Api `ProviderContracts.cs`; Web `ExternalProvidersForm.razor`, `ServiceText`/`SettingsText` (en, cs); Testing
+`ChargerTestHub.cs`, `HelloRules.cs` and README; Shelly `ShellyCharger.cs` and README; `docs/PROVIDERS.md`; the
+manual's `finding-devices` and `settings` pages (en, cs); tests as above.
+
+---
+
 ## 2026-11-23 — The plugin SDK on nuget.org, with a test hub and the Modbus client (#439)
 
 **What.** The first step of #438 (every charger as a plugin, in a repository of its own): what such a

@@ -30,6 +30,11 @@ namespace Gleanvolt.Api.Contracts;
 /// That report in English as Gleanvolt words it: its words for the code, then the provider's detail. Null
 /// when the provider said nothing.
 /// </param>
+/// <param name="RememberedProviderId">
+/// For the charger (#440): the plugin id Gleanvolt remembers and lets in alone until the owner presses Forget on
+/// Settings. Null for every other kind, and before the first plugin connected.
+/// </param>
+/// <param name="LastRefusal">The last connection this kind refused since the start, or null; cleared when one is accepted.</param>
 public sealed record ExternalProviderResponse(
     string Kind,
     string Name,
@@ -47,7 +52,9 @@ public sealed record ExternalProviderResponse(
     bool Unanswered,
     bool NeedsOwner = false,
     string? StatusCode = null,
-    string? StatusText = null)
+    string? StatusText = null,
+    string? RememberedProviderId = null,
+    ExternalProviderRefusalResponse? LastRefusal = null)
 {
     internal static ExternalProviderResponse From(ExternalProviderStatus status) => new(
         status.Kind,
@@ -66,5 +73,20 @@ public sealed record ExternalProviderResponse(
         status.Unanswered,
         status.NeedsOwner,
         status.StatusCode,
-        status.StatusSaid?.English);
+        status.StatusSaid?.English,
+        status.RememberedProviderId,
+        status.LastRefusal is { } refusal
+            ? new ExternalProviderRefusalResponse(refusal.ProviderId, refusal.ProviderName, refusal.Code, refusal.Reason, refusal.At)
+            : null);
 }
+
+/// <summary>A provider's connection that Gleanvolt refused (#440).</summary>
+/// <param name="ProviderId">The refused provider's id.</param>
+/// <param name="ProviderName">Its name.</param>
+/// <param name="Code">
+/// Why, as the provider was told: e.g. <c>limits</c> (the charger can't do what ChargeControl is set to) or
+/// <c>another-provider</c> (another provider is connected, or for the charger, remembered).
+/// </param>
+/// <param name="Reason">Why, in English, naming the setting to change where there is one.</param>
+/// <param name="At">When.</param>
+public sealed record ExternalProviderRefusalResponse(string ProviderId, string ProviderName, string Code, string Reason, DateTimeOffset At);

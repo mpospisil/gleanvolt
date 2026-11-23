@@ -1135,4 +1135,16 @@
   <data name="NoteChargerPlugin" xml:space="preserve">
     <value>Nabíječku obsluhuje plugin, takže Gleanvolt pro ni nepotřebuje adresu. Spusťte plugin s tokenem z Nastavení → Externí zdroje dat; Gleanvolt ho přijme po restartu.</value>
   </data>
+  <data name="ExternalRemembered" xml:space="preserve">
+    <value>Zapamatovaný: {0}. Žádný jiný plugin není vpuštěn.</value>
+  </data>
+  <data name="ExternalForget" xml:space="preserve">
+    <value>Zapomenout</value>
+  </data>
+  <data name="ExternalForgetHint" xml:space="preserve">
+    <value>Zapomenutí ukončí spojení pluginu; zapamatován bude plugin, který se připojí jako další. Odmítnutý plugin to zkusí znovu do 5 minut.</value>
+  </data>
+  <data name="ExternalRefused" xml:space="preserve">
+    <value>{0} byl odmítnut {1}: {2}</value>
+  </data>
 </root>

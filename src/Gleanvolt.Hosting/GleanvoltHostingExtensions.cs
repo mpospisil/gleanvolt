@@ -359,6 +359,7 @@ public static class GleanvoltHostingExtensions
         // "external", and the link its driver reads and commands through.
         services.Configure<ExternalChargerOptions>(configuration.GetSection(ExternalChargerOptions.SectionName));
         services.AddSingleton<ExternalChargerLink>();
+        services.AddSingleton<IRememberedProviders, RememberedProviders>();
         services.AddExternalProvider<ChargerHub>(ChargerHub.Kind);
 
         services.AddSingleton<IEvChargerDriver>(provider =>

@@ -30,6 +30,12 @@ public interface IExternalProviders
     /// </summary>
     string? ReadToken();
 
+    /// <summary>
+    /// Forgets the provider <paramref name="kind"/> remembers (#440), and closes its session if it is connected:
+    /// the next provider to say hello is remembered instead. Nothing for a kind that remembers none.
+    /// </summary>
+    Task ForgetAsync(string kind) => Task.CompletedTask;
+
     /// <summary>Raised when any kind's status changes: a session, its data, the token.</summary>
     event Action? Changed;
 }
@@ -70,6 +76,11 @@ public enum ExternalProviderState
 /// <param name="PageUrl">The attached or last provider's own page (#410), as it said in its hello, or null.</param>
 /// <param name="StatusCode">The code with that report (#415), as sent: one Gleanvolt words, or one it doesn't know.</param>
 /// <param name="StatusMessages">The report's detail in more languages (#415), language tag to text, or null.</param>
+/// <param name="RememberedProviderId">
+/// For a kind that remembers its provider (the charger, #440): the id it remembers, which is the only one let in
+/// until the owner forgets it. Null for any other kind, and before the first provider said hello.
+/// </param>
+/// <param name="LastRefusal">The last hello this kind refused since the start, or null; cleared when one is accepted.</param>
 public sealed record ExternalProviderStatus(
     string Kind,
     string Name,
@@ -89,8 +100,13 @@ public sealed record ExternalProviderStatus(
     bool NeedsOwner = false,
     Uri? PageUrl = null,
     string? StatusCode = null,
-    IReadOnlyDictionary<string, string>? StatusMessages = null)
+    IReadOnlyDictionary<string, string>? StatusMessages = null,
+    string? RememberedProviderId = null,
+    ExternalProviderRefusal? LastRefusal = null)
 {
+    /// <summary>Whether the kind remembers a provider the owner can forget.</summary>
+    public bool CanForget => RememberedProviderId is not null;
+
     /// <summary>
     /// What the provider last said about itself, worded for every language (#415): Gleanvolt's own words
     /// for <see cref="StatusCode"/>, then the detail in the viewer's language. The English is for the log,
@@ -110,3 +126,18 @@ public sealed record ExternalProviderStatus(
     /// <summary>The page path of <paramref name="kind"/>.</summary>
     public static string PagePathFor(string kind) => "/external/" + kind + "/page";
 }
+
+/// <summary>A hello the kind refused (#440).</summary>
+/// <param name="ProviderId">The refused provider's id, as it said.</param>
+/// <param name="ProviderName">Its name.</param>
+/// <param name="Code">The refusal code, as the provider was told.</param>
+/// <param name="Reason">Why, in English, as the provider was told.</param>
+/// <param name="Phrases">The same, for the web UI: one per sentence of <paramref name="Reason"/>, or null to show the English.</param>
+/// <param name="At">When.</param>
+public sealed record ExternalProviderRefusal(
+    string ProviderId,
+    string ProviderName,
+    string Code,
+    string Reason,
+    IReadOnlyList<Phrase?>? Phrases,
+    DateTimeOffset At);

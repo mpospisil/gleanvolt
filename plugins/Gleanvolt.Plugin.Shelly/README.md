@@ -17,13 +17,17 @@ page for the charger's address, which Gleanvolt links from **Settings → Extern
 1. **On the charger**: a fixed address in your router; **authentication off** in the Shelly app (the
    plugin sends no password yet); **Auto balance off** if you use Shelly EM load management.
 2. **In Gleanvolt**, under **Settings → Installation**, choose **External plugin** as the charger's brand
-   and save. The address fields go away. Restart Gleanvolt.
+   and save. The address fields go away. Keep the charge control within the charger's range: at most
+   16 A (`ChargeControl:MaxChargingCurrentAmps`, 20 by default) on up to three phases. Gleanvolt refuses
+   the plugin otherwise, and **Settings → External providers** says which setting to change. Restart
+   Gleanvolt.
 3. Under **Settings → External providers**, **Make a token** if there is none, and copy it.
 4. **Start the plugin** with the token (below), open its page from **Settings → External providers**, enter
    the charger's address and **Save and check**.
 
-Gleanvolt now shows the charger as any other. Try `ChargeControl:DryRun` first: Gleanvolt then sends no
-command, and the plugin's page says so.
+Gleanvolt now shows the charger as any other, and remembers this plugin: no other charger plugin is let in
+until you press **Forget** beside it on **Settings → External providers**. Try `ChargeControl:DryRun` first:
+Gleanvolt then sends no command, and the plugin's page says so.
 
 ## What it does
 

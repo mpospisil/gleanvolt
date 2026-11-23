@@ -60,6 +60,13 @@ EMMA** a jako adresu adresu EMMA.
 adresu nabíječky má plugin, na své vlastní stránce. Spusťte plugin s tokenem z **Nastavení → Externí
 zdroje dat**; Gleanvolt ho přijme po restartu a uložení ověří, že odpovídá.
 
+Plugin Gleanvoltu sdělí, co nabíječka umí. Pokud **Maximální proud (A)** nebo **Fáze** na stránce
+[Auto](../car/) chtějí víc (vyšší proud nebo tři fáze u jednofázové nabíječky), Gleanvolt plugin odmítne
+a **Nastavení → Externí zdroje dat** řekne, které nastavení snížit. Změňte ho, uložte a Gleanvolt
+restartujte. Gleanvolt si také zapamatuje první plugin nabíječky, který přijme, a žádný
+jiný nepustí. Chcete-li přejít na jiný plugin, zastavte ten starý a stiskněte vedle něj **Zapomenout**
+v **Nastavení → Externí zdroje dat**.
+
 ## Při uložení
 
 Gleanvolt z každého zařízení přečte jednu hodnotu, aby ověřil, že adresa odpovídá a že zařízení je to, za

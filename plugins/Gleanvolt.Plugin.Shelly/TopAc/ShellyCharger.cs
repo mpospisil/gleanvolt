@@ -58,6 +58,12 @@ public sealed class ShellyCharger : IChargerSource
     private bool? _allowed;
     private bool _paused;
     private int? _lastLimit;
+
+    /// <summary>
+    /// 6 A up to <see cref="ShellyOptions.MaxCurrentAmps"/> on three phases, paused with its start/stop switch rather
+    /// than a setpoint (#440).
+    /// </summary>
+    public ChargerCapabilities Capabilities => new(MinCurrentAmps, _options.MaxCurrentAmps, Phases: 3);
     private DateTimeOffset? _ownerSettingsReadAt;
 
     public ShellyCharger(ShellyRpcClient rpc, ShellyOptions options, TimeProvider time, ILogger<ShellyCharger> logger)

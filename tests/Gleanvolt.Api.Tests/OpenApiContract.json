@@ -398,6 +398,13 @@
       "name": "string (required)",
       "phases": "integer|string(int32)? (required)"
     },
+    "ExternalProviderRefusalResponse": {
+      "at": "string(date-time) (required)",
+      "code": "string (required)",
+      "providerId": "string (required)",
+      "providerName": "string (required)",
+      "reason": "string (required)"
+    },
     "ExternalProviderResponse": {
       "hasToken": "boolean (required)",
       "healthy": "boolean? (required)",
@@ -405,11 +412,13 @@
       "kind": "string (required)",
       "lastDataAt": "string(date-time)? (required)",
       "lastProblems": "array\u003Cstring\u003E (required)",
+      "lastRefusal": "any",
       "name": "string (required)",
       "needsOwner": "boolean",
       "providerId": "string? (required)",
       "providerName": "string? (required)",
       "providerVersion": "string? (required)",
+      "rememberedProviderId": "string?",
       "since": "string(date-time)? (required)",
       "state": "$ExternalProviderState (required)",
       "statusCode": "string?",

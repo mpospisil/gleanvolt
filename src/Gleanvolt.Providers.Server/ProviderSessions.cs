@@ -26,10 +26,18 @@ public sealed partial class ProviderSessions
     private int _contractMinor;
     private PendingRequest? _pending;
     private bool _pageOnThisHost;
+    private readonly IRememberedProviders? _remembered;
 
-    internal ProviderSessions(ProviderKind kind, bool hasToken, TimeProvider time, ILogger logger, Func<string, IClientProxy> client)
+    internal ProviderSessions(
+        ProviderKind kind,
+        bool hasToken,
+        TimeProvider time,
+        ILogger logger,
+        Func<string, IClientProxy> client,
+        IRememberedProviders? remembered = null)
     {
         Kind = kind;
+        _remembered = kind.RemembersProvider ? remembered ?? new InMemoryRememberedProviders() : null;
         _time = time;
         _logger = logger;
         _client = client;
@@ -46,7 +54,7 @@ public sealed partial class ProviderSessions
         {
             lock (_gate)
             {
-                return _status;
+                return _remembered is null ? _status : _status with { RememberedProviderId = _remembered.Find(Kind.Id) };
             }
         }
     }
@@ -88,18 +96,34 @@ public sealed partial class ProviderSessions
     /// Attaches <paramref name="context"/> as the session, or says why not: null when attached, else a
     /// refusal code. Replaces the same provider's older connection, which is told goodbye and closed.
     /// </summary>
-    internal (string? Code, string? Reason) Attach(HubCallerContext context, ProviderHello hello, bool pageOnThisHost = false)
+    internal (string? Code, string? Reason, Phrase? Phrase) Attach(HubCallerContext context, ProviderHello hello, bool pageOnThisHost = false)
     {
         HubCallerContext? replaced = null;
 
+        bool remember;
+
         lock (_gate)
         {
+            var remembered = _remembered?.Find(Kind.Id);
+
+            if (remembered is not null && !string.Equals(remembered, hello.ProviderId, StringComparison.Ordinal))
+            {
+                return (RefusalCodes.AnotherProvider,
+                    $"Gleanvolt remembers the provider {remembered} for this kind and lets in no other until the owner presses "
+                    + "Forget on Settings → External providers.",
+                    Phrase.Of("Provider.Remembered", new PhraseArg.Text(remembered)));
+            }
+
+            remember = _remembered is not null && remembered is null;
+
             if (_status.State == ExternalProviderState.Connected && _context is { } current && current.ConnectionId != context.ConnectionId)
             {
                 if (!string.Equals(_status.ProviderId, hello.ProviderId, StringComparison.Ordinal))
                 {
                     return (RefusalCodes.AnotherProvider,
-                        $"Another provider, {_status.ProviderName} ({_status.ProviderId}), is connected for this kind. Only one is active at a time.");
+                        $"Another provider, {_status.ProviderName} ({_status.ProviderId}), is connected for this kind. Only one is active at a time.",
+                        Phrase.Of("Provider.AnotherConnected", new PhraseArg.Text(_status.ProviderName ?? string.Empty),
+                            new PhraseArg.Text(_status.ProviderId ?? string.Empty)));
                 }
 
                 replaced = current;
@@ -123,7 +147,23 @@ public sealed partial class ProviderSessions
                 StatusMessages = null,
                 Unanswered = false,
                 PageUrl = hello.PageUrl,
+                LastRefusal = null,
             };
+        }
+
+        if (remember)
+        {
+            try
+            {
+                _remembered!.Remember(Kind.Id, hello.ProviderId);
+                _logger.LogInformation(
+                    "The {Kind} provider {Provider} is remembered: no other is let in until the owner forgets it.", Kind.Name, hello.ProviderId);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                // Still remembered in memory: the store says so, and it holds until the next start.
+                _logger.LogWarning("Could not keep the {Kind} provider {Provider} for the next start ({Reason}).", Kind.Name, hello.ProviderId, ex.Message);
+            }
         }
 
         if (replaced is not null)
@@ -134,7 +174,51 @@ public sealed partial class ProviderSessions
 
         _logger.LogInformation("The {Kind} provider {Provider} ({Name} {Version}) is connected.", Kind.Name, hello.ProviderId, hello.Name, hello.Version);
         Changed?.Invoke();
-        return (null, null);
+        return (null, null, null);
+    }
+
+    /// <summary>A hello was refused: kept in the status for the owner, and logged.</summary>
+    internal void Refused(ProviderHello hello, string code, string reason, IReadOnlyList<Phrase?>? phrases = null)
+    {
+        lock (_gate)
+        {
+            _status = _status with
+            {
+                LastRefusal = new ExternalProviderRefusal(hello.ProviderId, hello.Name, code, reason, phrases, _time.GetUtcNow()),
+            };
+        }
+
+        _logger.LogWarning("The {Kind} provider {Provider} was refused ({Code}): {Reason}", Kind.Name, hello.ProviderId, code, reason);
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Forgets the remembered provider (#440) and closes its session if it is attached, so the next provider to say
+    /// hello is remembered instead. Nothing for a kind that remembers none.
+    /// </summary>
+    public async Task ForgetAsync()
+    {
+        if (_remembered is null)
+        {
+            return;
+        }
+
+        var forgotten = _remembered.Find(Kind.Id);
+
+        try
+        {
+            _remembered.Forget(Kind.Id);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            // Forgotten in memory all the same; only the next start may remember it again.
+            _logger.LogWarning("Could not forget the {Kind} provider for the next start too ({Reason}).", Kind.Name, ex.Message);
+        }
+
+        _logger.LogInformation("The owner forgot the {Kind} provider {Provider}; the next to say hello is remembered.", Kind.Name, forgotten);
+        Changed?.Invoke();
+
+        await CloseAsync("forgotten", "The owner forgot this provider; the next provider to connect is remembered.").ConfigureAwait(false);
     }
 
     /// <summary>

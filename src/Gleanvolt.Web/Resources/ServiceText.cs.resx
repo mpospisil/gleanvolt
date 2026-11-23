@@ -814,4 +814,13 @@
   <data name="Charger_ModeTooLong" xml:space="preserve">
     <value>Režim je delší než {0} znaků.</value>
   </data>
+  <data name="Provider_Remembered" xml:space="preserve">
+    <value>Gleanvolt si pamatuje plugin {0} a žádný jiný nepustí, dokud nestisknete Zapomenout v Nastavení → Externí zdroje dat.</value>
+  </data>
+  <data name="Provider_AnotherConnected" xml:space="preserve">
+    <value>Je připojen jiný plugin, {0} ({1}). Aktivní je vždy jen jeden.</value>
+  </data>
+  <data name="Charger_Capabilities" xml:space="preserve">
+    <value>Schopnosti, které plugin uvádí pro svou nabíječku, nejsou použitelné: {0}</value>
+  </data>
 </root>
