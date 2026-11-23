@@ -42,7 +42,7 @@ public static class SetupStatusEvaluator
 
         Password(configuration, required);
 
-        var pv = configuration.GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
+        var pv = ChargerDrivers.WithPluginCharger(configuration).GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
         var pvProblems = new ConfigurationProblems();
         var site = PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, pvProblems, InverterDrivers.Known, ChargerDrivers.Known);
         ChargerDrivers.CheckLimits(configuration, site, pvProblems);

@@ -35,12 +35,16 @@ services:
     image: busybox:1.37
     container_name: gleanvolt-init
     user: "0:0"
-    # The OpenWeather plugin's directory too (#426), closed to everyone else: it holds an API key.
-    command: ["sh", "-c", "chown -R 1654:1654 /data /logs /plugins/openweather && chmod 700 /plugins/openweather"]
+    # The plugins' directories too (#426, #444), closed to everyone else: they hold an API key, a charger's password.
+    command: ["sh", "-c", "chown -R 1654:1654 /data /logs /plugins && chmod 700 /plugins/*"]
     volumes:
       - ${GLEANVOLT_DIR:-.}/data:/data
       - ${GLEANVOLT_DIR:-.}/logs:/logs
       - ${GLEANVOLT_DIR:-.}/plugins/openweather:/plugins/openweather
+      - ${GLEANVOLT_DIR:-.}/plugins/solax:/plugins/solax
+      - ${GLEANVOLT_DIR:-.}/plugins/huawei:/plugins/huawei
+      - ${GLEANVOLT_DIR:-.}/plugins/goe:/plugins/goe
+      - ${GLEANVOLT_DIR:-.}/plugins/shelly:/plugins/shelly
     restart: "no"
     network_mode: none
 
@@ -71,6 +75,9 @@ services:
       # Optional: the setup wizard finds and asks for both. Setting them here only saves it the asking.
       Pv__Inverter__Host: ${INVERTER_HOST:-}
       Pv__Chargers__0__Host: ${EV_CHARGER_HOST:-}
+      # Set to true with a charger plugin's profile (#444): the controller then drives the charger through the plugin,
+      # whatever the charger's brand says, so the two never both open it. docs/NAS.md has it.
+      ExternalCharger__UsePlugin: ${GLEANVOLT_CHARGER_PLUGIN:-false}
     volumes:
       - ${GLEANVOLT_DIR:-.}/data:/app/data
       - ${GLEANVOLT_DIR:-.}/logs:/app/logs
@@ -107,6 +114,118 @@ services:
     volumes:
       - ${GLEANVOLT_DIR:-.}/plugins/openweather:/data
     mem_limit: ${OPENWEATHER_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The solax charger plugin (#444): SolaX X1/X3-HAC and X1/X3-EVC, from gleanvolt-chargers. Opt-in with the `solax` profile, and with
+  # GLEANVOLT_CHARGER_PLUGIN=true for the controller; at most one charger plugin. The charger's address is EV_CHARGER_HOST.
+  gleanvolt-plugin-solax:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-solax:${SOLAX_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-solax
+    restart: unless-stopped
+    profiles: ["solax"]
+    init: true
+    network_mode: host
+    depends_on:
+      gleanvolt-init:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${SOLAX_PORT:-8098}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${SOLAX_PORT:-8098}/
+      Solax__Host: ${EV_CHARGER_HOST:-}
+    volumes:
+      - ${GLEANVOLT_DIR:-.}/plugins/solax:/data
+    mem_limit: ${SOLAX_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The huawei charger plugin (#444): Huawei SCharger-7KS-S0 and -22KT-S0, from gleanvolt-chargers. Opt-in with the `huawei` profile, and with
+  # GLEANVOLT_CHARGER_PLUGIN=true for the controller; at most one charger plugin. The charger's address is EV_CHARGER_HOST.
+  gleanvolt-plugin-huawei:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-huawei:${HUAWEI_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-huawei
+    restart: unless-stopped
+    profiles: ["huawei"]
+    init: true
+    network_mode: host
+    depends_on:
+      gleanvolt-init:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${HUAWEI_PORT:-8099}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${HUAWEI_PORT:-8099}/
+      Huawei__Host: ${EV_CHARGER_HOST:-}
+    volumes:
+      - ${GLEANVOLT_DIR:-.}/plugins/huawei:/data
+    mem_limit: ${HUAWEI_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The goe charger plugin (#444): the go-e Charger, from gleanvolt-chargers. Opt-in with the `goe` profile, and with
+  # GLEANVOLT_CHARGER_PLUGIN=true for the controller; at most one charger plugin. The charger's address is EV_CHARGER_HOST.
+  gleanvolt-plugin-goe:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-goe:${GOE_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-goe
+    restart: unless-stopped
+    profiles: ["goe"]
+    init: true
+    network_mode: host
+    depends_on:
+      gleanvolt-init:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${GOE_PORT:-8100}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${GOE_PORT:-8100}/
+      Goe__Host: ${EV_CHARGER_HOST:-}
+    volumes:
+      - ${GLEANVOLT_DIR:-.}/plugins/goe:/data
+    mem_limit: ${GOE_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The shelly charger plugin (#444): the Shelly TopAC, from gleanvolt-chargers. Opt-in with the `shelly` profile, and with
+  # GLEANVOLT_CHARGER_PLUGIN=true for the controller; at most one charger plugin. The charger's address is EV_CHARGER_HOST.
+  gleanvolt-plugin-shelly:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-shelly:${SHELLY_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-shelly
+    restart: unless-stopped
+    profiles: ["shelly"]
+    init: true
+    network_mode: host
+    depends_on:
+      gleanvolt-init:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${SHELLY_PORT:-8097}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${SHELLY_PORT:-8097}/
+      Shelly__Host: ${EV_CHARGER_HOST:-}
+    volumes:
+      - ${GLEANVOLT_DIR:-.}/plugins/shelly:/data
+    mem_limit: ${SHELLY_MEM_LIMIT:-160m}
     logging:
       driver: json-file
       options:

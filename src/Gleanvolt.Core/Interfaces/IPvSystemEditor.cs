@@ -35,6 +35,12 @@ public interface IPvSystemEditor
     IReadOnlyList<EvChargerDriverInfo> ChargerDrivers { get; }
 
     /// <summary>
+    /// Whether <c>ExternalCharger:UsePlugin</c> is set (#444): the charger is behind a plugin whatever the charger's brand
+    /// here says, because the deployment runs a charger plugin.
+    /// </summary>
+    bool ChargerPluginForced => false;
+
+    /// <summary>
     /// Stores <paramref name="values"/> (configuration key to value; an empty string clears a value)
     /// in the overrides file, merged with what is there already — if the merged configuration passes
     /// the startup resolver. A value equal to what the key would be without the file is not stored,

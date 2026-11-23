@@ -729,6 +729,10 @@ jobs:
             echo "\`ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/gleanvolt-plugin-openweather:${VERSION}\`, and the \`openweather\`"
             echo "profile of the compose stack. The README inside the zip says how to run it."
             echo
+            echo "The charger plugins (SolaX, Huawei SCharger, go-e, Shelly TopAC) are released on their own, from"
+            echo "[gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers); the compose stack runs one with"
+            echo "\`GLEANVOLT_PLUGINS\`. The built-in charger drivers are deprecated and go in 1.4."
+            echo
             echo "The \`.nupkg\` files are the libraries. The MIT ones a plugin is built on are also on nuget.org:"
             echo "\`Gleanvolt.Providers.Contracts\`, \`Gleanvolt.Providers.Client\`, \`Gleanvolt.Providers.Testing\`,"
             echo "\`Gleanvolt.Chargers.Hosting\` and \`Gleanvolt.Modbus\`, at ${VERSION}."

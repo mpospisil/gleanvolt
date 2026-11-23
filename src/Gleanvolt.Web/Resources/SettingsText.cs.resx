@@ -1147,4 +1147,13 @@
   <data name="ExternalRefused" xml:space="preserve">
     <value>{0} byl odmítnut {1}: {2}</value>
   </data>
+  <data name="NoteChargerDeprecated" xml:space="preserve">
+    <value>Zabudovaný ovladač {0} je zastaralý a v Gleanvoltu 1.4 bude odstraněn. Nahrazuje ho plugin {1}: v Dockeru přidejte {2} do GLEANVOLT_PLUGINS v .env a nasaďte znovu; adresa nabíječky se přenese.</value>
+  </data>
+  <data name="NoteChargerDeprecatedLink" xml:space="preserve">
+    <value>Jak plugin spustit</value>
+  </data>
+  <data name="NoteChargerPluginForced" xml:space="preserve">
+    <value>Toto nasazení spouští plugin nabíječky (ExternalCharger:UsePlugin), takže Gleanvolt řídí nabíječku přes něj, ať je zde zvolena jakákoli značka.</value>
+  </data>
 </root>

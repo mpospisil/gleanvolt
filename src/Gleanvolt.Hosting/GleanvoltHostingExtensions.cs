@@ -370,6 +370,15 @@ public static class GleanvoltHostingExtensions
                 : ChargerDrivers.DefaultId;
             var factory = provider.GetServices<IEvChargerDriverFactory>().SingleOrDefault(candidate => candidate.Id == id)
                 ?? throw new InvalidOperationException($"No charger driver '{id}' is registered.");
+
+            // The built-in charger drivers go in 1.4 (#444, #445): each start says which plugin replaces this one.
+            if (ChargerPlugins.Replacing(id) is { } plugin)
+            {
+                provider.GetRequiredService<ILoggerFactory>().CreateLogger("Gleanvolt.Chargers").LogWarning(
+                    "The built-in {Driver} charger driver is deprecated and is removed in Gleanvolt 1.4. The {Plugin} plugin replaces it: "
+                    + "add {Profile} to GLEANVOLT_PLUGINS in .env and deploy again, or see {Url}.",
+                    factory.DisplayName, plugin.Name, plugin.Profile, plugin.Url);
+            }
             var connection = factory.Transport switch
             {
                 EvChargerTransport.Http => EvChargerConnection.Over(provider.GetRequiredKeyedService<HttpClient>(ModbusClientKeys.EvCharger)),
@@ -1193,7 +1202,7 @@ public static class GleanvoltHostingExtensions
         PvSystemOptions pv;
         try
         {
-            pv = configuration.GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
+            pv = ChargerDrivers.WithPluginCharger(configuration).GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
         }
         catch (InvalidOperationException)
         {

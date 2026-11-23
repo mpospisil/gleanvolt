@@ -859,6 +859,9 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
 
     // SolaX as the host has it, and a second charger family with its own port and unit id, so a test can see
     // the form follow the selected charger driver's defaults (#349).
+    /// <summary>Whether the deployment runs a charger plugin (#444).</summary>
+    public bool ChargerPluginForced { get; set; }
+
     public IReadOnlyList<EvChargerDriverInfo> ChargerDrivers { get; set; } =
     [
         new("solax", "SolaX", EvChargerTransport.Modbus, new ModbusDefaults(502, 1, TimeSpan.FromMilliseconds(250)),

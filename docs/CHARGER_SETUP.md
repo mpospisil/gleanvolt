@@ -7,6 +7,11 @@ How to connect Gleanvolt to an EV charger that is not a SolaX: Huawei's **SCharg
 [Supported EV chargers](SUPPORTED_CHARGERS.md). In short: both are **Expected**. Their drivers
 were written from the manufacturers' documentation, and nobody has run them against a real charger yet.
 
+**The built-in drivers on this page are deprecated** (#444) and go in Gleanvolt 1.4: the
+[Huawei](https://github.com/mpospisil/gleanvolt-chargers/tree/main/huawei) and
+[go-e](https://github.com/mpospisil/gleanvolt-chargers/tree/main/goe) plugins replace them. What this page says about
+the charger itself (Modbus TCP, the API, the model, the address) holds for the plugins too.
+
 **Run in dry-run first.** `ChargeControl:DryRun` is on by default: Gleanvolt then only reads, and logs the
 writes it would make. Leave it on until the charger's status and power on the dashboard match the
 charger's own app.
