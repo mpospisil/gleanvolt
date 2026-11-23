@@ -30,8 +30,9 @@ its own, and a new package lets a charger plugin be tested without Gleanvolt.
 - **`ChargerReadingRules`** (Contracts): the limits and an English check. `ChargerReadingValidator` takes its
   limits from it.
 - **`release.yml`:** packs Modbus and Providers.Testing (expected: fourteen packages), builds with
-  `ContinuousIntegrationBuild=true`, and after the release a new step pushes the four MIT packages to
-  nuget.org with `--skip-duplicate`, or says in the summary that `NUGET_API_KEY` is missing. The header and the
+  `ContinuousIntegrationBuild=true`, and after the release `NuGet/login@v1` (Trusted Publishing, user from
+  the `NUGET_USER` variable) gets a one-hour key and a step pushes the four MIT packages to nuget.org with
+  `--skip-duplicate`, or says in the summary that `NUGET_USER` is missing. The header and the
   release notes no longer say there is no feed.
 - **Dockerfiles:** COPY lines for both new projects (`DockerfileTests` requires every `src/` project).
 

@@ -16,8 +16,10 @@ end to end against Gleanvolt's own hub, as `ExternalChargerTests` does here.
 **Decided.**
 - **nuget.org, for the MIT packages only:** `Gleanvolt.Providers.Contracts`, `.Client`, `.Testing` and
   `Gleanvolt.Modbus`. `release.yml` pushes them, with their symbol packages, after the release is created,
-  with `--skip-duplicate`, and only when the `NUGET_API_KEY` secret is set. Every other package stays on the
-  release and goes to no feed.
+  with `--skip-duplicate`, by **Trusted Publishing**: a policy on nuget.org for this repository and
+  `release.yml`, and `NuGet/login` trading the job's OIDC token for a key that lives one hour. No API key is
+  stored; nuget.org discourages them for CI. Without the `NUGET_USER` variable nothing is pushed. Every other
+  package stays on the release and goes to no feed.
 - **`Gleanvolt.Modbus`, MIT:** `IModbusClient`, `ModbusDeviceException` and `ModbusTcpClient` move there
   unchanged in behaviour, in namespace `Gleanvolt.Modbus`. The client takes a `ModbusEndpoint` (host, port,
   unit id, request spacing, reconnect backoff) instead of Core's `DeviceConfig`, which gains `ToEndpoint()`.
@@ -41,8 +43,9 @@ end to end against Gleanvolt's own hub, as `ExternalChargerTests` does here.
 - **A version on nuget.org is permanent:** it can be unlisted, never replaced. That is why the push comes last.
 - **The Modbus client's code is now MIT.** Code under this repository's licence can't be taken back from the
   package once it is published.
-- **Two things for the owner, outside the repository:** the `NUGET_API_KEY` secret, and reserving the
-  `Gleanvolt.` ID prefix on nuget.org. Until the key is set, a release pushes nothing and says so.
+- **Three things for the owner, outside the repository:** reserving the `Gleanvolt.` ID prefix on nuget.org,
+  the Trusted Publishing policy there, and the `NUGET_USER` variable here (docs/RELEASING.md). Until the
+  variable is set, a release pushes nothing and says so.
 
 ---
 

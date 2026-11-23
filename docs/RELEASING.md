@@ -124,6 +124,22 @@ Then, for each skill that changed:
    security scan and review again before it is live. Agensi's guides don't describe updating a listing.
    Correct this step after the first update.
 
+## Publishing to nuget.org
+
+The four MIT packages go to nuget.org by **Trusted Publishing** (#439): no API key is stored anywhere. Set up
+once, on nuget.org and on GitHub:
+
+1. On nuget.org, under your name → **Trusted Publishing**, add a policy owned by the account (or organization)
+   that owns the `Gleanvolt.*` packages: repository owner `mpospisil`, repository `gleanvolt`, workflow file
+   `release.yml`, environment empty.
+2. On GitHub, **Settings → Secrets and variables → Actions → Variables**, add `NUGET_USER`: the nuget.org
+   profile name (not the email address).
+
+The release job then logs in with `NuGet/login`, gets a key that lives one hour, and pushes. Without
+`NUGET_USER` it pushes nothing and says so in the run's summary. A policy on nuget.org may start as
+temporarily active for 7 days and is locked to the repository by the first successful push; if no release
+comes in those 7 days, restart the window on nuget.org.
+
 ## What a release carries
 
 | | |
@@ -133,7 +149,7 @@ Then, for each skill that changed:
 | `gleanvolt-<version>-linux-arm64.zip` | self-contained, ~46 MB — this is the Pi |
 | `gleanvolt_<version>_amd64.deb`, `gleanvolt_<version>_arm64.deb` | the same build as a systemd service for Debian, Ubuntu and Raspberry Pi OS (#205), ~50 MB each |
 | `install.sh` | the one-line Linux install; it finds the `.deb` by name in `SHA256SUMS`, so both names above are a contract — and so does the `gleanvolt-install` skill, which repeats those steps |
-| fourteen `.nupkg` and fourteen `.snupkg` | the libraries and their symbols: Api, Core, Hosting, Infrastructure, Web, the device packages Devices.Abstractions, Devices.Solax, Devices.Huawei, Devices.GoE, Providers.Server, and, under MIT, Providers.Contracts, Providers.Client, Providers.Testing and Modbus. The four MIT ones are also pushed to nuget.org (#439), after the release is created, when the `NUGET_API_KEY` secret is set; the rest go to no feed |
+| fourteen `.nupkg` and fourteen `.snupkg` | the libraries and their symbols: Api, Core, Hosting, Infrastructure, Web, the device packages Devices.Abstractions, Devices.Solax, Devices.Huawei, Devices.GoE, Providers.Server, and, under MIT, Providers.Contracts, Providers.Client, Providers.Testing and Modbus. The four MIT ones are also pushed to nuget.org (#439), after the release is created, by Trusted Publishing when the `NUGET_USER` variable is set (see below); the rest go to no feed |
 | `SHA256SUMS` | covers every file above, and not itself |
 
 Each zip, `.deb`, `install.sh` and `.nupkg` also carries a build provenance attestation, verifiable with

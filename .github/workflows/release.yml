@@ -778,17 +778,31 @@ jobs:
             artifacts/*
 
       # The MIT packages to nuget.org (#439), after the release exists: a version on nuget.org can't be taken
-      # back, only unlisted, so nothing goes there before the tag and the release do. The symbol packages go
-      # with them (dotnet nuget push takes the .snupkg beside each .nupkg). --skip-duplicate makes a re-run
-      # of this job harmless. Without NUGET_API_KEY the step says so and pushes nothing.
+      # back, only unlisted, so nothing goes there before the tag and the release do.
+      #
+      # Trusted Publishing, not a stored API key: nuget.org holds a policy for this repository and this
+      # workflow file, the job proves who it is with GitHub's OIDC token (the id-token: write above), and
+      # NuGet/login trades that for a key that lives one hour. Nothing that can push a package is kept in
+      # the repository. The login comes right before the push, so the key can't expire in between.
+      #
+      # NUGET_USER is a repository variable, the nuget.org profile name the policy belongs to; it isn't a
+      # secret. Without it both steps say so and push nothing. The symbol packages go with the packages
+      # (dotnet nuget push takes the .snupkg beside each .nupkg), and --skip-duplicate makes a re-run harmless.
+      - name: Log in to nuget.org
+        id: nuget
+        if: vars.NUGET_USER != ''
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Push the MIT packages to nuget.org
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ steps.nuget.outputs.NUGET_API_KEY }}
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
           if [ -z "$NUGET_API_KEY" ]; then
-            echo "No NUGET_API_KEY secret; the MIT packages were not pushed to nuget.org." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "No NUGET_USER variable, so no nuget.org login; the MIT packages were not pushed to nuget.org." | tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
