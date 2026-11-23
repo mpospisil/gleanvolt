@@ -79,9 +79,11 @@ installation: Gleanvolt acts on what they send.
 of the built-in volkswagen.de feed, run as a plugin, with its own page for the account and the sign-in
 (#410). It is a test of moving a car integration out of Gleanvolt, not part of the release.
 
-[`plugins/Gleanvolt.Plugin.Shelly`](../plugins/Gleanvolt.Plugin.Shelly) is the first charger plugin
-(#429, #435): the Shelly TopAC Portable EV Charger over its local RPC API, with its own page for the
-charger's address. It is not shipped.
+**The charger plugins live in a repository of their own**, [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (#443), MIT, each
+released on its own tag with an image and self-contained zips: the Shelly TopAC (moved from here, #429),
+and SolaX, Huawei and go-e, ported from the drivers built into Gleanvolt. Its `Gleanvolt.Chargers.Shared`
+is a starting point for another charger: the host, the guarded page, the address store, the search and the
+recording for testers.
 
 [`plugins/Gleanvolt.Plugin.OpenWeather`](../plugins/Gleanvolt.Plugin.OpenWeather) is another (#424):
 OpenWeatherMap as a weather provider, with its own page for the key, which Gleanvolt shows under

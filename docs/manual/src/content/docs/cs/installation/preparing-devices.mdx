@@ -17,7 +17,7 @@ Co zkontrolovat, záleží na značce:
 | Střídač Huawei SUN2000 | Modbus TCP, **Enable (Unrestricted)** | Aplikace FusionSolar, jako instalační technik |
 | Huawei SCharger | Modbus TCP | Aplikace FusionSolar |
 | Nabíječka go-e | **Local HTTP API v2** | Aplikace go-e |
-| Shelly TopAC Portable | Pevná adresa, ověřování **vypnuté** | Router; aplikace Shelly |
+| Shelly TopAC Portable | Pevná adresa; heslo, pokud je zapnuté ověřování | Router; aplikace Shelly |
 
 Obě zařízení musí být také **připojená k domácí síti**, kabelem nebo přes Wi-Fi, a zapnutá.
 
@@ -87,7 +87,8 @@ Gleanvolt sám adresu nabíječky nepotřebuje: zadáte ji pluginu.
 
 1. Přidělte nabíječce v routeru **pevnou adresu**, aby ji plugin vždy našel.
 
-2. V aplikaci Shelly nechte **ověřování vypnuté**. Plugin zatím heslo posílat neumí.
+2. Pokud je v aplikaci Shelly zapnuté **ověřování**, mějte po ruce jeho heslo: zadáte ho na stránce
+   pluginu.
 
 3. Pokud používáte **Auto balance** (řízení zátěže přes Shelly EM), vypněte ho. Samo snižuje proud a jde
    proti Gleanvoltu; plugin na to upozorňuje, dokud je zapnuté.
@@ -95,8 +96,8 @@ Gleanvolt sám adresu nabíječky nepotřebuje: zadáte ji pluginu.
 </Steps>
 
 Jak plugin spustit, popisuje jeho
-[README](https://github.com/mpospisil/gleanvolt/blob/main/plugins/Gleanvolt.Plugin.Shelly/README.md)
-(anglicky).
+[README](https://github.com/mpospisil/gleanvolt-chargers/blob/main/src/Gleanvolt.Plugin.Shelly/README.md)
+(anglicky). Viz také [Vaše nabíječka](../../setting-up/charger/).
 
 ## Vždy jen jeden řídicí systém
 

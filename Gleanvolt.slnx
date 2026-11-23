@@ -20,7 +20,6 @@
   </Folder>
   <Folder Name="/plugins/">
     <Project Path="plugins/Gleanvolt.Plugin.OpenWeather/Gleanvolt.Plugin.OpenWeather.csproj" />
-    <Project Path="plugins/Gleanvolt.Plugin.Shelly/Gleanvolt.Plugin.Shelly.csproj" />
     <Project Path="plugins/Gleanvolt.Plugin.SolarForecastSample/Gleanvolt.Plugin.SolarForecastSample.csproj" />
     <Project Path="plugins/Gleanvolt.Plugin.TariffSample/Gleanvolt.Plugin.TariffSample.csproj" />
     <Project Path="plugins/Gleanvolt.Plugin.VehicleSample/Gleanvolt.Plugin.VehicleSample.csproj" />

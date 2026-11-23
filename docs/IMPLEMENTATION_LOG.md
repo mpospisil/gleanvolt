@@ -4,6 +4,45 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-23 — The charger plugins repository: Shelly moved, SolaX, Huawei and go-e ported (#443)
+
+**What.** The fifth step of #438. The charger plugins now live in
+[gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers), and the Shelly plugin left this repository.
+
+**In gleanvolt-chargers** (MIT):
+- `Gleanvolt.Chargers.Shared`: `PluginHost`, `PluginCharger` with `StatusReporter` and `GleanvoltSession`,
+  `PluginSettings`/`SavedSetting`/`DeviceAddress`, `ModbusDevice`, `LanScan` with `IChargerSearch`, `DeviceRecorder`
+  with `RecordingModbusClient` and `RecordingHandler`, and the page's `PluginFrame` and sections, in English and Czech.
+- `Gleanvolt.Plugin.Solax` (8098), `.Huawei` (8099), `.GoE` (8100), `.Shelly` (8097).
+- One `docker/Dockerfile` for all four, CI (build, test, images), and a release workflow on `<name>-v<version>` tags.
+- `THIRD-PARTY-NOTICES.md` carries the SolaX register map's Apache-2.0 attribution.
+
+**Here:**
+- `plugins/Gleanvolt.Plugin.Shelly` is removed, with `FakeTopAc` and its references in the solution and in Hosting.Tests.
+- `ExternalChargerTests` uses a fake plugin charger for the driver's side: the threshold, the clamp, dry run, a failed
+  read and the plugin's status, a refused command, the wrong units, and #440's tests.
+- The docs point at the new repository: PROVIDERS, SUPPORTED_CHARGERS, SUPPORTED_PV_SYSTEMS, and the manual's
+  preparing-devices and charger pages (en, cs). The Shelly password is now supported.
+
+**Quirks.**
+- The page guard admits any GET whose path has an extension without the ticket, as a static file. So the recording is
+  downloaded from `/recording`, with no `.json` in the path.
+- The SDK registers the charger as a singleton. A typed `HttpClient` would make it transient, so the HTTP plugins take
+  `IHttpClientFactory` and named clients.
+- Shelly's digest is .NET's own: `SocketsHttpHandler.Credentials` gives `admin` and the saved password only when the
+  charger asks for `Digest`.
+
+**Tests.**
+- gleanvolt-chargers: 67 tests. Each plugin runs against the SDK's `ChargerTestHub` over a real socket, with a fake
+  charger on Modbus TCP (a register-map server) or HTTP. They cover readings, writes register for register, pauses,
+  limits refusals, `NotSetUp` and `NeedsOwner` statuses, the checks and searches, the recording without the
+  authorization header, settings across a restart, and the search's networks.
+- Each plugin was also run as a process: its page answers 403 without the ticket and renders, in Czech too, with one.
+  The SolaX image was built and run: it listens, keeps `/data` owner-only, and ships the licence.
+- Here, the full solution passes in Release.
+
+---
+
 ## 2026-11-23 — The wizard becomes Inverter → Site → Finish, and the charger leaves setup (#442)
 
 **What.** The fourth step of #438. Gleanvolt sets up only itself. A fresh install goes through Inverter, Site and

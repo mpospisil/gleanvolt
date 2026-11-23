@@ -36,8 +36,6 @@
     <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.Volkswagen\Gleanvolt.Plugin.Volkswagen.csproj" />
     <!-- The OpenWeather plugin, end to end against the weather hub (#424). -->
     <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.OpenWeather\Gleanvolt.Plugin.OpenWeather.csproj" />
-    <!-- The Shelly TopAC plugin, end to end against the charger hub and the external charger driver (#429, #435). -->
-    <ProjectReference Include="..\..\plugins\Gleanvolt.Plugin.Shelly\Gleanvolt.Plugin.Shelly.csproj" />
   </ItemGroup>
 
   <!-- The built-in feed's real capture, reused for the plugin's copy (#410): one file, not two. -->

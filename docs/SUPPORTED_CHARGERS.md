@@ -6,6 +6,10 @@ are explained in
 One charger is supported per installation. A tester's register snapshots
 ([issue #354](https://github.com/mpospisil/gleanvolt/issues/354)) move a row up a tier.
 
+Every charger below is also a plugin in [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (#443): driver `external`, with the
+plugin for the brand. The built-in drivers `solax`, `huawei-7ks`, `huawei-22kt` and `goe` are being replaced
+by those plugins; a plugin's page has a recording for testers in place of the register snapshot.
+
 ### Chargers at a glance
 
 | Manufacturer | Models | Driver | Tier |
@@ -96,12 +100,12 @@ So a new charger needs no new release of Gleanvolt, only a plugin:
 ### Shelly TopAC Portable EV Charger
 
 Driver `external`, with
-[`plugins/Gleanvolt.Plugin.Shelly`](https://github.com/mpospisil/gleanvolt/blob/main/plugins/Gleanvolt.Plugin.Shelly/README.md)
-(#429), over the charger's local Gen2 RPC API.
+the [Shelly plugin](https://github.com/mpospisil/gleanvolt-chargers/blob/main/src/Gleanvolt.Plugin.Shelly/README.md) in
+[gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (#429, #443), over the charger's local Gen2 RPC API.
 
 | Model | Driver | Tier | Notes |
 |---|---|---|---|
-| [**TopAC Portable EV Charger**](https://shelly-api-docs.shelly.cloud/gen2/Devices/ShellyX/XT1/TopACPortableEVCharger) (EVE01-11R), 11 kW, three phases, 6–16 A | `external` | Expected | Authentication off; the plugin has the address |
+| [**TopAC Portable EV Charger**](https://shelly-api-docs.shelly.cloud/gen2/Devices/ShellyX/XT1/TopACPortableEVCharger) (EVE01-11R), 11 kW, three phases, 6–16 A | `external` | Expected | The plugin has the address, and the password when authentication is on |
 
 - **A pause is the start/stop switch off**, because the TopAC takes nothing below 6 A. The plugin
   remembers that it paused, as the go-e driver does.
@@ -109,7 +113,8 @@ Driver `external`, with
   reads it as kW. The plugin compares it with V × I on the phases once the car draws.
 - **Auto balance** (Shelly EM load management) fights the control loop. The plugin asks the owner to turn
   it off.
-- **No password yet.** The plugin sends none, so authentication must stay off in the Shelly app.
+- **The password**, with authentication on in the Shelly app, is entered on the plugin's page and sent as
+  Shelly's digest.
 - **No search.** The charger isn't found by Gleanvolt's search; enter its address on the plugin's page.
 - **Not shipped.** The plugin is built with Gleanvolt and run by hand, not released as an image or a zip.
 - Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
