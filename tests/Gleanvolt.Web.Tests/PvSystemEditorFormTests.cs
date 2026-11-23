@@ -185,6 +185,29 @@ public class PvSystemEditorFormTests : BunitContext
     }
 
     [Fact]
+    public void A_built_in_charger_driver_says_it_is_deprecated_and_names_the_plugin_that_replaces_it()
+    {
+        // #444: the running charger is SolaX (empty driver, a host): the SolaX plugin takes its place in 1.4.
+        var form = Render<PvSystemEditorForm>();
+
+        var note = form.Find("#pv-charger-deprecated");
+        Assert.Contains("deprecated", note.TextContent);
+        Assert.Contains("GLEANVOLT_PLUGINS", note.TextContent);
+        Assert.Contains("solax", note.TextContent);
+        Assert.Equal("https://github.com/mpospisil/gleanvolt-chargers/tree/main/solax", note.QuerySelector("a")!.GetAttribute("href"));
+    }
+
+    [Fact]
+    public void A_deployment_running_a_charger_plugin_says_so_instead()
+    {
+        _editor.ChargerPluginForced = true;
+        var form = Render<PvSystemEditorForm>();
+
+        Assert.Contains("ExternalCharger:UsePlugin", form.Find("#pv-charger-plugin-forced").TextContent);
+        Assert.Empty(form.FindAll("#pv-charger-deprecated"));
+    }
+
+    [Fact]
     public void Choosing_a_charger_behind_a_plugin_hides_its_address_and_probes_the_plugin_instead()
     {
         // #435: the plugin reaches the charger, so the form asks for no address, and its name is said, not a brand.
@@ -202,6 +225,7 @@ public class PvSystemEditorFormTests : BunitContext
         Assert.Empty(form.FindAll(Field(PvSystemSettingKeys.ChargerPort)));
         Assert.Empty(form.FindAll(Field(PvSystemSettingKeys.ChargerUnitId)));
         Assert.NotNull(form.Find("#pv-charger-plugin"));
+        Assert.Empty(form.FindAll("#pv-charger-deprecated"));
 
         form.Find("#pv-save").Click();
 

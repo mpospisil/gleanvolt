@@ -273,8 +273,11 @@ One charger is supported per installation. A tester's register snapshots
 ([issue #354](https://github.com/mpospisil/gleanvolt/issues/354)) move a row up a tier.
 
 Every charger below is also a plugin in [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (#443): driver `external`, with the
-plugin for the brand. The built-in drivers `solax`, `huawei-7ks`, `huawei-22kt` and `goe` are being replaced
-by those plugins; a plugin's page has a recording for testers in place of the register snapshot.
+plugin for the brand. **The built-in drivers `solax`, `huawei-7ks`, `huawei-22kt` and `goe` are deprecated in 1.3
+and removed in 1.4** (#444, #445): each start logs which plugin replaces the one in use, and Settings says so beside
+the charger's brand. On Docker, add the plugin to `GLEANVOLT_PLUGINS` and deploy
+([deploy/README.md](https://github.com/mpospisil/gleanvolt/blob/main/deploy/README.md#shipped-plugins)). A plugin's
+page has a recording for testers in place of the register snapshot.
 
 ### Chargers at a glance
 

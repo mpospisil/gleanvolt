@@ -78,6 +78,9 @@ public sealed class PvSystemEditor : IPvSystemEditor
 
     public IReadOnlyList<EvChargerDriverInfo> ChargerDrivers { get; }
 
+    public bool ChargerPluginForced =>
+        _configuration?.GetValue<bool>(Chargers.ExternalChargerOptions.SectionName + ":" + nameof(Chargers.ExternalChargerOptions.UsePlugin)) == true;
+
     public PvSystemSettings Read()
     {
         if (_configuration is null || _overrides is null)

@@ -4,6 +4,38 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-23 — The built-in charger drivers are deprecated, and the charger plugins ship (#444)
+
+**Found.** Every built-in charger driver now has a plugin in gleanvolt-chargers (#443). Owners need a way to move
+that doesn't depend on getting the order of two changes right. A Pi running a SolaX charger has its address in `.env`
+(`EV_CHARGER_HOST`), perhaps a brand saved on Settings, and a charger that serves one Modbus client. If the built-in
+driver and the plugin both opened it, the charger would drop one of them, unpredictably.
+
+**Decided.**
+- **The built-in drivers keep working in 1.3,** and every start logs which plugin replaces the one in use. Settings
+  says so beside the charger's brand, with a link. Removal is #445, in 1.4.
+- **The charger plugins ship,** restating #426's rule (only a plugin that replaces or stands in for a built-in ships):
+  these replace the built-in drivers. They are released from gleanvolt-chargers on their own tags, not with
+  Gleanvolt's: a charger fix needs no Gleanvolt release, so their image tags are `<NAME>_PLUGIN_TAG`, not `IMAGE_TAG`.
+- **The switch is one setting, `ExternalCharger:UsePlugin`,** applied as an overlay on `Pv:Chargers:0:Driver` before
+  the installation is resolved: at startup, in setup's evaluation and in the partial view. It wins over the
+  environment and over the overrides file. The deploy scripts set it (`GLEANVOLT_CHARGER_PLUGIN`) exactly when
+  GLEANVOLT_PLUGINS names a charger plugin, and refuse two. Moving is therefore one line in `.env`, and moving back is
+  taking it off.
+- **The charger's address travels:** each charger plugin's container gets `EV_CHARGER_HOST` as `<Section>:Host`. One
+  saved on the plugin's page wins.
+
+**Consequences accepted.**
+- Run by hand without the scripts, with the profile but without `GLEANVOLT_CHARGER_PLUGIN=true`, the controller keeps
+  its built-in driver. That is still safe: the charger hub is then off, so Gleanvolt refuses the plugin, and a plugin
+  reads its charger only when Gleanvolt asks.
+- A charger address saved on Settings (in the overrides file) doesn't reach the plugin; the owner enters it on the
+  plugin's page.
+- The images exist only after each plugin's first release; until then a deploy with a charger plugin fails at the
+  pull.
+
+---
+
 ## 2026-11-23 — The charger plugins get a repository of their own, gleanvolt-chargers (#443)
 
 **Found.** With the SDK on nuget.org (#439), contract 1.1 (#440), availability (#441) and setup without a charger (#442),

@@ -311,8 +311,18 @@ Most plugins are built with the solution and run by hand. A **shipped** one is r
 | Plugin | Kind | Image | Compose profile | Port | Release zip |
 | --- | --- | --- | --- | --- | --- |
 | [OpenWeather](../plugins/Gleanvolt.Plugin.OpenWeather) | weather | `ghcr.io/mpospisil/gleanvolt-plugin-openweather` | `openweather` | 8096 | `gleanvolt-plugin-openweather-<version>-<rid>.zip` |
+| [SolaX](https://github.com/mpospisil/gleanvolt-chargers/tree/main/solax) | charger | `ghcr.io/mpospisil/gleanvolt-plugin-solax` | `solax` | 8098 | on its own release |
+| [Huawei SCharger](https://github.com/mpospisil/gleanvolt-chargers/tree/main/huawei) | charger | `ghcr.io/mpospisil/gleanvolt-plugin-huawei` | `huawei` | 8099 | on its own release |
+| [go-e](https://github.com/mpospisil/gleanvolt-chargers/tree/main/goe) | charger | `ghcr.io/mpospisil/gleanvolt-plugin-goe` | `goe` | 8100 | on its own release |
+| [Shelly TopAC](https://github.com/mpospisil/gleanvolt-chargers/tree/main/shelly) | charger | `ghcr.io/mpospisil/gleanvolt-plugin-shelly` | `shelly` | 8097 | on its own release |
 
-Only a plugin that replaces or stands in for a built-in ships. The samples and the Volkswagen copy don't.
+Only a plugin that replaces or stands in for a built-in ships. The samples and the Volkswagen copy don't. **The charger
+plugins ship** (#444): they replace the built-in charger drivers, which are deprecated in 1.3 and removed in 1.4
+(#445). They are released from gleanvolt-chargers on their own tags (`solax-v1.0.0`), each with its image and zips,
+so a charger fix needs no Gleanvolt release; the compose files and the deploy scripts run them like the OpenWeather
+plugin, at their own version (`SOLAX_PLUGIN_TAG`; unset is the newest). At most one charger plugin runs, and with
+one the deploy scripts set `ExternalCharger:UsePlugin`, so the controller drives the charger through it whatever the
+charger's brand says.
 
 - **In Docker** (the Pi, a NAS): the image, `linux/amd64` and `linux/arm64`, with Gleanvolt's tags:
   `latest`, the version, `sha-…`. The compose files run it under the plugin's profile, on the host's

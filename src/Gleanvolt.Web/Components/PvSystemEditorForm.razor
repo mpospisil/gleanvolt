@@ -137,9 +137,22 @@
                     {
                         <span class="field-note" id="pv-emma-one-client">@SettingsText.NoteEmmaOneClient</span>
                     }
-                    @if (key == PvSystemSettingKeys.ChargerDriver && ChargerThroughPlugin)
+                    @if (key == PvSystemSettingKeys.ChargerDriver && Editor.ChargerPluginForced)
+                    {
+                        @* The deployment runs a charger plugin (#444): this choice waits until it no longer does. *@
+                        <span class="field-note warning" id="pv-charger-plugin-forced">@SettingsText.NoteChargerPluginForced</span>
+                    }
+                    else if (key == PvSystemSettingKeys.ChargerDriver && ChargerThroughPlugin)
                     {
                         <span class="field-note" id="pv-charger-plugin">@SettingsText.NoteChargerPlugin</span>
+                    }
+                    else if (key == PvSystemSettingKeys.ChargerDriver && ChargerPlugins.Replacing(SelectedChargerDriverId) is { } replacement)
+                    {
+                        @* The built-in drivers go in 1.4 (#444, #445): which plugin takes this one's place. *@
+                        <span class="field-note warning" id="pv-charger-deprecated">
+                            @Localized.Format(SettingsText.NoteChargerDeprecated, ChargerDriverName(SelectedChargerDriver!), replacement.Name, replacement.Profile)
+                            @(" ")<a href="@replacement.Url" target="_blank" rel="noopener">@SettingsText.NoteChargerDeprecatedLink</a>
+                        </span>
                     }
                     @if (setting.IsPending)
                     {

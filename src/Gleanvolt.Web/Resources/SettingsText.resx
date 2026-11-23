@@ -1178,4 +1178,13 @@
   <data name="ExternalRefused" xml:space="preserve">
     <value>{0} was refused at {1}: {2}</value>
   </data>
+  <data name="NoteChargerDeprecated" xml:space="preserve">
+    <value>The built-in {0} driver is deprecated and goes in Gleanvolt 1.4. The {1} plugin replaces it: on Docker, add {2} to GLEANVOLT_PLUGINS in .env and deploy again; the charger's address goes with it.</value>
+  </data>
+  <data name="NoteChargerDeprecatedLink" xml:space="preserve">
+    <value>How to run the plugin</value>
+  </data>
+  <data name="NoteChargerPluginForced" xml:space="preserve">
+    <value>This deployment runs a charger plugin (ExternalCharger:UsePlugin), so Gleanvolt controls the charger through it, whatever brand is chosen here.</value>
+  </data>
 </root>

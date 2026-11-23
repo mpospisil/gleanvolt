@@ -21,7 +21,7 @@
 # docs/HOME_ASSISTANT.md for running the broker and Home Assistant beside it.
 #
 # Shipped plugins (#426) are services too, one per plugin, each under its own profile named after it
-# (`openweather`). They are opt-in the same way, but by .env rather than by script: GLEANVOLT_PLUGINS
+# (`openweather`, and the charger plugins `solax`, `huawei`, `goe`, `shelly`, #444). They are opt-in the same way, but by .env rather than by script: GLEANVOLT_PLUGINS
 # lists the ones to run, and both deploy scripts add them to their own profiles. See "Shipped plugins"
 # in deploy/README.md.
 #
@@ -147,6 +147,10 @@ services:
       Pv__Chargers__0__Driver: ${PV_CHARGER_DRIVER:-}
       Pv__Chargers__0__Model: ${PV_CHARGER_MODEL:-SolaX X1/X3-HAC}
       Pv__Chargers__0__Host: ${EV_CHARGER_HOST:-}
+      # True while a charger plugin runs (#444): the deploy scripts set GLEANVOLT_CHARGER_PLUGIN when GLEANVOLT_PLUGINS
+      # names one, and the controller then drives the charger through it, whatever PV_CHARGER_DRIVER or Settings says,
+      # so the built-in driver and the plugin never both open the charger. Run by hand: set it in .env yourself.
+      ExternalCharger__UsePlugin: ${GLEANVOLT_CHARGER_PLUGIN:-false}
 
       # Off by default -- see .env.example. Turning it on means both this and the `mosquitto` (and
       # usually `homeassistant`) profiles need to agree, which is why .env.example ships them
@@ -359,6 +363,122 @@ services:
       - ./plugins/openweather:/data
     # About 60 MB in use.
     mem_limit: ${OPENWEATHER_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The solax charger plugin (#443, #444): SolaX X1/X3-HAC and X1/X3-EVC, over Modbus TCP. From gleanvolt-chargers, released on its own tags,
+  # so its version is SOLAX_PLUGIN_TAG, not IMAGE_TAG. At most one charger plugin runs: the deploy scripts refuse two,
+  # and set GLEANVOLT_CHARGER_PLUGIN so the controller drives the charger through it. The charger's address is
+  # EV_CHARGER_HOST, as it was for the built-in driver; one saved on the plugin's page wins over it.
+  gleanvolt-plugin-solax:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-solax:${SOLAX_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-solax
+    restart: unless-stopped
+    profiles: ["solax"]
+    init: true
+    network_mode: host
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${SOLAX_PORT:-8098}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${SOLAX_PORT:-8098}/
+      Gleanvolt__FrameAncestors: ${SOLAX_FRAME_ANCESTORS:-}
+      Solax__Host: ${EV_CHARGER_HOST:-}
+    volumes:
+      # The charger's settings (its address, a password) and the page's own keys. Owned by uid 1654, mode 700.
+      - ./plugins/solax:/data
+    mem_limit: ${SOLAX_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The huawei charger plugin (#443, #444): Huawei SCharger-7KS-S0 and -22KT-S0, over Modbus TCP. From gleanvolt-chargers, released on its own tags,
+  # so its version is HUAWEI_PLUGIN_TAG, not IMAGE_TAG. At most one charger plugin runs: the deploy scripts refuse two,
+  # and set GLEANVOLT_CHARGER_PLUGIN so the controller drives the charger through it. The charger's address is
+  # EV_CHARGER_HOST, as it was for the built-in driver; one saved on the plugin's page wins over it.
+  gleanvolt-plugin-huawei:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-huawei:${HUAWEI_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-huawei
+    restart: unless-stopped
+    profiles: ["huawei"]
+    init: true
+    network_mode: host
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${HUAWEI_PORT:-8099}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${HUAWEI_PORT:-8099}/
+      Gleanvolt__FrameAncestors: ${HUAWEI_FRAME_ANCESTORS:-}
+      Huawei__Host: ${EV_CHARGER_HOST:-}
+    volumes:
+      # The charger's settings (its address, a password) and the page's own keys. Owned by uid 1654, mode 700.
+      - ./plugins/huawei:/data
+    mem_limit: ${HUAWEI_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The goe charger plugin (#443, #444): the go-e Charger, over its local HTTP API v2. From gleanvolt-chargers, released on its own tags,
+  # so its version is GOE_PLUGIN_TAG, not IMAGE_TAG. At most one charger plugin runs: the deploy scripts refuse two,
+  # and set GLEANVOLT_CHARGER_PLUGIN so the controller drives the charger through it. The charger's address is
+  # EV_CHARGER_HOST, as it was for the built-in driver; one saved on the plugin's page wins over it.
+  gleanvolt-plugin-goe:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-goe:${GOE_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-goe
+    restart: unless-stopped
+    profiles: ["goe"]
+    init: true
+    network_mode: host
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${GOE_PORT:-8100}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${GOE_PORT:-8100}/
+      Gleanvolt__FrameAncestors: ${GOE_FRAME_ANCESTORS:-}
+      Goe__Host: ${EV_CHARGER_HOST:-}
+    volumes:
+      # The charger's settings (its address, a password) and the page's own keys. Owned by uid 1654, mode 700.
+      - ./plugins/goe:/data
+    mem_limit: ${GOE_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The shelly charger plugin (#443, #444): the Shelly TopAC, over its local Gen2 RPC API. From gleanvolt-chargers, released on its own tags,
+  # so its version is SHELLY_PLUGIN_TAG, not IMAGE_TAG. At most one charger plugin runs: the deploy scripts refuse two,
+  # and set GLEANVOLT_CHARGER_PLUGIN so the controller drives the charger through it. The charger's address is
+  # EV_CHARGER_HOST, as it was for the built-in driver; one saved on the plugin's page wins over it.
+  gleanvolt-plugin-shelly:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-shelly:${SHELLY_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-shelly
+    restart: unless-stopped
+    profiles: ["shelly"]
+    init: true
+    network_mode: host
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${SHELLY_PORT:-8097}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${SHELLY_PORT:-8097}/
+      Gleanvolt__FrameAncestors: ${SHELLY_FRAME_ANCESTORS:-}
+      Shelly__Host: ${EV_CHARGER_HOST:-}
+    volumes:
+      # The charger's settings (its address, a password) and the page's own keys. Owned by uid 1654, mode 700.
+      - ./plugins/shelly:/data
+    mem_limit: ${SHELLY_MEM_LIMIT:-160m}
     logging:
       driver: json-file
       options:

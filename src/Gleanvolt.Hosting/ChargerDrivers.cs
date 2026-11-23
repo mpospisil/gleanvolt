@@ -41,6 +41,25 @@ public static class ChargerDrivers
     private static ILoggerFactory? Loggers(IServiceProvider? services) => services?.GetService<ILoggerFactory>();
 
     /// <summary>
+    /// The configuration as the controller resolves the installation from it (#444): with <c>ExternalCharger:UsePlugin</c>
+    /// set, the charger is behind a plugin whatever <c>Pv:Chargers</c>, the environment or the overrides file names. The
+    /// deploy scripts set it when a charger plugin is in GLEANVOLT_PLUGINS, so the built-in driver and the plugin never
+    /// both open the charger: a charger that serves one Modbus client drops a second. An overlay, so every other key is
+    /// read as it is.
+    /// </summary>
+    public static IConfiguration WithPluginCharger(IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        return configuration.GetValue<bool>(ExternalChargerOptions.SectionName + ":" + nameof(ExternalChargerOptions.UsePlugin))
+            ? new ConfigurationBuilder()
+                .AddConfiguration(configuration)
+                .AddInMemoryCollection([new KeyValuePair<string, string?>(PvSystemSettingKeys.ChargerDriver, ExternalChargerDriverFactory.DriverId)])
+                .Build()
+            : configuration;
+    }
+
+    /// <summary>
     /// <c>ChargeControl</c>'s current range and phase count against what the controlled charger's driver can
     /// do (#349), with that section's defaults for what is not set. Nothing when the charger or its driver is
     /// unknown: the resolver has already said so. Nothing for a charger behind a plugin either: the charger hub

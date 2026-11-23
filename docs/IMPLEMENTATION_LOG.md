@@ -4,6 +4,43 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-23 — Deprecate the built-in charger drivers, and ship the charger plugins (#444)
+
+**What.** The sixth step of #438. The built-in charger drivers still work, with a deprecation warning in the log and
+on Settings that names the replacing plugin. The Pi and the NAS run a charger plugin by `GLEANVOLT_PLUGINS`, with the
+existing `.env`, and the controller then drives the charger through it.
+
+**How.**
+- **Core:** `ChargerPlugins` (SolaX, Huawei SCharger, go-e, Shelly TopAC) and `Replacing(driverId)`.
+  `IPvSystemEditor.ChargerPluginForced` (a default interface member).
+- **Hosting:**
+  - `ExternalChargerOptions.UsePlugin`.
+  - `ChargerDrivers.WithPluginCharger(configuration)`, an overlay setting `Pv:Chargers:0:Driver` to `external`, used
+    by `PvSystemResolver`, `SetupStatusEvaluator` and the partial site.
+  - The charger driver's registration logs the deprecation with the plugin, its profile and its link.
+  - `PvSystemEditor.ChargerPluginForced`.
+- **Web:** `PvSystemEditorForm` shows a deprecation note beside a built-in charger brand, or a note that the
+  deployment runs a charger plugin. Three Settings strings, in en and cs.
+- **Deploy:**
+  - **Compose files** (Pi and NAS): `gleanvolt-plugin-{solax,huawei,goe,shelly}`, each under its own profile, on the
+    host's network, with `<Section>__Host: ${EV_CHARGER_HOST}`, its own `<NAME>_PLUGIN_TAG`, port and memory limit.
+    The controller gets `ExternalCharger__UsePlugin: ${GLEANVOLT_CHARGER_PLUGIN:-false}`, and the NAS init container
+    prepares every `plugins/*`.
+  - **`_lib.sh`:** `CHARGER_PLUGINS`, refuses two, and passes `GLEANVOLT_CHARGER_PLUGIN` to pull, up and ps.
+  - **`.env.example`** lists the charger plugins.
+- **Docs:** deploy/README (moving to a charger plugin), NAS, PROVIDERS (the charger plugins ship), SUPPORTED_CHARGERS
+  and CHARGER_SETUP (deprecated), the manual's charger page (moving from the built-in driver, en and cs), and the
+  release notes. Nine manual screenshots are regenerated: the Settings pages show the note beside the SolaX charger.
+
+**Tests.**
+- `ChargerPluginSwitchTests`: every built-in driver has a replacement and each maps to its plugin; the switch makes
+  the charger the plugin's over the environment and over a brand saved on Settings; setup sees it too.
+- `PvSystemEditorFormTests`: the deprecation note with its link; the forced note instead of it.
+- The compose files are checked with `docker compose config`, and `_lib.sh` with `bash -n`.
+- The full solution passes.
+
+---
+
 ## 2026-11-23 — The charger plugins repository: Shelly moved, SolaX, Huawei and go-e ported (#443)
 
 **What.** The fifth step of #438. The charger plugins now live in

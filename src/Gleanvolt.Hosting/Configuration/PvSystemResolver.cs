@@ -42,6 +42,7 @@ public static class PvSystemResolver
     /// </exception>
     public static PvSystemInfo Resolve(IConfiguration configuration)
     {
+        configuration = ChargerDrivers.WithPluginCharger(configuration);
         var pv = configuration.GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
 
         var problems = new ConfigurationProblems();

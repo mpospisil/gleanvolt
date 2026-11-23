@@ -37,6 +37,26 @@ your solar power and your home battery, but no charging mode can be started.
 
 </Steps>
 
+## Moving from the built-in driver
+
+Up to 1.3, Gleanvolt drove SolaX, Huawei and go-e chargers itself. Those built-in drivers still work in 1.3, but
+they are removed in 1.4: **Settings → Installation** says which plugin replaces yours, beside the charger's brand.
+
+On a Raspberry Pi or another Docker install, with the deploy scripts:
+
+<Steps>
+
+1. Make sure `GLEANVOLT_PROVIDER_TOKEN` is set in `/opt/gleanvolt/.env` (see step 1 above).
+
+2. Add the plugin to `GLEANVOLT_PLUGINS` in the same file, for example `GLEANVOLT_PLUGINS=solax`, or
+   `openweather,solax` with the weather. Change nothing else: `EV_CHARGER_HOST` becomes the plugin's address.
+
+3. Deploy again. Gleanvolt now drives the charger through the plugin, and never opens it itself beside the plugin.
+
+</Steps>
+
+To go back, take the plugin off the list and deploy again.
+
 ## If the plugin is turned away
 
 **Settings → External providers** says why under the **Charger** row:

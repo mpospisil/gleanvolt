@@ -62,6 +62,21 @@ Its page is the NAS's port 8096 (`OPENWEATHER_PORT`). Its key is kept in `plugin
 `data/`. A NAS UI that ignores profiles starts it with everything else: without a token it stops at once
 and keeps restarting, so either set the token or delete its service from the file.
 
+## The charger plugin
+
+The charger is driven through a plugin from [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers)
+(#444): `solax`, `huawei`, `goe` or `shelly`, each in the compose file under its own profile. The built-in charger
+drivers still work in 1.3 and go in 1.4. To use one:
+
+1. Make the token as for the weather plugin, and set `GLEANVOLT_PROVIDER_TOKEN`.
+2. Add the charger's profile to `COMPOSE_PROFILES` (`openweather,solax`), set `GLEANVOLT_CHARGER_PLUGIN=true` and
+   keep `EV_CHARGER_HOST`: it is the plugin's address. With the first, the controller drives the charger through the
+   plugin whatever its brand says, so the two never both open it.
+3. The plugin's page appears under **Settings → External providers**.
+
+At most one: a NAS UI that ignores profiles starts all four, which is harmless but wasteful. Gleanvolt accepts the
+first and refuses the rest, and a refused plugin never talks to its charger. Delete the services you don't use.
+
 ## Things that go wrong on a NAS
 
 **Bridge networking.** The file uses `network_mode: host`, and that has to survive whatever the NAS UI

@@ -527,12 +527,18 @@ pinning.
 
 ## Shipped plugins
 
-Some features come as plugins released with Gleanvolt (#426): their own container, from the same release,
-connected to the controller as an [external provider](../docs/PROVIDERS.md#shipped-plugins). One so far:
+Some features come as plugins (#426): their own container, connected to the controller as an
+[external provider](../docs/PROVIDERS.md#shipped-plugins). The OpenWeather plugin is released with Gleanvolt, from the
+same tag; the charger plugins (#444) come from [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers),
+each released on its own (`SOLAX_PLUGIN_TAG` and so on; unset is the newest).
 
 | Plugin | What it does | Port |
 |---|---|---|
 | `openweather` | the weather each charging session ran in, from OpenWeatherMap | 8096 |
+| `solax` | the charger: SolaX X1/X3-HAC and X1/X3-EVC | 8098 |
+| `huawei` | the charger: Huawei SCharger-7KS-S0 and -22KT-S0 | 8099 |
+| `goe` | the charger: the go-e Charger | 8100 |
+| `shelly` | the charger: the Shelly TopAC | 8097 |
 
 To run one:
 
@@ -550,6 +556,21 @@ To run one:
 4. Under **Settings → Weather**, choose **External** and save. The plugin's page appears there: enter the
    OpenWeatherMap key and press **Save and check**. `OPENWEATHER_API_KEY` in `.env`, or the older
    `WEATHER_API_KEY`, is its key until then.
+
+**Moving to a charger plugin** (#444). The built-in charger drivers still work in 1.3, and go in 1.4. To move, add the
+plugin to the list and deploy, with nothing else changed:
+
+```bash
+GLEANVOLT_PLUGINS=openweather,solax     # or huawei, goe; at most one charger plugin
+```
+
+The deploy then runs the plugin with `EV_CHARGER_HOST` as its address, and tells the controller to drive the charger
+through it (`ExternalCharger:UsePlugin`), whatever `PV_CHARGER_DRIVER` or Settings names. The two never both open the
+charger, which matters for one that serves a single Modbus client. Gleanvolt takes the first charger plugin that
+connects and remembers it; **Settings → External providers** shows it. To go back, take it off the list and deploy:
+the built-in driver is used again. Run by hand rather than by the scripts, set `GLEANVOLT_CHARGER_PLUGIN=true` in
+`.env` with the profile; without it the controller keeps its built-in driver and refuses the plugin, which then
+leaves the charger alone.
 
 **Upgrading from the built-in OpenWeather** (#425): the controller moves the weather to **External** by
 itself and says so under **Settings → Weather**. Turn the plugin on as above, and enter the key on its
