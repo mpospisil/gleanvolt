@@ -14,6 +14,14 @@ namespace Gleanvolt.Providers.Client.Charger;
 public interface IChargerSource
 {
     /// <summary>
+    /// What the charger can do: its current range and phases (charger 1.1, #440). Sent in every hello; Gleanvolt
+    /// refuses the hello with <see cref="RefusalCodes.Limits"/> when its charge control asks for more, and never
+    /// sends a setpoint above the maximum. Asked again at every reconnect, so a plugin that learns its model on its
+    /// own page can answer differently once it knows.
+    /// </summary>
+    ChargerCapabilities Capabilities { get; }
+
+    /// <summary>
     /// The charger now. Throw when it cannot be read: the SDK tells Gleanvolt nothing, and Gleanvolt reports a
     /// charger it could not read as unknown. <see cref="ChargerReading.InReplyTo"/> is filled in by the SDK.
     /// </summary>
@@ -83,6 +91,19 @@ public sealed class ChargerProviderConnection : ProviderConnection<ChargerWelcom
                 token => _source.SetChargingAllowedAsync(command.Allowed, token)));
             return Task.CompletedTask;
         });
+    }
+
+    protected override ProviderHello OnHello(ProviderHello hello)
+    {
+        var capabilities = _source.Capabilities;
+
+        if (capabilities.Check() is { Count: > 0 } problems)
+        {
+            // Sent anyway: Gleanvolt refuses it and says why, and its owner sees that on Settings.
+            Logger.LogError("The charger's capabilities are not usable: {Problems}", string.Join(" ", problems));
+        }
+
+        return hello with { Charger = capabilities };
     }
 
     protected override Task OnWelcomedAsync(ChargerWelcome welcome, CancellationToken cancellationToken) =>

@@ -43,14 +43,18 @@ public static class ChargerDrivers
     /// <summary>
     /// <c>ChargeControl</c>'s current range and phase count against what the controlled charger's driver can
     /// do (#349), with that section's defaults for what is not set. Nothing when the charger or its driver is
-    /// unknown: the resolver has already said so.
+    /// unknown: the resolver has already said so. Nothing for a charger behind a plugin either: the charger hub
+    /// checks it against the plugin's own capabilities at its hello (#440).
     /// </summary>
     public static void CheckLimits(IConfiguration configuration, PvSystemInfo site, ConfigurationProblems problems)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(site);
 
-        if (site.Chargers.Count == 0 || PvSystemRules.ChargerDriver(site.Chargers[0].Driver, Known) is not { } driver)
+        // A plugin's charger is checked when the plugin says hello (#440): only then is it known what it can do.
+        if (site.Chargers.Count == 0
+            || site.Chargers[0].Driver == ExternalChargerDriverFactory.DriverId
+            || PvSystemRules.ChargerDriver(site.Chargers[0].Driver, Known) is not { } driver)
         {
             return;
         }

@@ -1467,6 +1467,22 @@ internal sealed class FakeExternalProviders : IExternalProviders
 
     public string? ReadToken() => Token;
 
+    /// <summary>The kinds whose remembered provider was forgotten, in order.</summary>
+    public List<string> Forgotten { get; } = [];
+
+    public Task ForgetAsync(string kind)
+    {
+        Forgotten.Add(kind);
+
+        if (Statuses.FindIndex(status => status.Kind == kind) is var i and >= 0)
+        {
+            Statuses[i] = Statuses[i] with { RememberedProviderId = null };
+        }
+
+        Changed?.Invoke();
+        return Task.CompletedTask;
+    }
+
     public void Set(ExternalProviderStatus status)
     {
         Statuses.RemoveAll(existing => existing.Kind == status.Kind);

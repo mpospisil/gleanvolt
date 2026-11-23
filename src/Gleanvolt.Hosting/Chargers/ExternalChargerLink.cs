@@ -44,6 +44,12 @@ public sealed class ExternalChargerLink
     /// <summary>The charger's own ceiling from the newest reading that said one, or null.</summary>
     public int? DeviceMaxAmps { get; private set; }
 
+    /// <summary>
+    /// What the attached, or last, plugin said its charger can do in its hello (#440), or null before any plugin
+    /// said hello since the start.
+    /// </summary>
+    public ChargerCapabilities? Capabilities { get; private set; }
+
     /// <summary>Whether a charger plugin is attached right now.</summary>
     public bool IsAttached => Sessions?.ConnectionId is not null;
 
@@ -141,6 +147,18 @@ public sealed class ExternalChargerLink
         {
             _commands.TryRemove(id.Value, out _);
         }
+    }
+
+    /// <summary>The hub accepted a plugin's hello, which said <paramref name="capabilities"/>.</summary>
+    internal void Attached(ChargerCapabilities capabilities)
+    {
+        if (Capabilities != capabilities)
+        {
+            // Another charger, or the same one described anew: the old ceiling no longer holds.
+            DeviceMaxAmps = null;
+        }
+
+        Capabilities = capabilities;
     }
 
     /// <summary>The hub accepted <paramref name="reading"/>; a read waiting on its request has its answer.</summary>

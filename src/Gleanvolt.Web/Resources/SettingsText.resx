@@ -1166,4 +1166,16 @@
   <data name="NoteChargerPlugin" xml:space="preserve">
     <value>A plugin reaches the charger, so Gleanvolt needs no address for it. Start the plugin with the provider token from Settings → External providers; Gleanvolt accepts it after the restart.</value>
   </data>
+  <data name="ExternalRemembered" xml:space="preserve">
+    <value>Remembered: {0}. No other plugin is let in.</value>
+  </data>
+  <data name="ExternalForget" xml:space="preserve">
+    <value>Forget</value>
+  </data>
+  <data name="ExternalForgetHint" xml:space="preserve">
+    <value>Forget closes the plugin's connection; the next plugin to connect is remembered instead. A refused plugin tries again within 5 minutes.</value>
+  </data>
+  <data name="ExternalRefused" xml:space="preserve">
+    <value>{0} was refused at {1}: {2}</value>
+  </data>
 </root>

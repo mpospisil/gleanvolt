@@ -21,6 +21,11 @@ namespace Gleanvolt.Providers.Contracts;
 /// reachable from the owner's browser, not only from Gleanvolt. Null when the provider has no page. Added
 /// in tariff 1.2, solar-forecast 1.2 and vehicle 1.1; an older host ignores it.
 /// </param>
+/// <param name="Charger">
+/// What the charger can do: for the charger kind only, added in charger 1.1 (#440). Gleanvolt checks its charge
+/// control's limits against it before it accepts the hello. Null for every other kind, and from a 1.0 charger
+/// plugin, which is taken as <see cref="global::Gleanvolt.Providers.Contracts.Charger.ChargerCapabilities.Default"/>.
+/// </param>
 public sealed record ProviderHello(
     string ProviderId,
     string Name,
@@ -28,7 +33,8 @@ public sealed record ProviderHello(
     int ContractMajor,
     int ContractMinor,
     IReadOnlyList<string>? Capabilities = null,
-    Uri? PageUrl = null);
+    Uri? PageUrl = null,
+    global::Gleanvolt.Providers.Contracts.Charger.ChargerCapabilities? Charger = null);
 
 /// <summary>
 /// The host's answer to <see cref="ProviderHello"/>. A kind that has more to tell its provider (the
@@ -67,8 +73,17 @@ public static class RefusalCodes
     /// <summary>The provider speaks another major version of the contract.</summary>
     public const string ContractMajor = "contract-major";
 
-    /// <summary>Another provider is connected for this kind. Only one is active at a time.</summary>
+    /// <summary>
+    /// Another provider is connected for this kind; only one is active at a time. For the charger (1.1, #440),
+    /// also another plugin than the one Gleanvolt remembers, connected or not, until the owner forgets it.
+    /// </summary>
     public const string AnotherProvider = "another-provider";
+
+    /// <summary>
+    /// The charger cannot do what Gleanvolt's charge control is set to (charger 1.1, #440): its current range or
+    /// phases. The reason names the setting. Change the setting or the plugin's capabilities, then reconnect.
+    /// </summary>
+    public const string Limits = "limits";
 
     /// <summary>The hello itself is not usable: an empty id or name.</summary>
     public const string Invalid = "invalid";

@@ -68,6 +68,51 @@ public class ExternalProvidersFormTests : BunitContext
     }
 
     [Fact]
+    public void TheRememberedChargerPluginIsShownAndForgetLetsAnotherIn()
+    {
+        _providers.Set(new ExternalProviderStatus("charger", "Charger", "/providers/charger", true, ExternalProviderState.Disconnected,
+            ProviderId: "shelly-topac", ProviderName: "Shelly TopAC", Since: Now, RememberedProviderId: "shelly-topac"));
+
+        var form = RenderForm();
+
+        Assert.Contains("Remembered: shelly-topac. No other plugin is let in.", form.Find("#external-providers-charger-remembered").TextContent);
+
+        form.Find("#external-providers-charger-forget").Click();
+
+        Assert.Equal(["charger"], _providers.Forgotten);
+        Assert.Empty(form.FindAll("#external-providers-charger-remembered"));
+    }
+
+    [Fact]
+    public void WithoutALoginTheRememberedPluginCannotBeForgotten()
+    {
+        _providers.Set(new ExternalProviderStatus("charger", "Charger", "/providers/charger", true, ExternalProviderState.Connected,
+            ProviderId: "shelly-topac", ProviderName: "Shelly TopAC", Since: Now, RememberedProviderId: "shelly-topac"));
+
+        var form = RenderForm(signedIn: false);
+
+        Assert.NotEmpty(form.FindAll("#external-providers-charger-remembered"));
+        Assert.Empty(form.FindAll("#external-providers-charger-forget"));
+    }
+
+    [Fact]
+    public void ARefusedPluginIsShownWithWhyInThePagesLanguage()
+    {
+        var phrase = Gleanvolt.Core.Models.Phrase.Of("Config.ChargerPhases",
+            new Gleanvolt.Core.Models.PhraseArg.Number(3), new Gleanvolt.Core.Models.PhraseArg.Text("Huawei 7KS"),
+            new Gleanvolt.Core.Models.PhraseArg.Number(1));
+        _providers.Set(new ExternalProviderStatus("charger", "Charger", "/providers/charger", true, ExternalProviderState.Waiting,
+            LastRefusal: new ExternalProviderRefusal("huawei-scharger", "Huawei 7KS", "limits",
+                "ChargeControl:Phases (3) is more than the Huawei 7KS charger supplies (1).", [phrase], Now)));
+
+        var form = RenderForm();
+
+        Assert.Equal(
+            "Huawei 7KS was refused at 2026-11-15 10:00: ChargeControl:Phases (3) is more than the Huawei 7KS charger supplies (1).",
+            form.Find("#external-providers-charger-refused").TextContent.Trim());
+    }
+
+    [Fact]
     public void TheCarIsListedAndLinksToTheCarPage()
     {
         _providers.Set(new ExternalProviderStatus("vehicle", "Car", "/providers/vehicle", false, ExternalProviderState.Off));

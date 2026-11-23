@@ -43,6 +43,8 @@ public sealed class ChargerTestHub : IAsyncDisposable
     private TaskCompletionSource<ProviderHello> _hello = NewHello();
     private string? _connectionId;
     private ProviderHello? _attached;
+    private string? _remembered;
+    private (string Code, string Reason)? _lastRefusal;
 
     private ChargerTestHub(ChargerTestHubOptions options, WebApplication app, Uri endpoint, string token)
     {
@@ -72,6 +74,48 @@ public sealed class ChargerTestHub : IAsyncDisposable
 
     /// <summary>Whether a plugin is connected and its hello was accepted.</summary>
     public bool IsAttached => Hello is not null;
+
+    /// <summary>
+    /// The capabilities the connected plugin said hello with, or <see cref="ChargerCapabilities.Default"/> for a 1.0
+    /// plugin that said none. Null with none connected.
+    /// </summary>
+    public ChargerCapabilities? Capabilities => Hello is { } hello ? hello.Charger ?? ChargerCapabilities.Default : null;
+
+    /// <summary>
+    /// The plugin id the hub remembers (charger 1.1, #440): the first that was accepted. Another id is refused with
+    /// <see cref="RefusalCodes.AnotherProvider"/>, connected or not, until <see cref="Forget"/>.
+    /// </summary>
+    public string? RememberedProviderId
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _remembered;
+            }
+        }
+    }
+
+    /// <summary>The code and reason of the last hello the hub refused, or null.</summary>
+    public (string Code, string Reason)? LastRefusal
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _lastRefusal;
+            }
+        }
+    }
+
+    /// <summary>Forgets the remembered plugin, as the owner's Forget on Gleanvolt's Settings: the next to say hello is remembered.</summary>
+    public void Forget()
+    {
+        lock (_gate)
+        {
+            _remembered = null;
+        }
+    }
 
     /// <summary>The newest status the plugin reported, or null.</summary>
     public ProviderStatus? Status
@@ -219,10 +263,16 @@ public sealed class ChargerTestHub : IAsyncDisposable
             TimeZone = _options.TimeZone,
         };
 
-        var (code, reason) = HelloRules.Check(hello);
+        var (code, reason) = HelloRules.Check(hello, _options.Limits);
 
         lock (_gate)
         {
+            if (code is null && _remembered is { } remembered && remembered != hello.ProviderId)
+            {
+                (code, reason) = (RefusalCodes.AnotherProvider,
+                    $"Gleanvolt controls the charger through the plugin {remembered}. The owner presses Forget on Settings to let another in.");
+            }
+
             if (code is null && _attached is { } current && _connectionId != connectionId && current.ProviderId != hello.ProviderId)
             {
                 (code, reason) = (RefusalCodes.AnotherProvider, $"Another charger provider, {current.Name}, is connected.");
@@ -230,11 +280,13 @@ public sealed class ChargerTestHub : IAsyncDisposable
 
             if (code is not null)
             {
+                _lastRefusal = (code, reason!);
                 return welcome with { Accepted = false, ReasonCode = code, Reason = reason };
             }
 
             _connectionId = connectionId;
             _attached = hello;
+            _remembered ??= hello.ProviderId;
             _hello.TrySetResult(hello);
         }
 

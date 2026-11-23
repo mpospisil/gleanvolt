@@ -33,18 +33,28 @@ public sealed class ExternalChargerDriver : IEvChargerDriver
     }
 
     /// <summary>
-    /// What is known before a plugin connects: the contract's widest range. A plugin narrows the ceiling with
-    /// <see cref="ChargerReading.MaxCurrentAmps"/>, and nothing above it is sent.
+    /// What is known before a plugin connects, and what a 1.0 plugin, which says nothing, is taken to be: 6 to 32 A on
+    /// three phases. A 1.1 plugin says its charger's own in its hello (#440); a reading can narrow the ceiling further
+    /// with <see cref="ChargerReading.MaxCurrentAmps"/>, and nothing above it is sent.
     /// </summary>
-    public static EvChargerCapabilities ExternalCapabilities { get; } = new(
-        MinCurrentAmps: 6,
-        MaxCurrentAmps: 32,
-        PauseCurrentAmps: 0,
-        Phases: 3,
-        CanSwitchPhases: false,
-        HasUseMode: false);
+    public static EvChargerCapabilities ExternalCapabilities { get; } = CapabilitiesOf(ChargerCapabilities.Default);
 
-    public EvChargerCapabilities Capabilities => ExternalCapabilities;
+    /// <summary>The contract's capabilities as the driver contract's.</summary>
+    public static EvChargerCapabilities CapabilitiesOf(ChargerCapabilities capabilities)
+    {
+        ArgumentNullException.ThrowIfNull(capabilities);
+        return new EvChargerCapabilities(
+            capabilities.MinCurrentAmps,
+            capabilities.MaxCurrentAmps,
+            capabilities.PauseCurrentAmps,
+            capabilities.Phases,
+            capabilities.CanSwitchPhases,
+            HasUseMode: false);
+    }
+
+    /// <summary>The attached plugin's charger, or <see cref="ExternalCapabilities"/> before one said hello.</summary>
+    public EvChargerCapabilities Capabilities =>
+        _link.Capabilities is { } capabilities ? CapabilitiesOf(capabilities) : ExternalCapabilities;
 
     /// <summary>The contract's state as the driver contract's status; the names are the same OCPP ones.</summary>
     public static EvChargerStatus StatusOf(ChargerState state) => state switch
@@ -134,8 +144,10 @@ public sealed class ExternalChargerDriver : IEvChargerDriver
         return new EvChargerProbeResult(true, reading.PowerWatts);
     }
 
-    // The charger's own ceiling once a plugin has said it, never above what the contract allows.
-    private int Ceiling => Math.Min(_link.DeviceMaxAmps ?? Capabilities.MaxCurrentAmps, ChargerReadingValidator.MaxCurrentAmps);
+    // The charger's ceiling from its hello, lowered by what a reading says now, never above what the contract allows.
+    private int Ceiling => Math.Min(
+        Math.Min(_link.DeviceMaxAmps ?? int.MaxValue, Capabilities.MaxCurrentAmps),
+        ChargerReadingValidator.MaxCurrentAmps);
 }
 
 /// <summary>

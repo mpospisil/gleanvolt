@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using Gleanvolt.Core.Models;
 using Gleanvolt.Providers.Contracts;
 using Microsoft.AspNetCore.SignalR;
 
@@ -36,6 +37,17 @@ public abstract partial class ProviderHub<TClient, TWelcome> : Hub<TClient>, IPr
     /// <summary>The kind's own part of an accepted welcome.</summary>
     protected abstract TWelcome CreateWelcome();
 
+    /// <summary>
+    /// The kind's own checks of a hello that passed the common ones (#440): null to go on, else a refusal code, its
+    /// English reason, and the reason for the web UI (one phrase per sentence, or null to show the English).
+    /// </summary>
+    protected virtual (string? Code, string? Reason, IReadOnlyList<Phrase?>? Phrases) Admit(ProviderHello hello) => (null, null, null);
+
+    /// <summary>After a hello was accepted and its session attached: for a kind that keeps something from the hello.</summary>
+    protected virtual void OnAttached(ProviderHello hello)
+    {
+    }
+
     public Task<TWelcome> Hello(ProviderHello hello)
     {
         var kind = Sessions.Kind;
@@ -47,14 +59,33 @@ public abstract partial class ProviderHub<TClient, TWelcome> : Hub<TClient>, IPr
         };
 
         var (code, reason) = Check(hello, kind);
+        IReadOnlyList<Phrase?>? phrases = null;
 
         if (code is null)
         {
-            (code, reason) = Sessions.Attach(Context, hello, PageOnThisHost(hello));
+            (code, reason, phrases) = Admit(hello);
+        }
+
+        if (code is null)
+        {
+            Phrase? said;
+            (code, reason, said) = Sessions.Attach(Context, hello, PageOnThisHost(hello));
+            phrases = said is null ? null : [said];
+        }
+
+        if (code is null)
+        {
+            OnAttached(hello);
         }
 
         if (code is not null)
         {
+            // Not a hello at all, or a kind that is off: nothing the owner needs to see beside the session.
+            if (hello?.ProviderId is not null && hello.Name is not null && code is not RefusalCodes.Disabled)
+            {
+                Sessions.Refused(hello, code, reason ?? string.Empty, phrases);
+            }
+
             // The answer is written before the connection closes, so the provider can log why.
             _ = CloseSoonAsync();
             return Task.FromResult(welcome with { Accepted = false, ReasonCode = code, Reason = reason });

@@ -36,9 +36,20 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
     private WebApplication? _app;
     private string _token = string.Empty;
 
+    // Read by the hub at every hello, so a test can change it before its plugin connects.
+    // The TopAC's own range: a charge control asking more is refused at the hello (#440).
+    private ChargeControlOptions _chargeControl = new()
+    {
+        MinChargingCurrentAmps = 6,
+        MaxChargingCurrentAmps = 16,
+        Phases = 3,
+    };
+
     private ExternalChargerLink Link => _app!.Services.GetRequiredService<ExternalChargerLink>();
 
-    private ExternalProviderStatus Status => _app!.Services.GetRequiredService<ExternalProviderRegistry>().Find(ChargerContract.Kind)!;
+    private ExternalProviderRegistry Registry => _app!.Services.GetRequiredService<ExternalProviderRegistry>();
+
+    private ExternalProviderStatus Status => Registry.Find(ChargerContract.Kind)!;
 
     public async Task InitializeAsync()
     {
@@ -49,12 +60,7 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
         builder.Services.AddSingleton<ISecretStore>(new RecordingSecretStore());
         builder.Services.AddSingleton(new ProviderHostInfo("1.4.0-test"));
         builder.Services.AddSingleton(Site);
-        builder.Services.AddSingleton(Options.Create(new ChargeControlOptions
-        {
-            MinChargingCurrentAmps = 6,
-            MaxChargingCurrentAmps = 20,
-            Phases = 3,
-        }));
+        builder.Services.AddSingleton<IOptions<ChargeControlOptions>>(new CurrentOptions<ChargeControlOptions>(() => _chargeControl));
         builder.Services.AddSingleton(Options.Create(new ExternalChargerOptions
         {
             ReadTimeout = TimeSpan.FromSeconds(1),
@@ -113,7 +119,7 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
         Assert.Equal(new EvChargerSettings(true, 10), await driver.ReadSettingsAsync());
 
         // The welcome told the plugin the charge control's limits; the plugin told Gleanvolt the charger's ceiling.
-        Assert.Equal(new ChargerLimits(6, 20, 3, 230), plugin.Limits);
+        Assert.Equal(new ChargerLimits(6, 16, 3, 230), plugin.Limits);
         Assert.Equal(16, Link.DeviceMaxAmps);
         Assert.Equal(PowerUnit.Kilowatts, charger.Unit);
         Assert.Equal("Shelly TopAC", Status.ProviderName);
@@ -175,7 +181,7 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
         await driver.SetCurrentAsync(10, 10, "steady");
         Assert.Empty(_topAc.Writes);
 
-        // ChargeControl allows 20 A; the TopAC said it takes 16.
+        // Above the 16 A the TopAC said in its hello.
         await driver.SetCurrentAsync(10, 20, "more sun");
         Assert.Equal(["current_limit=16"], _topAc.Writes);
     }
@@ -249,6 +255,107 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
 
         Assert.Contains("refused", error.Message);
         Assert.Contains("The power is -7000 W", error.Message);
+    }
+
+    [Fact]
+    public async Task A_single_phase_plugin_is_let_in_and_controlled_within_the_range_it_said()
+    {
+        _chargeControl = new ChargeControlOptions { MinChargingCurrentAmps = 6, MaxChargingCurrentAmps = 32, Phases = 1 };
+        var source = new FixedSource(new ChargerReading(DateTimeOffset.UtcNow, ChargerState.Charging, 2300, CurrentAmps: 10, ChargingAllowed: true))
+        {
+            Capabilities = new ChargerCapabilities(6, 32, Phases: 1),
+        };
+        await StartPluginAsync(source);
+        var driver = Driver();
+
+        Assert.Equal(new EvChargerCapabilities(6, 32, 0, 1, false, false), driver.Capabilities);
+
+        // Above the charger's 32 A: clamped to it, never past it.
+        await driver.SetCurrentAsync(10, 40, "more sun");
+        await driver.SetCurrentAsync(32, 6, "a cloud");
+
+        Assert.Equal(["current=32", "current=6"], source.Commands);
+        Assert.Null(Status.LastRefusal);
+    }
+
+    [Fact]
+    public async Task A_charger_that_cannot_do_what_the_charge_control_asks_is_refused_with_limits_naming_the_settings()
+    {
+        // ChargeControl wants 6-20 A on three phases; the charger does 16 A on one.
+        _chargeControl = new ChargeControlOptions { MinChargingCurrentAmps = 6, MaxChargingCurrentAmps = 20, Phases = 3 };
+        var source = new FixedSource(new ChargerReading(DateTimeOffset.UtcNow, ChargerState.Available, 0))
+        {
+            Capabilities = new ChargerCapabilities(6, 16, Phases: 1),
+        };
+        await StartPluginAsync(source, attaches: false);
+
+        await Eventually(() => Status.LastRefusal is not null, "the hello should be refused");
+
+        var refusal = Status.LastRefusal!;
+        Assert.Equal(RefusalCodes.Limits, refusal.Code);
+        Assert.Contains("ChargeControl:MaxChargingCurrentAmps (20 A)", refusal.Reason);
+        Assert.Contains("ChargeControl:Phases (3)", refusal.Reason);
+        Assert.Equal(2, refusal.Phrases!.Count);
+        Assert.False(Link.IsAttached);
+
+        // Nothing is remembered from a plugin that was not let in.
+        Assert.Null(Status.RememberedProviderId);
+    }
+
+    [Fact]
+    public async Task Capabilities_that_make_no_sense_are_refused_as_invalid()
+    {
+        var source = new FixedSource(new ChargerReading(DateTimeOffset.UtcNow, ChargerState.Available, 0))
+        {
+            Capabilities = new ChargerCapabilities(16, 6, Phases: 3),
+        };
+        await StartPluginAsync(source, attaches: false);
+
+        await Eventually(() => Status.LastRefusal is not null, "the hello should be refused");
+
+        Assert.Equal(RefusalCodes.Invalid, Status.LastRefusal!.Code);
+        Assert.Contains("maximum current is 6 A", Status.LastRefusal.Reason);
+    }
+
+    [Fact]
+    public async Task The_first_plugin_is_remembered_and_another_is_refused_even_after_it_has_gone_until_the_owner_forgets_it()
+    {
+        var first = await StartPluginAsync(new FixedSource(new ChargerReading(DateTimeOffset.UtcNow, ChargerState.Available, 0)));
+        Assert.Equal("shelly-topac", Status.RememberedProviderId);
+        Assert.True(Status.CanForget);
+
+        await first.StopAsync(CancellationToken.None);
+        await Eventually(() => !Link.IsAttached, "the first plugin should be gone");
+
+        // A sample started by mistake: the charger is not free for it, though nothing is connected.
+        var sample = new FixedSource(new ChargerReading(DateTimeOffset.UtcNow, ChargerState.Available, 0));
+        await StartPluginAsync(sample, attaches: false, id: "charger-sample");
+
+        await Eventually(() => Status.LastRefusal is not null, "the second plugin should be refused");
+        Assert.Equal(RefusalCodes.AnotherProvider, Status.LastRefusal!.Code);
+        Assert.Equal("charger-sample", Status.LastRefusal.ProviderId);
+        Assert.Contains("shelly-topac", Status.LastRefusal.Reason);
+        Assert.False(Link.IsAttached);
+
+        await Registry.ForgetAsync(ChargerContract.Kind);
+
+        await Eventually(() => Link.IsAttached, "after Forget the next plugin should get in");
+        Assert.Equal("charger-sample", Status.ProviderId);
+        Assert.Equal("charger-sample", Status.RememberedProviderId);
+        Assert.Null(Status.LastRefusal);
+    }
+
+    [Fact]
+    public async Task Forget_closes_the_remembered_plugins_session_and_it_is_remembered_again_when_it_comes_back()
+    {
+        await StartPluginAsync(new FixedSource(new ChargerReading(DateTimeOffset.UtcNow, ChargerState.Available, 0)));
+        var connectedSince = Status.Since;
+
+        await Registry.ForgetAsync(ChargerContract.Kind);
+
+        // Closed: a new session, after the plugin's wait.
+        await Eventually(() => Status.Since != connectedSince && Link.IsAttached, "the plugin should be closed and reconnect");
+        await Eventually(() => Link.IsAttached && Status.RememberedProviderId == "shelly-topac", "the plugin should reconnect and be remembered");
     }
 
     [Theory]
@@ -334,14 +441,15 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
         return (plugin, charger);
     }
 
-    private async Task<ChargerProviderConnection> StartPluginAsync(IChargerSource source, bool publishes = false)
+    private async Task<ChargerProviderConnection> StartPluginAsync(
+        IChargerSource source, bool publishes = false, bool attaches = true, string id = "shelly-topac")
     {
         var plugin = new ChargerProviderConnection(
             Options.Create(new ProviderOptions
             {
                 Endpoint = _app!.GetTestServer().BaseAddress,
                 Token = _token,
-                ProviderId = "shelly-topac",
+                ProviderId = id,
                 Name = "Shelly TopAC",
                 Version = "1.0",
                 PageUrl = new Uri("http://localhost:8097/"),
@@ -355,6 +463,12 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
         _plugins.Add(plugin);
 
         await plugin.StartAsync(CancellationToken.None);
+
+        if (!attaches)
+        {
+            return plugin;
+        }
+
         await Eventually(() => Link.IsAttached, "the plugin should attach");
 
         if (publishes)
@@ -382,14 +496,33 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
         Assert.True(condition(), because);
     }
 
-    // A plugin whose charger always says the same thing, fresh.
+    // A plugin whose charger always says the same thing, fresh, and keeps the commands it was sent.
     private sealed class FixedSource(ChargerReading reading) : IChargerSource
     {
+        public ChargerCapabilities Capabilities { get; init; } = ChargerCapabilities.Default;
+
+        public List<string> Commands { get; } = [];
+
         public Task<ChargerReading> ReadAsync(CancellationToken cancellationToken) =>
             Task.FromResult(reading with { ReadAt = DateTimeOffset.UtcNow });
 
-        public Task SetCurrentAsync(int amps, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task SetCurrentAsync(int amps, CancellationToken cancellationToken)
+        {
+            Commands.Add($"current={amps}");
+            return Task.CompletedTask;
+        }
 
-        public Task SetChargingAllowedAsync(bool allowed, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task SetChargingAllowedAsync(bool allowed, CancellationToken cancellationToken)
+        {
+            Commands.Add($"allowed={allowed}");
+            return Task.CompletedTask;
+        }
+    }
+
+    // Options read anew each time, as a test changes them.
+    private sealed class CurrentOptions<T>(Func<T> value) : IOptions<T>
+        where T : class
+    {
+        public T Value => value();
     }
 }

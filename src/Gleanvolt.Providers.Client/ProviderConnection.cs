@@ -61,6 +61,12 @@ public abstract class ProviderConnection<TWelcome> : BackgroundService
     /// <summary>Registers the kind's handlers on a new connection, before it starts.</summary>
     protected abstract void OnConfigure(HubConnection connection);
 
+    /// <summary>
+    /// The hello about to be sent, for a kind to add its own part to: the charger adds its capabilities (#440).
+    /// Asked before every hello, so what it adds can change between sessions.
+    /// </summary>
+    protected virtual ProviderHello OnHello(ProviderHello hello) => hello;
+
     /// <summary>After every accepted hello: typically, publish once.</summary>
     protected virtual Task OnWelcomedAsync(TWelcome welcome, CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -185,6 +191,7 @@ public abstract class ProviderConnection<TWelcome> : BackgroundService
             _contractMajor,
             _contractMinor,
             PageUrl: _options.PageUrl);
+        hello = OnHello(hello);
 
         var welcome = await Connection.InvokeAsync<TWelcome>(ProviderMethods.Hello, hello, stoppingToken).ConfigureAwait(false);
 

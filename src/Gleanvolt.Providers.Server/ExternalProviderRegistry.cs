@@ -44,7 +44,8 @@ public sealed class ExternalProviderRegistry : IExternalProviders
             Tokens.Exists,
             time,
             logger,
-            connectionId => registration.Client(services, connectionId)))];
+            connectionId => registration.Client(services, connectionId),
+            services.GetService<IRememberedProviders>()))];
         _byHub = list.Zip(_sessions).ToDictionary(pair => pair.First.HubType, pair => pair.Second);
 
         foreach (var sessions in _sessions)
@@ -87,6 +88,8 @@ public sealed class ExternalProviderRegistry : IExternalProviders
         _sessions.Select(sessions => sessions.Kind).FirstOrDefault(kind => path.StartsWithSegments(kind.HubPath, StringComparison.OrdinalIgnoreCase));
 
     public string? ReadToken() => Tokens.Read();
+
+    public Task ForgetAsync(string kind) => For(kind)?.ForgetAsync() ?? Task.CompletedTask;
 
     /// <summary>
     /// The address of <paramref name="kind"/>'s page with a fresh ticket and the viewer's theme and culture
