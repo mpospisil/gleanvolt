@@ -162,6 +162,12 @@ EMMA</strong> a jako adresu adresu EMMA.</p>
 <p><strong>Externí plugin</strong> je pro nabíječku, kterou řídí plugin, například Shelly TopAC. Pole pro adresu zmizí:
 adresu nabíječky má plugin, na své vlastní stránce. Spusťte plugin s tokenem z <strong>Nastavení → Externí
 zdroje dat</strong>; Gleanvolt ho přijme po restartu a uložení ověří, že odpovídá.</p>
+<p>Plugin Gleanvoltu sdělí, co nabíječka umí. Pokud <strong>Maximální proud (A)</strong> nebo <strong>Fáze</strong> na stránce
+<a href="../car/">Auto</a> chtějí víc (vyšší proud nebo tři fáze u jednofázové nabíječky), Gleanvolt plugin odmítne
+a <strong>Nastavení → Externí zdroje dat</strong> řekne, které nastavení snížit. Změňte ho, uložte a Gleanvolt
+restartujte. Gleanvolt si také zapamatuje první plugin nabíječky, který přijme, a žádný
+jiný nepustí. Chcete-li přejít na jiný plugin, zastavte ten starý a stiskněte vedle něj <strong>Zapomenout</strong>
+v <strong>Nastavení → Externí zdroje dat</strong>.</p>
 <div class="sl-heading-wrapper level-h2"><h2 id="při-uložení">Při uložení</h2><a class="sl-anchor-link" href="#při-uložení"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Sekce “Při uložení”</span></a></div>
 <p>Gleanvolt z každého zařízení přečte jednu hodnotu, aby ověřil, že adresa odpovídá a že zařízení je to, za
 co jste ho označili:</p>
