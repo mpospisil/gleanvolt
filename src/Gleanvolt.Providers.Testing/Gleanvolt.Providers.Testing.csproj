@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Gleanvolt.Providers.Testing</PackageId>
+    <Description>Test a Gleanvolt charger plugin without Gleanvolt (#439): a charger hub on a loopback port that the plugin connects to with the ordinary SDK. Read the charger, send it commands, and check every reading by the contract's rules. MIT.</Description>
+    <PackageTags>gleanvolt;signalr;provider;charger;testing</PackageTags>
+
+    <!-- MIT, like the contracts: see Gleanvolt.Providers.Contracts.csproj. -->
+    <GleanvoltMitPackage>true</GleanvoltMitPackage>
+    <PackageLicenseFile></PackageLicenseFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="LICENSE" Pack="true" PackagePath="\" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- A real SignalR hub on Kestrel, so the plugin under test connects exactly as it does to Gleanvolt. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gleanvolt.Providers.Client\Gleanvolt.Providers.Client.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="..\CultureInvariant.globalconfig" />
+  </ItemGroup>
+
+</Project>

@@ -44,6 +44,7 @@ WORKDIR /source
 COPY Gleanvolt.slnx ./
 COPY src/Gleanvolt.Core/Gleanvolt.Core.csproj                     src/Gleanvolt.Core/
 COPY src/Gleanvolt.Devices.Abstractions/Gleanvolt.Devices.Abstractions.csproj src/Gleanvolt.Devices.Abstractions/
+COPY src/Gleanvolt.Modbus/Gleanvolt.Modbus.csproj                 src/Gleanvolt.Modbus/
 COPY src/Gleanvolt.Devices.Solax/Gleanvolt.Devices.Solax.csproj   src/Gleanvolt.Devices.Solax/
 COPY src/Gleanvolt.Devices.Huawei/Gleanvolt.Devices.Huawei.csproj src/Gleanvolt.Devices.Huawei/
 COPY src/Gleanvolt.Devices.GoE/Gleanvolt.Devices.GoE.csproj       src/Gleanvolt.Devices.GoE/
@@ -56,6 +57,7 @@ COPY src/Gleanvolt.Discovery/Gleanvolt.Discovery.csproj           src/Gleanvolt.
 COPY src/Gleanvolt.Discovery.Cli/Gleanvolt.Discovery.Cli.csproj   src/Gleanvolt.Discovery.Cli/
 COPY src/Gleanvolt.Providers.Contracts/Gleanvolt.Providers.Contracts.csproj src/Gleanvolt.Providers.Contracts/
 COPY src/Gleanvolt.Providers.Client/Gleanvolt.Providers.Client.csproj src/Gleanvolt.Providers.Client/
+COPY src/Gleanvolt.Providers.Testing/Gleanvolt.Providers.Testing.csproj src/Gleanvolt.Providers.Testing/
 COPY src/Gleanvolt.Providers.Server/Gleanvolt.Providers.Server.csproj src/Gleanvolt.Providers.Server/
 RUN dotnet restore src/Gleanvolt.Worker/Gleanvolt.Worker.csproj -a "$TARGETARCH"
 

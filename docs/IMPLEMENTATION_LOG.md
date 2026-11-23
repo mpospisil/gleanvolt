@@ -4,6 +4,58 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-23 — The plugin SDK on nuget.org, with a test hub and the Modbus client (#439)
+
+**What.** The first step of #438 (every charger as a plugin, in a repository of its own): what such a
+repository needs from this one. The MIT SDK is pushed to nuget.org, the Modbus client becomes an MIT package of
+its own, and a new package lets a charger plugin be tested without Gleanvolt.
+
+**How.**
+- **`src/Gleanvolt.Modbus`** (new, MIT): `IModbusClient` and `ModbusDeviceException` (from
+  Devices.Abstractions) and `ModbusTcpClient` (from Infrastructure), moved with their history, namespace
+  `Gleanvolt.Modbus`. New `ModbusEndpoint` record replaces `DeviceConfig` in the client's constructor;
+  `DeviceConfig.ToEndpoint()` converts, and `DeviceConfig.MaxReconnectBackoff` now reads the endpoint's.
+  Devices.Abstractions references it; Infrastructure drops its direct NModbus reference. Every file using the
+  three types got `using Gleanvolt.Modbus;`.
+- **`tests/Gleanvolt.Modbus.Tests`** (new): `ModbusTcpClientTests` and `FakeModbusTcpServer` moved from
+  Infrastructure.Tests, on `ModbusEndpoint`. Infrastructure.Tests links the fake server for
+  `ReadOnlyModbusClientTests`.
+- **`src/Gleanvolt.Providers.Testing`** (new, MIT): `ChargerTestHub` starts Kestrel on `127.0.0.1:0` with a
+  `TestChargerHub` at `/providers/charger`, a bearer/`access_token` check, and the same JSON protocol
+  (camelCase string enums) and 1 MiB limit as Gleanvolt. `Configure(ProviderOptions)` points a plugin at it.
+  `ReadAsync` sends `RefreshRequested` and waits for the quoting `Publish`; `SetCurrentAsync` and
+  `SetChargingAllowedAsync` wait for `CommandDone`. A refused reading fails the read with
+  `ChargerContractException`. `HelloRules` repeats Gleanvolt's hello checks (id pattern, name, page URL,
+  contract major), and a second provider id is refused as `another-provider`.
+- **`ChargerReadingRules`** (Contracts): the limits and an English check. `ChargerReadingValidator` takes its
+  limits from it.
+- **`release.yml`:** packs Modbus and Providers.Testing (expected: fourteen packages), builds with
+  `ContinuousIntegrationBuild=true`, and after the release a new step pushes the four MIT packages to
+  nuget.org with `--skip-duplicate`, or says in the summary that `NUGET_API_KEY` is missing. The header and the
+  release notes no longer say there is no feed.
+- **Dockerfiles:** COPY lines for both new projects (`DockerfileTests` requires every `src/` project).
+
+**Quirks.**
+- The hub accepts the hello a moment before the SDK has processed its welcome, and the SDK drops a
+  `ReportStatusAsync` made in that gap (`IsAttached` is still false). A test waits for the SDK's side too.
+- `IServerAddressesFeature` is read after `StartAsync` to learn the port Kestrel chose.
+
+**Tests.** `ChargerTestHubTests` (6, a fake charger behind the real SDK: hello and limits, reads, ordered
+commands, a refused command, a refused reading, a status, a wrong token) and `ChargerReadingRulesTests` (12
+readings; Gleanvolt's validator and the contract's rules give the same English). The full solution passes.
+
+**Files.** New: `src/Gleanvolt.Modbus/*`, `src/Gleanvolt.Providers.Testing/*`,
+`src/Gleanvolt.Providers.Contracts/ChargerReadingRules.cs`, `tests/Gleanvolt.Modbus.Tests/*`,
+`tests/Gleanvolt.Providers.Tests/ChargerTestHubTests.cs`, `tests/Gleanvolt.Hosting.Tests/ChargerReadingRulesTests.cs`.
+Changed: `Gleanvolt.slnx`, `Dockerfile`, `Dockerfile.windows`, `.github/workflows/release.yml`,
+`src/Gleanvolt.Core/Models/DeviceConfig.cs`, `Gleanvolt.Devices.Abstractions.csproj`,
+`Gleanvolt.Infrastructure.csproj`, `src/Gleanvolt.Hosting/Chargers/ChargerReadingValidator.cs`, the client's
+constructors in `GleanvoltHostingExtensions.cs`, `PvSystemEditor.cs` and `DeviceScanner.cs`, `using` lines
+across the drivers and tests, `README.md`, `docs/PROVIDERS.md`, `docs/RELEASING.md`, `docs/DECISIONS.md`,
+`src/Gleanvolt.Providers.Client/README.md`.
+
+---
+
 ## 2026-11-22 — Chargers as external plugins, and the Shelly TopAC as the first (#435, #429)
 
 **What.** A charger can now be driven by a plugin: a program outside Gleanvolt that reads and commands the

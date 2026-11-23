@@ -1,12 +1,10 @@
 using System.Net.Sockets;
 using NModbus;
-using Gleanvolt.Core.Models;
-using Gleanvolt.Devices;
 
-namespace Gleanvolt.Infrastructure.Modbus;
+namespace Gleanvolt.Modbus;
 
 /// <summary>
-/// Modbus TCP client for one SolaX device. Owns the socket and, crucially, its <em>health</em>:
+/// Modbus TCP client for one device. Owns the socket and, crucially, its <em>health</em>:
 /// every request is serialised, spaced, and — if it fails — followed by a full teardown of the
 /// connection.
 ///
@@ -43,7 +41,7 @@ public sealed class ModbusTcpClient : IModbusClient
     /// </summary>
     public const int OldResponseThreshold = 16;
 
-    private readonly DeviceConfig _device;
+    private readonly ModbusEndpoint _device;
     private readonly TimeSpan _connectTimeout;
     private readonly TimeSpan _ioTimeout;
     private readonly int? _retries;
@@ -60,7 +58,7 @@ public sealed class ModbusTcpClient : IModbusClient
     private long _lastRequestTicks;
 
     // Reconnect backoff (issue #320): how many connects in a row have failed, and when the next may be
-    // tried. Unused while DeviceConfig.ReconnectBackoff is zero.
+    // tried. Unused while ModbusEndpoint.ReconnectBackoff is zero.
     private int _failedConnects;
     private DateTimeOffset _nextConnectAt;
 
@@ -74,7 +72,7 @@ public sealed class ModbusTcpClient : IModbusClient
     /// reply would otherwise pay for one timeout several times over before it learnt anything.
     /// </param>
     public ModbusTcpClient(
-        DeviceConfig device,
+        ModbusEndpoint device,
         TimeProvider? timeProvider = null,
         TimeSpan? connectTimeout = null,
         TimeSpan? ioTimeout = null,
@@ -242,7 +240,7 @@ public sealed class ModbusTcpClient : IModbusClient
         {
             _failedConnects++;
             var doublings = Math.Min(_failedConnects - 1, 16);
-            var delay = TimeSpan.FromTicks(Math.Min(backoff.Ticks << doublings, DeviceConfig.MaxReconnectBackoff.Ticks));
+            var delay = TimeSpan.FromTicks(Math.Min(backoff.Ticks << doublings, ModbusEndpoint.MaxReconnectBackoff.Ticks));
             _nextConnectAt = _timeProvider.GetUtcNow() + delay;
             throw;
         }
@@ -286,8 +284,8 @@ public sealed class ModbusTcpClient : IModbusClient
     }
 
     /// <summary>
-    /// Waits out the remainder of <see cref="DeviceConfig.MinRequestInterval"/> since the last request.
-    /// The SolaX protocol asks for a gap between consecutive instructions; without one the device
+    /// Waits out the remainder of <see cref="ModbusEndpoint.MinRequestInterval"/> since the last request.
+    /// SolaX's protocol, for one, asks for a gap between consecutive instructions; without one the device
     /// starts replying late, which is precisely how a stream ends up desynchronised.
     /// </summary>
     private async Task ThrottleAsync(CancellationToken cancellationToken)

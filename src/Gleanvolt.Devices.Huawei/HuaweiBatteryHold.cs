@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Devices.Huawei;
 

@@ -4,6 +4,48 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-23 — The plugin SDK on nuget.org, with a test hub and the Modbus client, all MIT (#439)
+
+**Found.** Charger plugins are to live in a repository of their own (#438), and every charger, the SolaX and
+Huawei ones included, is to become one. Three things stood in the way. The SDK was only attached to the
+release (`release.yml`: "there is deliberately no package feed"), so another repository had nothing to
+restore. The Modbus client every Modbus driver needs, with the teardown of 2026-07-29 and the late-reply fix
+of #433, was in `Gleanvolt.Infrastructure`, under this repository's licence. And a plugin could only be tested
+end to end against Gleanvolt's own hub, as `ExternalChargerTests` does here.
+
+**Decided.**
+- **nuget.org, for the MIT packages only:** `Gleanvolt.Providers.Contracts`, `.Client`, `.Testing` and
+  `Gleanvolt.Modbus`. `release.yml` pushes them, with their symbol packages, after the release is created,
+  with `--skip-duplicate`, and only when the `NUGET_API_KEY` secret is set. Every other package stays on the
+  release and goes to no feed.
+- **`Gleanvolt.Modbus`, MIT:** `IModbusClient`, `ModbusDeviceException` and `ModbusTcpClient` move there
+  unchanged in behaviour, in namespace `Gleanvolt.Modbus`. The client takes a `ModbusEndpoint` (host, port,
+  unit id, request spacing, reconnect backoff) instead of Core's `DeviceConfig`, which gains `ToEndpoint()`.
+  Gleanvolt's own drivers use it, so there is one copy. `ReadOnlyModbusClient` stays in Infrastructure: dry
+  run is Gleanvolt's guarantee, not a plugin's.
+- **`Gleanvolt.Providers.Testing`, MIT:** `ChargerTestHub`, a real SignalR charger hub on a loopback port.
+  The plugin connects with the ordinary SDK, so the test covers the wire as Gleanvolt sees it. It checks the
+  hello as Gleanvolt does and every reading by the contract's rules. It does not imitate Gleanvolt's
+  safeguards (threshold, clamp, dry run), which a plugin never sees.
+- **The reading rules move into the contracts** as `ChargerReadingRules`: the limits and an English check.
+  `ChargerReadingValidator` keeps its translated phrases but takes the limits from there, and a test asserts
+  both refuse the same readings in the same words.
+- **Versions:** the SDK packages carry Gleanvolt's version, from the same tag. Whether a plugin works with a
+  Gleanvolt is decided by the kind's contract major, not by the package version.
+- **SourceLink:** the release build sets `ContinuousIntegrationBuild`, so the symbols point at the commit on
+  GitHub. ci.yml builds as before.
+
+**Consequences accepted.**
+- **`Gleanvolt.Devices.Abstractions` is no longer reference-free.** It references `Gleanvolt.Modbus`, and
+  NModbus with it. The point of #317 (a driver never sees the controller's domain) still holds.
+- **A version on nuget.org is permanent:** it can be unlisted, never replaced. That is why the push comes last.
+- **The Modbus client's code is now MIT.** Code under this repository's licence can't be taken back from the
+  package once it is published.
+- **Two things for the owner, outside the repository:** the `NUGET_API_KEY` secret, and reserving the
+  `Gleanvolt.` ID prefix on nuget.org. Until the key is set, a release pushes nothing and says so.
+
+---
+
 ## 2026-11-22 — Chargers as plugins: a charger provider kind, with the safeguards kept in Gleanvolt (#435, #429)
 
 **Found.** #429 planned the Shelly TopAC as a seventh in-tree driver over the HTTP transport go-e added.

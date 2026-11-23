@@ -5,6 +5,7 @@ using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Devices;
 using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Testing;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Discovery.Tests;
 

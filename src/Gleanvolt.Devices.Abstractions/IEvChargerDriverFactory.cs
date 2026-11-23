@@ -1,3 +1,5 @@
+using Gleanvolt.Modbus;
+
 namespace Gleanvolt.Devices;
 
 /// <summary>

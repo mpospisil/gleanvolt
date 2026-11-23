@@ -20,8 +20,8 @@ program can read it at [`GET /api/v1/providers`](HTTP_API.md).
 
 ## Writing one in .NET
 
-Reference `Gleanvolt.Providers.Client`, which brings `Gleanvolt.Providers.Contracts` with it. Both
-are MIT, so the provider can use any licence. A provider is an ordinary worker service:
+Reference `Gleanvolt.Providers.Client` from nuget.org, which brings `Gleanvolt.Providers.Contracts` with it.
+Both are MIT, so the provider can use any licence. A provider is an ordinary worker service:
 
 ```csharp
 var builder = Host.CreateApplicationBuilder(args);
@@ -87,6 +87,33 @@ OpenWeatherMap as a weather provider, with its own page for the key, which Glean
 **Settings → Weather**. It began as a copy of the built-in integration, and its README lists what
 changed. It is the first [shipped plugin](#shipped-plugins) (#426), and since #425 the only way to get
 OpenWeatherMap's weather: the built-in is gone.
+
+**Testing a charger plugin without Gleanvolt** (#439). `Gleanvolt.Providers.Testing` (MIT) is a charger hub
+on a loopback port that speaks the charger kind as Gleanvolt does. The plugin connects to it with the
+ordinary SDK (`hub.Configure(options)` gives it the address and the token), and the test reads and commands
+it:
+
+```csharp
+await using var hub = await ChargerTestHub.StartAsync();
+// ... start the plugin with hub.Configure(options) ...
+await hub.WaitForHelloAsync();
+var reading = await hub.ReadAsync();          // RefreshRequested → Publish
+var done = await hub.SetCurrentAsync(10);     // SetCurrent → CommandDone
+```
+
+Every reading is checked by `ChargerReadingRules` in the contracts, the same limits Gleanvolt refuses a
+reading by, and a reading that breaks them fails the read with each problem listed. Gleanvolt's own
+safeguards (the threshold, the clamp, dry-run) are not in the test hub: they are Gleanvolt's, and a plugin
+carries out what it is sent.
+
+**Talking Modbus.** `Gleanvolt.Modbus` (MIT) is the Modbus TCP client Gleanvolt's own drivers use: one
+request at a time, spaced, the connection torn down after any failed exchange, late replies read past, and
+a reconnect backoff. A charger plugin for a Modbus charger uses it rather than NModbus directly.
+
+**Versions.** The SDK packages carry Gleanvolt's version and are released with it, from the same tag.
+Whether a plugin and a Gleanvolt work together is decided by the kind's contract major (below), not by the
+package version: a plugin built against an older SDK keeps working with a newer Gleanvolt of the same
+major, and the other way round.
 
 **Secrets.** A provider that holds an account (a password, a session's cookies, an API key) keeps it
 with `services.AddGleanvoltProviderSecrets(directory)` and `IProviderSecretStore` (#416): `Read`,

@@ -7,12 +7,14 @@
     <Project Path="src/Gleanvolt.Devices.GoE/Gleanvolt.Devices.GoE.csproj" />
     <Project Path="src/Gleanvolt.Api/Gleanvolt.Api.csproj" />
     <Project Path="src/Gleanvolt.Infrastructure/Gleanvolt.Infrastructure.csproj" />
+    <Project Path="src/Gleanvolt.Providers.Testing/Gleanvolt.Providers.Testing.csproj" />
     <Project Path="src/Gleanvolt.Web/Gleanvolt.Web.csproj" />
     <Project Path="src/Gleanvolt.Hosting/Gleanvolt.Hosting.csproj" />
     <Project Path="src/Gleanvolt.Worker/Gleanvolt.Worker.csproj" />
     <Project Path="src/Gleanvolt.Discovery/Gleanvolt.Discovery.csproj" />
     <Project Path="src/Gleanvolt.Discovery.Cli/Gleanvolt.Discovery.Cli.csproj" />
     <Project Path="src/Gleanvolt.Providers.Contracts/Gleanvolt.Providers.Contracts.csproj" />
+    <Project Path="src/Gleanvolt.Modbus/Gleanvolt.Modbus.csproj" />
     <Project Path="src/Gleanvolt.Providers.Client/Gleanvolt.Providers.Client.csproj" />
     <Project Path="src/Gleanvolt.Providers.Server/Gleanvolt.Providers.Server.csproj" />
   </Folder>
@@ -31,6 +33,7 @@
     <Project Path="tests/Gleanvolt.Web.Tests/Gleanvolt.Web.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Web.Screenshots/Gleanvolt.Web.Screenshots.csproj" />
     <Project Path="tests/Gleanvolt.Hosting.Tests/Gleanvolt.Hosting.Tests.csproj" />
+    <Project Path="tests/Gleanvolt.Modbus.Tests/Gleanvolt.Modbus.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Providers.Tests/Gleanvolt.Providers.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Discovery.Tests/Gleanvolt.Discovery.Tests.csproj" />
     <Project Path="tests/Gleanvolt.Devices.Testing/Gleanvolt.Devices.Testing.csproj" />

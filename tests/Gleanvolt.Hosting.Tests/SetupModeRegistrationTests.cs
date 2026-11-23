@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Gleanvolt.Devices;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Hosting.Tests;
 

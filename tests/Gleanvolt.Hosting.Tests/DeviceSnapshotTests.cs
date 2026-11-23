@@ -10,6 +10,7 @@ using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Solax;
 using Gleanvolt.Devices.Testing;
 using Gleanvolt.Hosting.Setup;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Hosting.Tests;
 

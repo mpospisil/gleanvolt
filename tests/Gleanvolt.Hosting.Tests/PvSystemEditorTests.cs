@@ -7,6 +7,7 @@ using System.Text.Json.Nodes;
 using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Solax;
 using Gleanvolt.Devices.Testing;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Hosting.Tests;
 

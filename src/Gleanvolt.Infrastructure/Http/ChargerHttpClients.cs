@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Devices;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Infrastructure.Http;
 

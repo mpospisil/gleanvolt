@@ -8,14 +8,17 @@
 
     <IsPackable>true</IsPackable>
     <PackageId>Gleanvolt.Devices.Abstractions</PackageId>
-    <Description>The device driver contract for the Gleanvolt: the Modbus client a driver is handed, the inverter driver and its reading, and the battery hold. No dependencies, deliberately -- it is what a driver for another inverter brand builds against.</Description>
+    <Description>The device driver contract for the Gleanvolt: the inverter driver and its reading, and the battery hold. No dependencies, deliberately -- it is what a driver for another inverter brand builds against.</Description>
   </PropertyGroup>
 
   <!--
-    No references, and that is the point of the project (issue #317). Core references this, not the
-    other way round, so a driver never sees the controller's domain and the contract can later be
-    published on its own for third-party drivers.
+    One reference only, and that is the point of the project (issue #317): the MIT Modbus client (#439), which
+    every Modbus driver is handed. Core references this, not the other way round, so a driver never sees the
+    controller's domain and the contract can later be published on its own for third-party drivers.
   -->
+  <ItemGroup>
+    <ProjectReference Include="..\Gleanvolt.Modbus\Gleanvolt.Modbus.csproj" />
+  </ItemGroup>
 
   <!-- Formatting and parsing name their culture here: see the file for why (#290). -->
   <ItemGroup>

@@ -13,23 +13,19 @@ namespace Gleanvolt.Hosting.Chargers;
 /// </summary>
 public static class ChargerReadingValidator
 {
-    /// <summary>How far ahead of this clock a reading may be: clock drift, not a reading from the future.</summary>
-    public static readonly TimeSpan MaxAhead = TimeSpan.FromMinutes(5);
+    // The limits are the contract's (#439), so a plugin's tests and Gleanvolt refuse the same readings; only
+    // the wording, in the viewer's language, is Gleanvolt's own.
+    public static readonly TimeSpan MaxAhead = ChargerReadingRules.MaxAhead;
 
-    /// <summary>The oldest reading accepted. A charger is controlled on what it is doing now.</summary>
-    public static readonly TimeSpan MaxAge = TimeSpan.FromMinutes(1);
+    public static readonly TimeSpan MaxAge = ChargerReadingRules.MaxAge;
 
-    /// <summary>The most power accepted, W: above any wallbox's 22 kW, well below a value sent in mW.</summary>
-    public const double MaxPowerWatts = 100_000;
+    public const double MaxPowerWatts = ChargerReadingRules.MaxPowerWatts;
 
-    /// <summary>The highest setpoint accepted, A.</summary>
-    public const int MaxCurrentAmps = 80;
+    public const int MaxCurrentAmps = ChargerReadingRules.MaxCurrentAmps;
 
-    /// <summary>The lowest ceiling a charger may report, A: IEC 61851's minimum.</summary>
-    public const int MinCeilingAmps = 6;
+    public const int MinCeilingAmps = ChargerReadingRules.MinCeilingAmps;
 
-    /// <summary>The longest mode name, in characters.</summary>
-    public const int MaxModeLength = 50;
+    public const int MaxModeLength = ChargerReadingRules.MaxModeLength;
 
     /// <summary>The problems with <paramref name="reading"/>; empty when it can be held.</summary>
     public static ConfigurationProblems Check(ChargerReading reading, DateTimeOffset now)

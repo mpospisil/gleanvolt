@@ -11,7 +11,6 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.10" />
-    <PackageReference Include="NModbus" Version="3.0.83" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
     <!--
       DPAPI is not in the shared framework: ProtectedData is a package even on Windows, and this
@@ -28,7 +27,7 @@
 
     <IsPackable>true</IsPackable>
     <PackageId>Gleanvolt.Infrastructure</PackageId>
-    <Description>Modbus TCP client, SolaX Gen4 and EV charger register maps, the SQLite charging-session store and the Solcast forecast client for the Gleanvolt.</Description>
+    <Description>SolaX Gen4 and EV charger register maps, the SQLite charging-session store and the Solcast forecast client for the Gleanvolt.</Description>
   </PropertyGroup>
 
   <!-- Formatting and parsing name their culture here: see the file for why (#290). -->

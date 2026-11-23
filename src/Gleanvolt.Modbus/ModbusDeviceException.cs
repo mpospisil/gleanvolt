@@ -1,4 +1,4 @@
-namespace Gleanvolt.Devices;
+namespace Gleanvolt.Modbus;
 
 /// <summary>
 /// The device answered with a Modbus exception response (issue #319): the link works, and the device

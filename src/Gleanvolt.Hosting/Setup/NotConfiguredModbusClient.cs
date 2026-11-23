@@ -1,4 +1,5 @@
 using Gleanvolt.Devices;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Hosting.Setup;
 

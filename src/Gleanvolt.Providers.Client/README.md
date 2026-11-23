@@ -46,6 +46,10 @@ Gleanvolt shows a provider's status in each viewer's language: report it with a 
 `ProviderStatusCodes`, which Gleanvolt words itself, and the detail in `ProviderStatus.Messages`, one
 text per language.
 
+A charger provider uses `AddGleanvoltChargerProvider<T>` and an `IChargerSource`. Test it without Gleanvolt
+with `Gleanvolt.Providers.Testing`, a charger hub on a loopback port; talk to a Modbus charger with
+`Gleanvolt.Modbus`. Both are MIT too.
+
 The protocol, the tokens and the limits on the data are described in
 [docs/PROVIDERS.md](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md).
 

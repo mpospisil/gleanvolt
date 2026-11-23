@@ -133,7 +133,7 @@ Then, for each skill that changed:
 | `gleanvolt-<version>-linux-arm64.zip` | self-contained, ~46 MB — this is the Pi |
 | `gleanvolt_<version>_amd64.deb`, `gleanvolt_<version>_arm64.deb` | the same build as a systemd service for Debian, Ubuntu and Raspberry Pi OS (#205), ~50 MB each |
 | `install.sh` | the one-line Linux install; it finds the `.deb` by name in `SHA256SUMS`, so both names above are a contract — and so does the `gleanvolt-install` skill, which repeats those steps |
-| twelve `.nupkg` and twelve `.snupkg` | the libraries and their symbols, attached rather than pushed to a feed: Api, Core, Hosting, Infrastructure, Web, the device packages Devices.Abstractions, Devices.Solax, Devices.Huawei, Devices.GoE, and the external provider packages Providers.Server and, under MIT, Providers.Contracts and Providers.Client |
+| fourteen `.nupkg` and fourteen `.snupkg` | the libraries and their symbols: Api, Core, Hosting, Infrastructure, Web, the device packages Devices.Abstractions, Devices.Solax, Devices.Huawei, Devices.GoE, Providers.Server, and, under MIT, Providers.Contracts, Providers.Client, Providers.Testing and Modbus. The four MIT ones are also pushed to nuget.org (#439), after the release is created, when the `NUGET_API_KEY` secret is set; the rest go to no feed |
 | `SHA256SUMS` | covers every file above, and not itself |
 
 Each zip, `.deb`, `install.sh` and `.nupkg` also carries a build provenance attestation, verifiable with

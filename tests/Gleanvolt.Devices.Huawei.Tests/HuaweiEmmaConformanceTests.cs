@@ -1,4 +1,5 @@
 using Gleanvolt.Devices.Testing;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Devices.Huawei.Tests;
 

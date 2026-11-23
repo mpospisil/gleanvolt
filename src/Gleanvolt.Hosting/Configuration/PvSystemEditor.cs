@@ -8,6 +8,7 @@ using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.Http;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Infrastructure.RegisterMaps;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Hosting.Configuration;
 
@@ -58,7 +59,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
         _overrides = PvSystemOverrides.Find(configuration);
         _running = running;
         _logger = logger;
-        _clientFactory = clientFactory ?? (device => new ModbusTcpClient(device));
+        _clientFactory = clientFactory ?? (device => new ModbusTcpClient(device.ToEndpoint()));
 
         // Read-only, as the Modbus probe's client is: an address nobody has confirmed is never written to.
         _httpClientFactory = httpClientFactory
