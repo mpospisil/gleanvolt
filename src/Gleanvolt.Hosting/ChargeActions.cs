@@ -164,6 +164,12 @@ public sealed class ChargeActions : IChargeActions
             await _charger.SetChargingAllowedAsync(allowed, reason, cancellationToken).ConfigureAwait(false);
             return null;
         }
+        catch (ChargerNotConnectedException ex)
+        {
+            // No charger plugin attached: a state, said in one line, not a fault with a stack trace.
+            _logger.LogWarning("Could not {Action} the charger: {Message} {Reason}", allowed ? "start" : "stop", ex.Message, reason);
+            return ex.Message;
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Failed to {Action} the charger. {Reason}", allowed ? "start" : "stop", reason);
