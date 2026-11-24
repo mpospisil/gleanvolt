@@ -212,7 +212,7 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
     [Fact]
     public async Task Without_a_plugin_a_read_fails_at_once()
     {
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => Driver().ReadAsync());
+        var error = await Assert.ThrowsAsync<ChargerNotConnectedException>(() => Driver().ReadAsync());
         Assert.Contains("No charger plugin is connected", error.Message);
     }
 

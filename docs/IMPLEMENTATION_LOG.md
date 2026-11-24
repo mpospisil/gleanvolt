@@ -4,6 +4,29 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-24 — A charger plugin not connected yet is one log line, not a stack trace
+
+**What.** At start-up the first poll runs before the charger plugin has attached, so the energy reader logged
+"EV charger is unreachable" as a warning with a full stack trace on every start. Seen on the Pi after the switch to
+the SolaX plugin. Behaviour was right (the charger read Unknown, and the next poll found the plugin); only the log
+was alarming.
+
+**How.** A new `ChargerNotConnectedException` in `Gleanvolt.Devices.Abstractions` (an `InvalidOperationException`, so
+existing catches still hold) is thrown by `ExternalChargerLink` when no plugin session exists, for reads and commands.
+`EnergyStateReader` logs it once per outage at Information, with the reason and no exception; every other charger
+failure keeps its warning and stack trace. The "reachable again" line still closes the pair.
+
+**Files.** `src/Gleanvolt.Devices.Abstractions/ChargerNotConnectedException.cs` (new),
+`src/Gleanvolt.Hosting/Chargers/ExternalChargerLink.cs`, `src/Gleanvolt.Infrastructure/EnergyStateReader.cs`,
+`tests/Gleanvolt.Infrastructure.Tests/EnergyStateReaderTests.cs`, `tests/Gleanvolt.Hosting.Tests/ExternalChargerTests.cs`.
+
+**Also: a racy lifecycle test.** `LifecycleTests.APluginAttachesAgainAfterSeveralRestarts` failed on CI with 5 welcomes
+for 4 instances: a 50 ms retry reached an instance that was shutting down, and it welcomed the plugin too. The test
+now proves each attachment by the new instance's own registry, and counts welcomes as a lower bound
+(`tests/Gleanvolt.Providers.Tests/LifecycleTests.cs`).
+
+---
+
 ## 2026-11-23 — Deprecate the built-in charger drivers, and ship the charger plugins (#444)
 
 **What.** The sixth step of #438. The built-in charger drivers still work, with a deprecation warning in the log and

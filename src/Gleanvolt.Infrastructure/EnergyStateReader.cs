@@ -119,10 +119,23 @@ public sealed class EnergyStateReader : IEnergyStateReader
             if (_evChargerReachable)
             {
                 _evChargerReachable = false;
-                _logger.LogWarning(
-                    ex,
-                    "EV charger is unreachable; reporting it as {Status} and continuing with inverter telemetry.",
-                    EvChargerStatus.Unknown);
+
+                // No plugin connected is a state, not a fault: a plugin attaches seconds after start-up,
+                // so a stack trace here would only alarm whoever reads the log.
+                if (ex is ChargerNotConnectedException)
+                {
+                    _logger.LogInformation(
+                        "EV charger is not connected yet ({Reason}); reporting it as {Status} until it is.",
+                        ex.Message,
+                        EvChargerStatus.Unknown);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "EV charger is unreachable; reporting it as {Status} and continuing with inverter telemetry.",
+                        EvChargerStatus.Unknown);
+                }
             }
 
             return (Unreachable, ex.Message);
