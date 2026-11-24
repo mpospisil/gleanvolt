@@ -57,6 +57,7 @@ public sealed class PollingService : BackgroundService
     private readonly ChargeControlStatusHolder _statusHolder;
     private readonly ChargePowerConverter _power;
     private readonly bool _chargeControlDryRun;
+    private bool _noHoldInDryRunNoted;
     private readonly BatteryHoldOptions _batteryHoldOptions;
     private readonly ForecastChargeOptions _forecastOptions;
     private readonly SolarGridProvider? _solarGrid;
@@ -260,7 +261,7 @@ public sealed class PollingService : BackgroundService
                 // energy the car already has.
                 var fastCharge = Planned("fast charge progress", () => _fastCharge.Update(state));
 
-                await ResumeAsync(charger, stoppingToken);
+                await ResumeAsync(state, charger, stoppingToken);
 
                 var mode = _mode.Mode;
                 OnModeEntry(mode);
@@ -499,17 +500,21 @@ public sealed class PollingService : BackgroundService
     /// hold. Tried every poll until it lands, the owner picks a mode, or <see cref="ResumeWindow"/> runs
     /// out; until then the mode file is left as it was.
     /// </summary>
-    private async Task ResumeAsync(ChargerAvailability charger, CancellationToken cancellationToken)
+    private async Task ResumeAsync(EnergyState state, ChargerAvailability charger, CancellationToken cancellationToken)
     {
         if (_resumeUntil is not { } until || _resuming is not { } mode)
         {
             return;
         }
 
-        if (!charger.Available && _mode.Mode == ChargeControlMode.Off)
+        if ((!charger.Available || state.EvChargerReadError is not null) && _mode.Mode == ChargeControlMode.Off)
         {
             // Not tried, and the window waits (#441): a charger that is not back yet after the restart is the
             // charger's outage, not a refusal, and the mode is taken up once it is back. Bounded by ResumeWithin.
+            //
+            // A charger this poll could not read counts too, though it is still within its grace: the first poll
+            // after a start usually runs before the charger plugin attaches, and a start sent then only fails,
+            // with a warning, to be sent again a poll later.
             _resumeUntil = Min(_timeProvider.GetUtcNow() + ResumeWindow, _resumeStartedAt + _resumeWithin + ResumeWindow);
             return;
         }
@@ -734,6 +739,12 @@ public sealed class PollingService : BackgroundService
             return;
         }
 
+        if (_chargeControlDryRun)
+        {
+            NoteNoHoldInDryRun(mode);
+            return;
+        }
+
         _fastHold = true;
         _batteryHold.Set(true, "the FastNoBattery mode charging");
     }
@@ -944,6 +955,24 @@ public sealed class PollingService : BackgroundService
     /// <para><see cref="ChargeControlMode.SolarGrid"/> and <see cref="ChargeControlMode.Targeted"/> want it
     /// while the car draws more than the sun gives — see <see cref="BridgeHold"/>.</para>
     /// </summary>
+    /// <summary>
+    /// Says once, the first time a mode would hold the battery for its charge, that dry run does not: the
+    /// line an owner looks for when the pack keeps serving the house while a mode "charges".
+    /// </summary>
+    private void NoteNoHoldInDryRun(ChargeControlMode mode)
+    {
+        if (_noHoldInDryRunNoted)
+        {
+            return;
+        }
+
+        _noHoldInDryRunNoted = true;
+        _logger.LogInformation(
+            "Battery discharge hold: the {Mode} mode does not hold the battery while charge control is in dry run, "
+            + "because the car draws nothing. The hold switch still works.",
+            mode);
+    }
+
     private bool AutoHold(
         EnergyState state,
         ChargeControlMode mode,
@@ -986,6 +1015,23 @@ public sealed class PollingService : BackgroundService
                 _autoHold = false;
             }
 
+            return false;
+        }
+
+        // In dry run nothing reaches the charger, so the car draws nothing: a hold for its charge would only
+        // keep the pack from serving the house, and put the house on the grid for no charge at all. Seen on
+        // the Pi on 2026-11-24: FastNoBattery in dry run held the pack for half an hour at 3.2 kW of import.
+        // The owner's own switch is not a mode's hold, and still works.
+        if (_chargeControlDryRun && mode is ChargeControlMode.Targeted or ChargeControlMode.SolarGrid)
+        {
+            NoteNoHoldInDryRun(mode);
+
+            if (_autoHold)
+            {
+                _logger.LogInformation("Battery discharge hold released automatically: charge control is in dry run.");
+            }
+
+            _autoHold = false;
             return false;
         }
 

@@ -4,6 +4,47 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-24 — A restart's resume waits for a poll that read the charger
+
+**What.** Live on the Pi with the SolaX plugin, a restart resumed FastNoBattery on its first poll, before the plugin
+had attached. The start failed ("Failed to start the charger" with a stack trace, then "Could not resume
+FastNoBattery yet"), and the next poll's start went through. In dry run the same moment was already quiet (#454),
+because no write was sent.
+
+**How.** `PollingService.ResumeAsync` now gets the poll's state and waits, as it does for an unavailable charger,
+while that poll could not read the charger (`EnergyState.EvChargerReadError`). The charger is still within its
+availability grace then, so the existing check didn't stop it. The wait is bounded by the same resume window. A
+start that still meets no plugin (a button press, say) logs one warning line without a stack trace
+(`ChargeActions.WriteChargingAllowedAsync`).
+
+**Files.** `src/Gleanvolt.Hosting/PollingService.cs`, `src/Gleanvolt.Hosting/ChargeActions.cs`,
+`tests/Gleanvolt.Hosting.Tests/ChargeModeResumeLoopTests.cs` (a first poll that couldn't read the charger sends no
+start, and the next poll resumes; fails without the fix).
+
+---
+
+## 2026-11-24 — No battery hold in charge-control dry run, and a quiet resume before the plugin attaches
+
+**What.** Two things seen on the Pi on 1.3.2, with the SolaX charger through its plugin and `ChargeControl:DryRun`
+on:
+
+- **The hold in dry run.** FastNoBattery, started from the web UI at 16:42, switched the battery discharge hold on
+  (`BatteryHold:DryRun` is false there). The charger was never started, so the car drew nothing, and the house ran on
+  about 3.2 kW from the grid until the high tariff stood the mode down at 17:15. Now, in charge-control dry run,
+  FastNoBattery doesn't arm its hold, and Targeted and Solar + grid don't arm their automatic one. The log says so once.
+  The owner's switch still works: it is the owner's, not a mode's.
+- **A resumed mode before the plugin attaches.** A restart resumes the running mode at once, and its first commands
+  ran before the plugin connected: "Could not set the charge current..." and "Charge-control cycle failed" were
+  logged as warnings with stack traces. Both now catch `ChargerNotConnectedException` (#452) and log one line at
+  Information. The availability monitor (#441) still suspends the mode if the plugin stays away.
+
+**Files.** `src/Gleanvolt.Hosting/PollingService.cs` (`SetFastHoldForCharging`, `AutoHold`, `NoteNoHoldInDryRun`),
+`src/Gleanvolt.Hosting/ChargeActions.cs`, `src/Gleanvolt.Hosting/ChargingControlCoordinator.cs`; tests in
+`FastNoBatteryModeTests`, `SolarGridModeTests`, `ChargingControlCoordinatorTests` (and `Fakes.FakeEvChargerControl.ReadFailure`);
+`docs/BATTERY_HOLD.md`, `docs/CHARGE_CONTROL.md`.
+
+---
+
 ## 2026-11-24 — A charger behind a plugin no longer crashes a web page
 
 **What.** On the Pi, 1.3.2 with the SolaX plugin, opening a web page threw `UriFormatException: Invalid URI: The

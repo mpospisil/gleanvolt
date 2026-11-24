@@ -1,3 +1,4 @@
+using Gleanvolt.Devices;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
@@ -136,6 +137,15 @@ public sealed class ChargeActions : IChargeActions
                     cancellationToken)
                 .ConfigureAwait(false);
         }
+        catch (ChargerNotConnectedException ex)
+        {
+            // A mode resumed at start-up runs before the charger plugin has attached: a state, not a fault.
+            _logger.LogInformation(
+                "Could not set the charge current to {Amps}A when starting FastNoBattery yet ({Reason}); the next "
+                + "control cycle will command it.",
+                _fast.ChargeCurrentAmps,
+                ex.Message);
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(
@@ -153,6 +163,12 @@ public sealed class ChargeActions : IChargeActions
         {
             await _charger.SetChargingAllowedAsync(allowed, reason, cancellationToken).ConfigureAwait(false);
             return null;
+        }
+        catch (ChargerNotConnectedException ex)
+        {
+            // No charger plugin attached: a state, said in one line, not a fault with a stack trace.
+            _logger.LogWarning("Could not {Action} the charger: {Message} {Reason}", allowed ? "start" : "stop", ex.Message, reason);
+            return ex.Message;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

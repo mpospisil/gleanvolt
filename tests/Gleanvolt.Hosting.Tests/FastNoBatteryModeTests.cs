@@ -265,6 +265,28 @@ public class FastNoBatteryModeTests
     }
 
     [Fact]
+    public async Task InDryRunTheModeNeverHoldsThePack_BecauseTheCarDrawsNothing()
+    {
+        // Seen on the Pi on 2026-11-24: in dry run the charger is never started, and a hold put the house
+        // on 3.2 kW of grid for half an hour with nothing charging.
+        await RunAsync([Charging(Now), Charging(Now.AddMinutes(1))], dryRun: true);
+
+        Assert.All(_inverter.Applied, hold => Assert.False(hold));
+        Assert.False(_manualHold.Hold);
+        Assert.Equal(ChargeControlMode.FastNoBattery, _mode.Mode);
+    }
+
+    [Fact]
+    public async Task InDryRunTheOwnersOwnHoldSwitchStillWorks()
+    {
+        _manualHold.Set(true, "owner");
+
+        await RunAsync([Charging(Now), Charging(Now.AddMinutes(1))], dryRun: true);
+
+        Assert.All(_inverter.Applied, hold => Assert.True(hold));
+    }
+
+    [Fact]
     public async Task TheModeArmsTheHoldThroughTheSwitch_SoItsLevelMatchesWhatIsOnScreen()
     {
         // Home Assistant publishes what is *armed*, not what was asked for. A hold armed beside the
@@ -594,7 +616,8 @@ public class FastNoBatteryModeTests
         FastChargeLimit? limit = null,
         ISolarForecastService? forecast = null,
         ITariffSchedule? tariff = null,
-        bool lowTariffOnly = false)
+        bool lowTariffOnly = false,
+        bool dryRun = false)
     {
         if (limit is not null)
         {
@@ -608,6 +631,7 @@ public class FastNoBatteryModeTests
             PauseCurrentAmps = 0,
             CompletionDwell = TimeSpan.FromMinutes(2),
             CompletionPowerThresholdWatts = 200,
+            DryRun = dryRun,
         };
 
         var power = new ChargePowerConverter(chargeControl.NominalVoltage, chargeControl.Phases);

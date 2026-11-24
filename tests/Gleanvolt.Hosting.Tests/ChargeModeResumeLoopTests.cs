@@ -68,6 +68,30 @@ public sealed class ChargeModeResumeLoopTests : IDisposable
     }
 
     [Fact]
+    public async Task AChargerNotReadYetAfterTheRestart_IsNotSentTheStart_UntilAPollReadsIt()
+    {
+        // The Pi on 2026-11-24: the first poll ran before the charger plugin attached, the start sent then
+        // failed with a warning and a stack trace, and the next poll's start went through.
+        var before = new Run(ModePath);
+        before.Mode.Set(ChargeControlMode.FastNoBattery, "test");
+        await before.RunAsync(Charging(Now));
+
+        var after = new Run(ModePath);
+        var unread = new EnergyState(Now.AddMinutes(2), BatterySocPercent: 60, BatteryPowerWatts: 0, SolarPowerWatts: 0,
+            GridPowerWatts: 300, EvChargerStatus.Unknown, EvChargerPowerWatts: 0,
+            EvChargerReadError: "No charger plugin is connected to Gleanvolt.");
+        var modeAfterFirstPoll = (ChargeControlMode?)null;
+        after.AfterPoll = _ => modeAfterFirstPoll ??= after.Mode.Mode;
+
+        await after.RunAsync(unread, Paused(Now.AddMinutes(3)));
+
+        Assert.Equal(ChargeControlMode.Off, modeAfterFirstPoll);
+        var start = Assert.Single(after.Charger.ModeWrites, write => write.Mode == SolaxMode.Fast);
+        Assert.Contains("restart", start.Reason);
+        Assert.Equal(ChargeControlMode.FastNoBattery, after.Mode.Mode);
+    }
+
+    [Fact]
     public async Task ATargetSurvivesTheRestart()
     {
         var request = new TargetedChargeRequest(RequiredEnergyWh: 12_000, DepartBy: Now.AddHours(9), ActivatedAt: Now);

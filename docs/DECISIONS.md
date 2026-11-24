@@ -4,6 +4,22 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-24 — In charge-control dry run, no mode holds the battery
+
+**Found.** On the Pi, a dry-run FastNoBattery charge armed the battery discharge hold, because the hold has its
+own dry-run setting and that one was off. The charger was never started, so for half an hour the house drew about
+3.2 kW from the grid while the car charged nothing.
+
+**Decided.** The modes' holds exist for the car's draw: FastNoBattery's for the whole charge, and Targeted's and
+Solar + grid's for a grid block or a bridge. In charge-control dry run there is no draw, so none of them arm. The
+owner's hold switch is not a mode's hold, and keeps working. `BatteryHold:DryRun` keeps its meaning: decide and
+log, but don't write to the inverter.
+
+**Consequences accepted.** A dry run of a charge no longer exercises the hold on the inverter. Testing the hold
+before going live means switching it on by hand, which shows on the battery's power the same way.
+
+---
+
 ## 2026-11-23 — The built-in charger drivers are deprecated, and the charger plugins ship (#444)
 
 **Found.** Every built-in charger driver now has a plugin in gleanvolt-chargers (#443). Owners need a way to move

@@ -44,6 +44,11 @@ power to deliver to the house, every poll:
 
 Turning the switch off releases the hold at once.
 
+**Not while charge control is in dry run.** With `ChargeControl:DryRun` on, the charger is never started, so
+Fast (no battery), Targeted and Solar + grid don't switch the hold on: it would only keep the battery from the
+house, with the grid covering a car that draws nothing. The log says so once. The switch itself still works.
+This is `ChargeControl:DryRun`, not `BatteryHold:DryRun`, which only stops the writes to the inverter.
+
 ## What the switch shows
 
 The hold does **not** survive a restart and can't be switched on by configuration: the service always

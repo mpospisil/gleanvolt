@@ -318,6 +318,13 @@ public sealed class ChargingControlCoordinator
         {
             throw;
         }
+        catch (ChargerNotConnectedException ex)
+        {
+            // No plugin attached yet (a mode resumed at start-up) or any more: the availability monitor
+            // suspends the mode if it lasts, so one line per cycle without a stack trace is enough here.
+            _logger.LogInformation("Charge-control cycle skipped: {Reason} Will retry next poll.", ex.Message);
+            return new ChargeControlCycleResult(_charging ? ChargeControlState.Charging : ChargeControlState.Idle, null, null, _charging);
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Charge-control cycle failed; will retry next poll.");
