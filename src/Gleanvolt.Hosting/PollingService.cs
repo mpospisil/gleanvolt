@@ -261,7 +261,7 @@ public sealed class PollingService : BackgroundService
                 // energy the car already has.
                 var fastCharge = Planned("fast charge progress", () => _fastCharge.Update(state));
 
-                await ResumeAsync(charger, stoppingToken);
+                await ResumeAsync(state, charger, stoppingToken);
 
                 var mode = _mode.Mode;
                 OnModeEntry(mode);
@@ -500,17 +500,21 @@ public sealed class PollingService : BackgroundService
     /// hold. Tried every poll until it lands, the owner picks a mode, or <see cref="ResumeWindow"/> runs
     /// out; until then the mode file is left as it was.
     /// </summary>
-    private async Task ResumeAsync(ChargerAvailability charger, CancellationToken cancellationToken)
+    private async Task ResumeAsync(EnergyState state, ChargerAvailability charger, CancellationToken cancellationToken)
     {
         if (_resumeUntil is not { } until || _resuming is not { } mode)
         {
             return;
         }
 
-        if (!charger.Available && _mode.Mode == ChargeControlMode.Off)
+        if ((!charger.Available || state.EvChargerReadError is not null) && _mode.Mode == ChargeControlMode.Off)
         {
             // Not tried, and the window waits (#441): a charger that is not back yet after the restart is the
             // charger's outage, not a refusal, and the mode is taken up once it is back. Bounded by ResumeWithin.
+            //
+            // A charger this poll could not read counts too, though it is still within its grace: the first poll
+            // after a start usually runs before the charger plugin attaches, and a start sent then only fails,
+            // with a warning, to be sent again a poll later.
             _resumeUntil = Min(_timeProvider.GetUtcNow() + ResumeWindow, _resumeStartedAt + _resumeWithin + ResumeWindow);
             return;
         }
