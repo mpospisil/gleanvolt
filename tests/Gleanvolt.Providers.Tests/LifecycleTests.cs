@@ -32,6 +32,8 @@ public sealed class LifecycleTests : IAsyncDisposable
 
     private ExternalProviderRegistry Registry => _gleanvolt!.Services.GetRequiredService<ExternalProviderRegistry>();
 
+    private bool ConnectedToThisGleanvolt() => Registry.Find(EchoHub.Kind)?.State == ExternalProviderState.Connected;
+
     [Fact]
     public async Task APluginStartedBeforeGleanvoltAttachesOnceGleanvoltIsUp()
     {
@@ -82,15 +84,19 @@ public sealed class LifecycleTests : IAsyncDisposable
         using var plugin = Plugin(out var welcomes);
         await plugin.StartAsync(CancellationToken.None);
 
+        // Each instance's own registry is the proof of attachment: the plugin's IsAttached can still be true
+        // from the instance just stopped, and a retry can land on an instance that is shutting down and be
+        // welcomed by it too, so the number of welcomes is a lower bound, not an exact count.
+        await Eventually.True(() => ConnectedToThisGleanvolt(), "the plugin should attach to the first Gleanvolt");
+
         for (var restart = 1; restart <= 3; restart++)
         {
-            await Eventually.True(() => plugin.IsAttached, $"the plugin should be attached before restart {restart}");
             await StopGleanvoltAsync();
             await StartGleanvoltAsync();
+            await Eventually.True(() => ConnectedToThisGleanvolt(), $"the plugin should attach again after restart {restart}");
         }
 
-        await Eventually.True(() => plugin.IsAttached, "the plugin should be attached after the last restart");
-        Assert.Equal(4, welcomes.Count);
+        Assert.True(welcomes.Count >= 4, $"expected a welcome from each of the 4 instances, got {welcomes.Count}");
 
         await plugin.StopAsync(CancellationToken.None);
     }

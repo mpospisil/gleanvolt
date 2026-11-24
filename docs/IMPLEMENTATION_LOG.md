@@ -20,6 +20,11 @@ failure keeps its warning and stack trace. The "reachable again" line still clos
 `src/Gleanvolt.Hosting/Chargers/ExternalChargerLink.cs`, `src/Gleanvolt.Infrastructure/EnergyStateReader.cs`,
 `tests/Gleanvolt.Infrastructure.Tests/EnergyStateReaderTests.cs`, `tests/Gleanvolt.Hosting.Tests/ExternalChargerTests.cs`.
 
+**Also: a racy lifecycle test.** `LifecycleTests.APluginAttachesAgainAfterSeveralRestarts` failed on CI with 5 welcomes
+for 4 instances: a 50 ms retry reached an instance that was shutting down, and it welcomed the plugin too. The test
+now proves each attachment by the new instance's own registry, and counts welcomes as a lower bound
+(`tests/Gleanvolt.Providers.Tests/LifecycleTests.cs`).
+
 ---
 
 ## 2026-11-23 — Deprecate the built-in charger drivers, and ship the charger plugins (#444)
