@@ -85,7 +85,7 @@ Another device already uses <code dir="auto">gleanvolt.local</code>, usually a s
 <p><strong>The page doesn’t open at all, even by address.</strong>
 Check that Gleanvolt is running: see <a href="#is-it-running">Is it running?</a> below.</p>
 <p><strong>Every page goes to the setup wizard.</strong>
-Something required is still missing: the password, the inverter or the charger. Gleanvolt waits, and
+Something required is still missing: the password or the inverter. Gleanvolt waits, and
 controls nothing, until they are set. Finish <a href="../setting-up/setup-wizard/">the setup wizard</a> and press
 <strong>Restart</strong> on its last step.</p>
 <p><strong>I finished the wizard, but it still goes to the wizard.</strong>
@@ -127,8 +127,8 @@ Or look for “reset code” in the container’s log, in your NAS’s container
 <p>The code works once, for 15 minutes.</p>
 <div class="sl-heading-wrapper level-h2"><h2 id="devices-and-readings">Devices and readings</h2><a class="sl-anchor-link" href="#devices-and-readings"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Devices and readings”</span></a></div>
 <p><strong>The home battery level never changes, and solar and grid show 0.</strong>
-The inverter’s and the charger’s addresses are swapped. Both answer on the same port, so Gleanvolt
-connects to either. Swap them on <strong>Settings</strong>, save and restart.</p>
+The inverter’s address is your charger’s. Both answer on the same port, so Gleanvolt connects to either.
+Correct it on <strong>Settings</strong>, save and restart. The charger’s address goes on its plugin’s page.</p>
 <p><strong>Everything reads zero.</strong>
 Gleanvolt can’t reach the devices. Check the addresses on <strong>Settings</strong>, and that
 <a href="../installation/preparing-devices/">Modbus TCP is turned on</a>.</p>

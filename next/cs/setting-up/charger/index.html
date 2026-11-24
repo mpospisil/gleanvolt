@@ -102,22 +102,15 @@ nabíječky. Režim nabíjení spustíte na stránce <strong>Plán nabíjení</s
 </li>
 </ol>
 <div class="sl-heading-wrapper level-h2"><h2 id="přechod-ze-zabudovaného-ovladače">Přechod ze zabudovaného ovladače</h2><a class="sl-anchor-link" href="#přechod-ze-zabudovaného-ovladače"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Sekce “Přechod ze zabudovaného ovladače”</span></a></div>
-<p>Do verze 1.3 řídil Gleanvolt nabíječky SolaX, Huawei a go-e sám. Tyto zabudované ovladače ve verzi 1.3 stále fungují,
-ale ve verzi 1.4 budou odstraněny: <strong>Nastavení → Instalace</strong> u značky nabíječky řekne, který plugin váš nahrazuje.</p>
-<p>Na Raspberry Pi nebo jiné instalaci v Dockeru s nasazovacími skripty:</p>
-<ol role="list" class="sl-steps">
-<li>
-<p>Zkontrolujte, že je v <code dir="auto">/opt/gleanvolt/.env</code> nastavený <code dir="auto">GLEANVOLT_PROVIDER_TOKEN</code> (viz krok 1 výše).</p>
-</li>
-<li>
-<p>Přidejte plugin do <code dir="auto">GLEANVOLT_PLUGINS</code> ve stejném souboru, například <code dir="auto">GLEANVOLT_PLUGINS=solax</code>, nebo
-<code dir="auto">openweather,solax</code> s počasím. Nic jiného neměňte: <code dir="auto">EV_CHARGER_HOST</code> se stane adresou pluginu.</p>
-</li>
-<li>
-<p>Nasaďte znovu. Gleanvolt pak řídí nabíječku přes plugin a sám ji vedle pluginu nikdy neotevře.</p>
-</li>
-</ol>
-<p>Chcete-li se vrátit, odeberte plugin ze seznamu a nasaďte znovu.</p>
+<p>Do verze 1.3 řídil Gleanvolt nabíječky SolaX, Huawei a go-e sám. Verze 1.4 tyto zabudované ovladače
+odstranila: každá nabíječka má teď plugin a Gleanvolt se k nabíječce sám nikdy nepřipojuje.</p>
+<p>Na Raspberry Pi s nasazovacími skripty nemusíte dělat nic. Při nasazení verze 1.4 skript najde adresu
+nabíječky (<code dir="auto">EV_CHARGER_HOST</code>) v <code dir="auto">/opt/gleanvolt/.env</code>, spustí plugin pro značku vaší nabíječky a řekne
+který. Potřebuje token pro zdroje dat (<code dir="auto">GLEANVOLT_PROVIDER_TOKEN</code>, viz krok 1 výše), a pokud není
+nastavený, zastaví se a řekne vám to. Aby hlášení zmizelo, přidejte plugin do <code dir="auto">GLEANVOLT_PLUGINS</code>,
+například <code dir="auto">GLEANVOLT_PLUGINS=solax</code>, nebo <code dir="auto">openweather,solax</code> s počasím.</p>
+<p>Jinde spusťte plugin sami, jako v části <a href="#p%C5%99id%C3%A1n%C3%AD-nab%C3%ADje%C4%8Dky">Přidání nabíječky</a>. Dokud staré nastavení
+nabíječky nezmizí, zapíše Gleanvolt při každém spuštění do logu varování, které plugin jmenuje.</p>
 <div class="sl-heading-wrapper level-h2"><h2 id="když-je-plugin-odmítnut">Když je plugin odmítnut</h2><a class="sl-anchor-link" href="#když-je-plugin-odmítnut"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Sekce “Když je plugin odmítnut”</span></a></div>
 <p><strong>Nastavení → Externí zdroje dat</strong> napíše pod řádek <strong>Nabíječka</strong>, proč:</p>
 <ul>

@@ -106,22 +106,15 @@ state. Start a charging mode on the <strong>Charging plan</strong> page.</p>
 </li>
 </ol>
 <div class="sl-heading-wrapper level-h2"><h2 id="moving-from-the-built-in-driver">Moving from the built-in driver</h2><a class="sl-anchor-link" href="#moving-from-the-built-in-driver"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Moving from the built-in driver”</span></a></div>
-<p>Up to 1.3, Gleanvolt drove SolaX, Huawei and go-e chargers itself. Those built-in drivers still work in 1.3, but
-they are removed in 1.4: <strong>Settings → Installation</strong> says which plugin replaces yours, beside the charger’s brand.</p>
-<p>On a Raspberry Pi or another Docker install, with the deploy scripts:</p>
-<ol role="list" class="sl-steps">
-<li>
-<p>Make sure <code dir="auto">GLEANVOLT_PROVIDER_TOKEN</code> is set in <code dir="auto">/opt/gleanvolt/.env</code> (see step 1 above).</p>
-</li>
-<li>
-<p>Add the plugin to <code dir="auto">GLEANVOLT_PLUGINS</code> in the same file, for example <code dir="auto">GLEANVOLT_PLUGINS=solax</code>, or
-<code dir="auto">openweather,solax</code> with the weather. Change nothing else: <code dir="auto">EV_CHARGER_HOST</code> becomes the plugin’s address.</p>
-</li>
-<li>
-<p>Deploy again. Gleanvolt now drives the charger through the plugin, and never opens it itself beside the plugin.</p>
-</li>
-</ol>
-<p>To go back, take the plugin off the list and deploy again.</p>
+<p>Up to 1.3, Gleanvolt drove SolaX, Huawei and go-e chargers itself. 1.4 removed those built-in drivers:
+every charger now has a plugin, and Gleanvolt never connects to the charger itself.</p>
+<p>On a Raspberry Pi with the deploy scripts, there is nothing to do. When you deploy 1.4, the script sees
+your charger’s address (<code dir="auto">EV_CHARGER_HOST</code>) in <code dir="auto">/opt/gleanvolt/.env</code>, starts the plugin for your charger’s
+brand, and says which one. It needs the provider token (<code dir="auto">GLEANVOLT_PROVIDER_TOKEN</code>, see step 1 above),
+and stops and tells you if it isn’t set. To silence the message, add the plugin to <code dir="auto">GLEANVOLT_PLUGINS</code>,
+for example <code dir="auto">GLEANVOLT_PLUGINS=solax</code>, or <code dir="auto">openweather,solax</code> with the weather.</p>
+<p>Anywhere else, start the plugin yourself, as in <a href="#add-the-charger">Add the charger</a>. Gleanvolt writes a
+warning to its log at every start until the old charger settings are gone; the warning names the plugin.</p>
 <div class="sl-heading-wrapper level-h2"><h2 id="if-the-plugin-is-turned-away">If the plugin is turned away</h2><a class="sl-anchor-link" href="#if-the-plugin-is-turned-away"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “If the plugin is turned away”</span></a></div>
 <p><strong>Settings → External providers</strong> says why under the <strong>Charger</strong> row:</p>
 <ul>
