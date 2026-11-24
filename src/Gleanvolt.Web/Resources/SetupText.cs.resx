@@ -64,7 +64,7 @@
     <value>Vyhledání zařízení</value>
   </data>
   <data name="FindDevicesIntro" xml:space="preserve">
-    <value>Prohledá tuto síť a najde střídače a nabíječky, které Gleanvolt podporuje. Síť /24 trvá minutu nebo dvě.</value>
+    <value>Prohledá tuto síť a najde střídače, které Gleanvolt podporuje. Síť /24 trvá minutu nebo dvě.</value>
   </data>
   <data name="Subnet" xml:space="preserve">
     <value>Síť</value>
@@ -99,20 +99,8 @@
   <data name="LooksLikeInverter" xml:space="preserve">
     <value>střídač</value>
   </data>
-  <data name="LooksLikeCharger" xml:space="preserve">
-    <value>nabíječka</value>
-  </data>
   <data name="UseAsInverter" xml:space="preserve">
     <value>Použít jako střídač</value>
-  </data>
-  <data name="UseAsCharger" xml:space="preserve">
-    <value>Použít jako nabíječku</value>
-  </data>
-  <data name="RoleMismatchInverter" xml:space="preserve">
-    <value>{0} se ohlásilo jako nabíječka, ne jako střídač. Před uložením to ověřte: prohozená zařízení se po spuštění projeví jako zamrzlá baterie a nulová výroba.</value>
-  </data>
-  <data name="RoleMismatchCharger" xml:space="preserve">
-    <value>{0} se ohlásilo jako střídač, ne jako nabíječka. Před uložením to ověřte: prohozená zařízení se po spuštění projeví jako zamrzlá baterie a nulová výroba.</value>
   </data>
   <data name="SetItUp" xml:space="preserve">
     <value>Nastavit</value>

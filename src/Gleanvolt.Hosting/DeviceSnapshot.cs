@@ -8,9 +8,8 @@ using Gleanvolt.Modbus;
 namespace Gleanvolt.Hosting;
 
 /// <summary>
-/// <see cref="IDeviceSnapshot"/> on the running devices (issues #319, #350): the ranges the configured driver
-/// names, read once on the device's keyed client, the serial number cut to its prefix; for a charger reached
-/// over HTTP (#352), the requests its driver names, on the charger's HTTP client.
+/// <see cref="IDeviceSnapshot"/> on the running inverter (issue #319): the ranges the configured driver names, read
+/// once on the inverter's keyed client, the serial number cut to its prefix.
 /// </summary>
 public sealed class DeviceSnapshot : IDeviceSnapshot
 {
@@ -18,139 +17,41 @@ public sealed class DeviceSnapshot : IDeviceSnapshot
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
     private readonly IModbusClient _inverter;
-    private readonly IModbusClient _charger;
-    private readonly HttpClient _chargerHttp;
     private readonly PvSystemInfo _site;
     private readonly IEnumerable<IInverterDriverFactory> _inverterDrivers;
-    private readonly IEnumerable<IEvChargerDriverFactory> _chargerDrivers;
     private readonly TimeProvider _time;
     private readonly ILogger<DeviceSnapshot> _logger;
 
     public DeviceSnapshot(
         [FromKeyedServices(ModbusClientKeys.Inverter)] IModbusClient inverter,
-        [FromKeyedServices(ModbusClientKeys.EvCharger)] IModbusClient charger,
-        [FromKeyedServices(ModbusClientKeys.EvCharger)] HttpClient chargerHttp,
         PvSystemInfo site,
         IEnumerable<IInverterDriverFactory> inverterDrivers,
-        IEnumerable<IEvChargerDriverFactory> chargerDrivers,
         TimeProvider time,
         ILogger<DeviceSnapshot> logger)
     {
         _inverter = inverter;
-        _charger = charger;
-        _chargerHttp = chargerHttp;
         _site = site;
         _inverterDrivers = inverterDrivers;
-        _chargerDrivers = chargerDrivers;
         _time = time;
         _logger = logger;
     }
 
-    public Task<RegisterSnapshotFile> TakeAsync(PvDeviceRole role, string note, CancellationToken cancellationToken = default) =>
-        role switch
-        {
-            PvDeviceRole.Inverter => TakeInverterAsync(note, cancellationToken),
-            PvDeviceRole.Charger => TakeChargerAsync(note, cancellationToken),
-            _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Not a device role."),
-        };
-
-    private Task<RegisterSnapshotFile> TakeInverterAsync(string note, CancellationToken cancellationToken)
+    public async Task<RegisterSnapshotFile> TakeAsync(string note, CancellationToken cancellationToken = default)
     {
         var driver = _inverterDrivers.FirstOrDefault(candidate => candidate.Id == _site.InverterDriver)
             ?? throw new InvalidOperationException($"No inverter driver '{_site.InverterDriver}' is registered.");
 
-        return TakeAsync(
-            "inverter",
-            _inverter,
-            driver.SnapshotFor(new InverterDriverOptions { Topology = _site.InverterTopology }),
-            driver.Id,
-            _site.Inverter.Model,
-            $"gleanvolt-registers-{driver.Id}",
-            note,
-            cancellationToken);
-    }
-
-    private Task<RegisterSnapshotFile> TakeChargerAsync(string note, CancellationToken cancellationToken)
-    {
-        // The controlled charger: the one the charger client is keyed to. Setup mode has none, and its
-        // client refuses every call anyway.
-        if (_site.Chargers is not [var charger, ..])
-        {
-            throw new InvalidOperationException("No charger is configured.");
-        }
-
-        var id = charger.Driver.Length > 0 ? charger.Driver : ChargerDrivers.DefaultId;
-        var driver = _chargerDrivers.FirstOrDefault(candidate => candidate.Id == id)
-            ?? throw new InvalidOperationException($"No charger driver '{id}' is registered.");
-
-        // A family reached over HTTP keeps no registers: its recording is of its API's responses (go-e, #352).
-        if (driver.HttpSnapshot is { } requests)
-        {
-            return TakeHttpAsync(requests, driver.Id, charger.Model, note, cancellationToken);
-        }
-
-        var spec = driver.Snapshot
-            ?? throw new InvalidOperationException($"The {driver.DisplayName} charger names nothing to save.");
-
-        return TakeAsync(
-            "charger",
-            _charger,
-            spec,
-            driver.Id,
-            charger.Model,
-            $"gleanvolt-registers-{driver.Id}-charger",
-            note,
-            cancellationToken);
-    }
-
-    private async Task<RegisterSnapshotFile> TakeHttpAsync(
-        HttpSnapshotSpec spec, string driverId, string family, string note, CancellationToken cancellationToken)
-    {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(Timeout);
-
-        var now = _time.GetUtcNow();
-        var dump = await HttpSnapshot.TakeAsync(
-            _chargerHttp,
-            spec,
-            new HttpDump
-            {
-                Driver = driverId,
-                Family = family,
-                GleanvoltVersion = BuildInfo.Version,
-                CapturedAt = now,
-                Note = note.Trim(),
-            },
-            timeout.Token).ConfigureAwait(false);
-
-        _logger.LogInformation(
-            "HTTP snapshot of the charger taken: {Count} response(s) ({Driver}).", dump.Responses.Count, driverId);
-
-        var stamp = now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
-        return new RegisterSnapshotFile($"gleanvolt-http-{driverId}-charger-{stamp}.json", dump.ToJson());
-    }
-
-    private async Task<RegisterSnapshotFile> TakeAsync(
-        string device,
-        IModbusClient client,
-        RegisterSnapshotSpec spec,
-        string driverId,
-        string family,
-        string fileStem,
-        string note,
-        CancellationToken cancellationToken)
-    {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(Timeout);
 
         var now = _time.GetUtcNow();
         var dump = await RegisterSnapshot.TakeAsync(
-            client,
-            spec,
+            _inverter,
+            driver.SnapshotFor(new InverterDriverOptions { Topology = _site.InverterTopology }),
             new RegisterDump
             {
-                Driver = driverId,
-                Family = family,
+                Driver = driver.Id,
+                Family = _site.Inverter.Model,
                 GleanvoltVersion = BuildInfo.Version,
                 CapturedAt = now,
                 Note = note.Trim(),
@@ -158,10 +59,10 @@ public sealed class DeviceSnapshot : IDeviceSnapshot
             timeout.Token).ConfigureAwait(false);
 
         _logger.LogInformation(
-            "Register snapshot of the {Device} taken: {Holding} holding and {Input} input registers ({Driver}).",
-            device, dump.Holding.Count, dump.Input.Count, driverId);
+            "Register snapshot of the inverter taken: {Holding} holding and {Input} input registers ({Driver}).",
+            dump.Holding.Count, dump.Input.Count, driver.Id);
 
         var stamp = now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
-        return new RegisterSnapshotFile($"{fileStem}-{stamp}.json", dump.ToJson());
+        return new RegisterSnapshotFile($"gleanvolt-registers-{driver.Id}-{stamp}.json", dump.ToJson());
     }
 }

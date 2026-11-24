@@ -58,8 +58,8 @@ The other sections are documented with their features:
 ## The PV system (the `Pv` section)
 
 One section describes the installation: where the array is, what it faces, what it is made of, and what
-to call it. Set it in the setup wizard's **Devices** and **Site** steps, or later on **Settings →
-Installation**. The keys below are the reference behind those forms.
+to call it. Set it in the setup wizard's **Inverter** and **Site** steps, or later on **Settings →
+Installation**. The charger isn't here: it is its plugin's ([Your charger](CHARGER_SETUP.md)). The keys below are the reference behind those forms.
 
 ```jsonc
 "Pv": {
@@ -81,36 +81,21 @@ Installation**. The keys below are the reference behind those forms.
     "Model": "SolaX X3-HYB-G4 PRO",
     "Host": "192.168.2.10", "Port": 502, "UnitId": 1,
     "UnmeteredGridPhase": ""       // only for a grid meter missing a phase clamp: "L3" (or SolaX's "T")
-  },
-
-  "Chargers": [                    // a list; exactly one entry is supported
-    {
-      "Id": "charger",             // slug: the charger's identity within the system
-      "Driver": "",                // which charger family it speaks to: "solax" (empty), "huawei-7ks", "huawei-22kt", "goe" (untested) or "external" (a plugin)
-      "Name": "Garage wallbox",
-      "Model": "SolaX X1/X3-HAC",
-      "Host": "192.168.2.6", "Port": 502, "UnitId": 1
-    }
-  ]
+  }
 }
 ```
 
-- **`Driver` picks how a device is spoken to; `Model` is only a label.** Empty means `solax`, except for a
-  charger with no `Host`, or no charger at all: that is the charger behind a plugin (`external`, #442),
-  which is what a new installation has. The
-  driver fills in `Port` and `UnitId` when they are left out. On Settings these are the **Inverter
-  brand** and **Charger brand** drop-downs. Which models each driver covers is in
-  [Supported PV systems](SUPPORTED_PV_SYSTEMS.md).
-- **The charge-control limits must fit the charger.** `ChargeControl:MinChargingCurrentAmps` below its
-  lowest setpoint, `MaxChargingCurrentAmps` above its highest, or `ChargeControl:Phases` above the
-  phases it supplies is refused at startup and on save.
+- **`Driver` picks how the inverter is spoken to; `Model` is only a label.** Empty means `solax`. The
+  driver fills in `Port` and `UnitId` when they are left out. On Settings it is the **Inverter brand**
+  drop-down. Which models each driver covers is in [Supported PV systems](SUPPORTED_PV_SYSTEMS.md).
 - **`AzimuthDegrees` is stored, not used.** The Solcast forecast already knows your roof's orientation
   from its resource id.
-- **One charger.** `Chargers` is a list, but a second entry stops startup.
-- **`Driver` = `external`: a charger behind a plugin** (#435), such as the Shelly TopAC. `Host`, `Port`
-  and `UnitId` are not used and may be left out: the plugin has the charger's address. Choosing it turns
-  the [charger hub](PROVIDERS.md#the-charger-kind) on, after the restart every driver change takes. How
-  long Gleanvolt waits for the plugin is the `ExternalCharger` section; the defaults need no change:
+- **`Pv:Chargers` is ignored** since 1.4 (#445), with a warning at startup naming the plugin that replaced
+  the built-in driver it chose. Remove it. See [Your charger](CHARGER_SETUP.md#moving-from-a-built-in-driver-13--14).
+- **The charger is behind a plugin**, on the [charger hub](PROVIDERS.md#the-charger-kind), always on.
+  The charge-control limits are checked against what the plugin's charger can do when it connects, not at
+  startup. How long Gleanvolt waits for the plugin is the `ExternalCharger` section; the defaults need no
+  change:
 
   ```jsonc
   "ExternalCharger": {
@@ -126,8 +111,8 @@ Installation**. The keys below are the reference behind those forms.
 
 **Checked at startup.** A configuration that cannot describe a site stops the controller with every
 problem listed, each naming its key: an id that is not a slug, a latitude without a longitude, a tilt
-outside 0–90, a loss factor outside (0, 1], an unparsable install date, a missing inverter or charger
-address (except for the `external` driver), an unknown driver, an unmetered phase that is not a phase, or two chargers. (In
+outside 0–90, a loss factor outside (0, 1], an unparsable install date, a missing inverter address, an unknown
+driver, or an unmetered phase that is not a phase. (In
 [setup mode](WEB_UI.md#setup-mode) these are listed on the setup page instead.)
 
 ### Keys that have moved
@@ -137,13 +122,14 @@ A configuration that still sets a retired key **stops at startup**, naming the r
 | Retired | Replaced by |
 | --- | --- |
 | `Solax:Inverter` | `Pv:Inverter` |
-| `Solax:EvCharger` | `Pv:Chargers:0` |
+| `Solax:EvCharger` | `Pv:Chargers:0`, itself ignored since 1.4: the charger is its plugin's |
 | `Solax:PollIntervalSeconds` | `Controller:PollIntervalSeconds` |
 | `Weather:Latitude` | `Pv:Latitude` |
 | `Weather:Longitude` | `Pv:Longitude` |
 | `HomeAssistant:DeviceName` | `Pv:Name` |
 
-The `deploy/.env` names (`INVERTER_HOST`, `EV_CHARGER_HOST`) did not change.
+The `deploy/.env` names (`INVERTER_HOST`, `EV_CHARGER_HOST`) did not change. `EV_CHARGER_HOST` is the charger
+plugin's address.
 
 ## The data directory holds secrets (the `Secrets` section)
 

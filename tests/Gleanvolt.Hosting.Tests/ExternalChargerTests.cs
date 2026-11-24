@@ -340,12 +340,11 @@ public sealed class ExternalChargerTests : IAsyncLifetime, IDisposable
         InverterCapacityWatts: null,
         LossFactor: null,
         InstallDate: null,
-        Inverter: new PvDeviceInfo("Inverter", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.1" }),
-        Chargers: [new PvDeviceInfo("charger", string.Empty, string.Empty, new DeviceConfig { Host = string.Empty }) { Driver = "external" }]);
+        Inverter: new PvDeviceInfo("Inverter", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.1" }));
 
     // The driver the control loop gets, as the container makes it.
     private IEvChargerDriver Driver(bool dryRun = false) =>
-        new ExternalChargerDriverFactory(Link).Create(EvChargerConnection.External, new EvChargerDriverOptions { DryRun = dryRun });
+        new ExternalChargerDriver(Link, options: new EvChargerDriverOptions { DryRun = dryRun });
 
     // The fake charger behind the ordinary SDK, on this TestServer.
     private Task<ChargerProviderConnection> StartPluginAsync(bool publishes = true) =>

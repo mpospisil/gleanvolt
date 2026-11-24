@@ -13,7 +13,7 @@ There are five **kinds** of provider:
 | `solar-forecast` | Solcast | `/providers/solar-forecast` | Choosing **External** under **Settings → Solar forecast** and saving |
 | `vehicle` | The car's built-in feeds (volkswagen.de, MyŠkoda, Data Act) | `/providers/vehicle` | Choosing **An external provider** on the **Car** page, saving and restarting |
 | `weather` | The built-in OpenWeatherMap, removed in #425 | `/providers/weather` | Choosing **External** under **Settings → Weather** and saving |
-| `charger` | A charger driver built into Gleanvolt | `/providers/charger` | Choosing **External plugin** as the charger's brand on **Settings**, saving and restarting |
+| `charger` | The charger drivers built into Gleanvolt, removed in 1.4 (#445) | `/providers/charger` | Always on |
 
 Gleanvolt holds one active provider per kind. The owner sees each kind's session on Settings, and a
 program can read it at [`GET /api/v1/providers`](HTTP_API.md).
@@ -317,12 +317,10 @@ Most plugins are built with the solution and run by hand. A **shipped** one is r
 | [Shelly TopAC](https://github.com/mpospisil/gleanvolt-chargers/tree/main/shelly) | charger | `ghcr.io/mpospisil/gleanvolt-plugin-shelly` | `shelly` | 8097 | on its own release |
 
 Only a plugin that replaces or stands in for a built-in ships. The samples and the Volkswagen copy don't. **The charger
-plugins ship** (#444): they replace the built-in charger drivers, which are deprecated in 1.3 and removed in 1.4
-(#445). They are released from gleanvolt-chargers on their own tags (`solax-v1.0.0`), each with its image and zips,
+plugins ship** (#444): they replaced the built-in charger drivers, which 1.4 removed (#445). They are released from gleanvolt-chargers on their own tags (`solax-v1.0.0`), each with its image and zips,
 so a charger fix needs no Gleanvolt release; the compose files and the deploy scripts run them like the OpenWeather
-plugin, at their own version (`SOLAX_PLUGIN_TAG`; unset is the newest). At most one charger plugin runs, and with
-one the deploy scripts set `ExternalCharger:UsePlugin`, so the controller drives the charger through it whatever the
-charger's brand says.
+plugin, at their own version (`SOLAX_PLUGIN_TAG`; unset is the newest). At most one charger plugin runs, and it is
+the only way the controller reaches the charger.
 
 - **In Docker** (the Pi, a NAS): the image, `linux/amd64` and `linux/arm64`, with Gleanvolt's tags:
   `latest`, the version, `sha-…`. The compose files run it under the plugin's profile, on the host's
@@ -673,9 +671,8 @@ recorded without the weather; there is nothing to fall back to.
 
 Hub: `/providers/charger` (#435). A program outside Gleanvolt **is** the EV charger's driver: it reads the
 charger when asked and carries out Gleanvolt's two commands, so a charger Gleanvolt has no driver for can
-be controlled without a new Gleanvolt. Unlike every other kind, this one writes to a device. Turned on by
-`Pv:Chargers:0:Driver` = `external`, which **Settings** writes as the charger brand **External plugin**,
-after a restart. The charger then needs no address in Gleanvolt; the plugin has it.
+be controlled without a new Gleanvolt. Unlike every other kind, this one writes to a device. Always on: since
+1.4 (#445) every charger is behind a plugin, and Gleanvolt has no address for it; the plugin has it.
 
 **Gleanvolt keeps the safeguards on its side.** The driver contract's rules hold whatever the plugin does:
 
@@ -786,8 +783,7 @@ back, when the mode resumes by itself. So report `healthy: false` only for somet
 being controlled, and `healthy: true` again as soon as it is fixed. See
 [When the charger is unavailable](CHARGE_CONTROL.md#when-the-charger-is-unavailable).
 
-**What Gleanvolt does with it.** Everything a built-in charger driver does: the Overview, the charging
-modes, sessions, Home Assistant. **Settings → External providers** shows the session, the remembered
+**What Gleanvolt does with it.** Everything: the Overview, the charging modes, sessions, Home Assistant. **Settings → External providers** shows the session, the remembered
 plugin with **Forget**, the last refusal, and links to the plugin's page. There is no register snapshot.
 
 ## The protocol, for a client in another language

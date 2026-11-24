@@ -5,9 +5,7 @@ using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Devices;
 using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Models;
-using Gleanvolt.Infrastructure.Http;
 using Gleanvolt.Infrastructure.Modbus;
-using Gleanvolt.Infrastructure.RegisterMaps;
 using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Hosting.Configuration;
@@ -33,9 +31,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
     private readonly PvSystemOverridesProvider? _overrides;
     private readonly IReadOnlyDictionary<string, string?> _running;
     private readonly Func<DeviceConfig, IModbusClient> _clientFactory;
-    private readonly Func<DeviceConfig, HttpClient> _httpClientFactory;
     private readonly IReadOnlyList<IInverterDriverFactory> _inverterDrivers;
-    private readonly IReadOnlyList<IEvChargerDriverFactory> _chargerDrivers;
     private readonly ILogger<PvSystemEditor> _logger;
 
     // Two browser tabs saving at once must not interleave a read-modify-write of the same file.
@@ -51,9 +47,7 @@ public sealed class PvSystemEditor : IPvSystemEditor
         IReadOnlyDictionary<string, string?> running,
         ILogger<PvSystemEditor> logger,
         Func<DeviceConfig, IModbusClient>? clientFactory = null,
-        IReadOnlyList<IInverterDriverFactory>? inverterDrivers = null,
-        IReadOnlyList<IEvChargerDriverFactory>? chargerDrivers = null,
-        Func<DeviceConfig, HttpClient>? httpClientFactory = null)
+        IReadOnlyList<IInverterDriverFactory>? inverterDrivers = null)
     {
         _configuration = configuration as IConfigurationRoot;
         _overrides = PvSystemOverrides.Find(configuration);
@@ -61,13 +55,8 @@ public sealed class PvSystemEditor : IPvSystemEditor
         _logger = logger;
         _clientFactory = clientFactory ?? (device => new ModbusTcpClient(device.ToEndpoint()));
 
-        // Read-only, as the Modbus probe's client is: an address nobody has confirmed is never written to.
-        _httpClientFactory = httpClientFactory
-            ?? (device => ChargerHttpClients.Create(device, writable: false, NullLogger<ReadOnlyHttpHandler>.Instance));
         _inverterDrivers = inverterDrivers ?? [.. Gleanvolt.Hosting.InverterDrivers.Factories.Select(make => make(null))];
         InverterDrivers = [.. _inverterDrivers.Select(InverterDriverInfo.Of)];
-        _chargerDrivers = chargerDrivers ?? [.. Gleanvolt.Hosting.ChargerDrivers.Factories.Select(make => make(null))];
-        ChargerDrivers = [.. _chargerDrivers.Select(EvChargerDriverInfo.Of)];
     }
 
     /// <summary>Each editable key's value in <paramref name="configuration"/>, for the <c>running</c> argument.</summary>
@@ -75,11 +64,6 @@ public sealed class PvSystemEditor : IPvSystemEditor
         PvSystemSettingKeys.All.ToDictionary(key => key, key => configuration[key], StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyList<InverterDriverInfo> InverterDrivers { get; }
-
-    public IReadOnlyList<EvChargerDriverInfo> ChargerDrivers { get; }
-
-    public bool ChargerPluginForced =>
-        _configuration?.GetValue<bool>(Chargers.ExternalChargerOptions.SectionName + ":" + nameof(Chargers.ExternalChargerOptions.UsePlugin)) == true;
 
     public PvSystemSettings Read()
     {
@@ -153,7 +137,6 @@ public sealed class PvSystemEditor : IPvSystemEditor
     }
 
     public async Task<DeviceProbeResult> ProbeAsync(
-        PvDeviceRole role,
         string host,
         int port,
         byte unitId,
@@ -163,104 +146,36 @@ public sealed class PvSystemEditor : IPvSystemEditor
     {
         var address = $"{host}:{port}";
 
-        // A charger behind a plugin (#435) has no address: its probe is a reading through the connected plugin.
-        if (role == PvDeviceRole.Charger && ChargerDriverFactory(driver, host) is { Transport: EvChargerTransport.External } plugin)
-        {
-            return await ProbePluginAsync(plugin, cancellationToken).ConfigureAwait(false);
-        }
-
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(ProbeTimeout);
 
         try
         {
-            // A charger reached over HTTP (go-e, #352) is probed over HTTP, on a client that passes only reads.
-            if (role == PvDeviceRole.Charger && ChargerDriverFactory(driver, host) is { Transport: EvChargerTransport.Http } httpFamily)
-            {
-                using var http = _httpClientFactory(new DeviceConfig { Host = host, Port = port, UnitId = unitId });
-                var apiProbe = await httpFamily.Create(EvChargerConnection.Over(http), new EvChargerDriverOptions { DryRun = true })
-                    .ProbeAsync(timeout.Token).ConfigureAwait(false);
-                var answer = (long)Math.Round(apiProbe.Reading);
-
-                return apiProbe.Recognised
-                    ? new DeviceProbeResult(true, true, $"{address} answered: the charger's API reports car state {answer}.",
-                        Phrase.Of("Probe.ChargerApiOk", new PhraseArg.Text(address), new PhraseArg.Number(answer)))
-                    : new DeviceProbeResult(true, false,
-                        $"{address} answered (HTTP {answer}), but not with the selected charger's API. "
-                        + "Is its local HTTP API switched on?",
-                        Phrase.Of("Probe.ChargerApiImplausible", new PhraseArg.Text(address), new PhraseArg.Number(answer)));
-            }
-
             await using var client = _clientFactory(new DeviceConfig { Host = host, Port = port, UnitId = unitId });
             await client.ConnectAsync(timeout.Token).ConfigureAwait(false);
 
-            if (role == PvDeviceRole.Inverter)
-            {
-                // Through the driver, so "Test connection" asks whatever the family's own probe asks. The
-                // client refuses writes, and the probe makes none: an address nobody has confirmed yet is
-                // never written to.
-                var inverter = InverterDriverFactory(driver).Create(
-                    new ReadOnlyModbusClient(client, NullLogger<ReadOnlyModbusClient>.Instance),
-                    new InverterDriverOptions { DryRun = true, Topology = KnownTopology(driver, inverterTopology) });
-                var probe = await inverter.ProbeAsync(timeout.Token).ConfigureAwait(false);
-                var reading = (long)Math.Round(probe.Reading);
+            // Through the driver, so "Test connection" asks whatever the family's own probe asks. The
+            // client refuses writes, and the probe makes none: an address nobody has confirmed yet is
+            // never written to.
+            var inverter = InverterDriverFactory(driver).Create(
+                new ReadOnlyModbusClient(client, NullLogger<ReadOnlyModbusClient>.Instance),
+                new InverterDriverOptions { DryRun = true, Topology = KnownTopology(driver, inverterTopology) });
+            var probe = await inverter.ProbeAsync(timeout.Token).ConfigureAwait(false);
+            var reading = (long)Math.Round(probe.Reading);
 
-                return probe.Recognised
-                    ? new DeviceProbeResult(true, true, $"{address} answered: battery at {reading} %.",
-                        Phrase.Of("Probe.InverterOk", new PhraseArg.Text(address), new PhraseArg.Number(reading)))
-                    : new DeviceProbeResult(true, false,
-                        $"{address} answered, but it does not look like an inverter of the selected brand "
-                        + $"(battery register: {reading}). Is this the charger's address?",
-                        Phrase.Of("Probe.InverterImplausible", new PhraseArg.Text(address), new PhraseArg.Number(reading)));
-            }
-
-            // The charger's probe is its driver's too (#349), on a client that cannot write.
-            var charger = ChargerDriverFactory(driver, host).Create(
-                EvChargerConnection.Over(new ReadOnlyModbusClient(client, NullLogger<ReadOnlyModbusClient>.Instance)),
-                new EvChargerDriverOptions { DryRun = true });
-            return ChargerProbeResult(address, await charger.ProbeAsync(timeout.Token).ConfigureAwait(false));
+            return probe.Recognised
+                ? new DeviceProbeResult(true, true, $"{address} answered: battery at {reading} %.",
+                    Phrase.Of("Probe.InverterOk", new PhraseArg.Text(address), new PhraseArg.Number(reading)))
+                : new DeviceProbeResult(true, false,
+                    $"{address} answered, but it does not look like an inverter of the selected brand "
+                    + $"(battery register: {reading}). Is this the charger's address?",
+                    Phrase.Of("Probe.InverterImplausible", new PhraseArg.Text(address), new PhraseArg.Number(reading)));
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             return new DeviceProbeResult(false, false, $"{address} did not answer ({ex.Message}).",
                 Phrase.Of("Probe.NoAnswer", new PhraseArg.Text(address), new PhraseArg.Text(ex.Message)));
         }
-    }
-
-    private async Task<DeviceProbeResult> ProbePluginAsync(IEvChargerDriverFactory plugin, CancellationToken cancellationToken)
-    {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(ProbeTimeout);
-
-        try
-        {
-            var probe = await plugin.Create(EvChargerConnection.External, new EvChargerDriverOptions { DryRun = true })
-                .ProbeAsync(timeout.Token).ConfigureAwait(false);
-            var watts = (long)Math.Round(probe.Reading);
-            return new DeviceProbeResult(true, true, $"The charger plugin answered: the charger delivers {watts} W.",
-                Phrase.Of("Probe.ChargerPluginOk", new PhraseArg.Number(watts)));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-        {
-            // Said, not refused: the plugin may well be started after the save, as its README says.
-            return new DeviceProbeResult(false, false,
-                $"No charger plugin answered ({ex.Message}). Start it with the provider token from Settings → External providers; "
-                + "Gleanvolt accepts it after the restart.",
-                Phrase.Of("Probe.ChargerPluginMissing", new PhraseArg.Text(ex.Message)));
-        }
-    }
-
-    private static DeviceProbeResult ChargerProbeResult(string address, EvChargerProbeResult chargerProbe)
-    {
-        var value = (long)Math.Round(chargerProbe.Reading);
-
-        return chargerProbe.Recognised
-            ? new DeviceProbeResult(true, true, $"{address} answered: charger run mode {value}.",
-                Phrase.Of("Probe.ChargerOk", new PhraseArg.Text(address), new PhraseArg.Number(value)))
-            : new DeviceProbeResult(true, false,
-                $"{address} answered, but its run-mode register reads {value}, which no charger "
-                + "reports. Is this the inverter's address?",
-                Phrase.Of("Probe.ChargerImplausible", new PhraseArg.Text(address), new PhraseArg.Number(value)));
     }
 
     // The driver the form has selected. An id this host does not have probes with the default: the save
@@ -271,15 +186,6 @@ public sealed class PvSystemEditor : IPvSystemEditor
         return _inverterDrivers.FirstOrDefault(candidate => candidate.Id == wanted)
             ?? _inverterDrivers.FirstOrDefault(candidate => candidate.Id == PvSystemRules.DefaultInverterDriver)
             ?? _inverterDrivers[0];
-    }
-
-    // As for the inverter: an id this host does not have probes with the default, and the save says why.
-    private IEvChargerDriverFactory ChargerDriverFactory(string? id, string? host)
-    {
-        var wanted = PvSystemRules.ChargerDriverId(id, host);
-        return _chargerDrivers.FirstOrDefault(candidate => candidate.Id == wanted)
-            ?? _chargerDrivers.FirstOrDefault(candidate => candidate.Id == PvSystemRules.DefaultChargerDriver)
-            ?? _chargerDrivers[0];
     }
 
     // The topology the form has selected, if the driver has it; anything else probes the default, and the
@@ -314,6 +220,12 @@ public sealed class PvSystemEditor : IPvSystemEditor
 
             var before = new Dictionary<string, string>(stored, StringComparer.OrdinalIgnoreCase);
             change(stored);
+
+            // A charger saved here before 1.4 (#445) means nothing now: it goes with the next change.
+            foreach (var key in stored.Keys.Where(RemovedChargerSettings.IsChargerKey).ToList())
+            {
+                stored.Remove(key);
+            }
 
             if (stored.Count == before.Count
                 && stored.All(entry => before.TryGetValue(entry.Key, out var old) && old == entry.Value))

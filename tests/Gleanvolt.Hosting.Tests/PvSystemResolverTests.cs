@@ -19,7 +19,6 @@ public class PvSystemResolverTests
     private static readonly (string Key, string? Value)[] PvDevices =
     [
         ("Pv:Inverter:Host", "192.168.2.10"),
-        ("Pv:Chargers:0:Host", "192.168.2.6"),
     ];
 
     private static (string Key, string? Value)[] WithDevices(params (string Key, string? Value)[] settings) =>
@@ -39,11 +38,7 @@ public class PvSystemResolverTests
             ("Pv:LossFactor", "0.9"),
             ("Pv:InstallDate", "2024-05-01"),
             ("Pv:Inverter:Model", "SolaX X3-HYB-G4 PRO"),
-            ("Pv:Inverter:Host", "192.168.2.10"),
-            ("Pv:Chargers:0:Id", "wallbox"),
-            ("Pv:Chargers:0:Name", "Garage wallbox"),
-            ("Pv:Chargers:0:Model", "SolaX X3-HAC"),
-            ("Pv:Chargers:0:Host", "192.168.2.6"));
+            ("Pv:Inverter:Host", "192.168.2.10"));
 
         Assert.Equal("home-roof", site.Id);
         Assert.Equal("Home Roof", site.Name);
@@ -58,12 +53,6 @@ public class PvSystemResolverTests
 
         Assert.Equal("SolaX X3-HYB-G4 PRO", site.Inverter.Model);
         Assert.Equal("192.168.2.10", site.Inverter.Connection.Host);
-
-        var charger = Assert.Single(site.Chargers);
-        Assert.Equal("wallbox", charger.Id);
-        Assert.Equal("Garage wallbox", charger.Name);
-        Assert.Equal("SolaX X3-HAC", charger.Model);
-        Assert.Equal("192.168.2.6", charger.Connection.Host);
     }
 
     [Fact]
@@ -74,15 +63,6 @@ public class PvSystemResolverTests
         Assert.Equal(502, site.Inverter.Connection.Port);
         Assert.Equal(1, site.Inverter.Connection.UnitId);
         Assert.Equal(TimeSpan.FromMilliseconds(250), site.Inverter.Connection.MinRequestInterval);
-        Assert.Equal(502, site.Chargers[0].Connection.Port);
-    }
-
-    [Fact]
-    public void AChargerWithNoIdOfItsOwnGetsOne()
-    {
-        var site = Resolve(WithDevices());
-
-        Assert.Equal(PvSystemResolver.DefaultChargerId, Assert.Single(site.Chargers).Id);
     }
 
     [Fact]
@@ -134,45 +114,21 @@ public class PvSystemResolverTests
     [Fact]
     public void NoInverterIsAStartupFailureRatherThanAConnectionErrorLater()
     {
-        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(("Pv:Chargers:0:Host", "192.168.2.6")));
+        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(("Pv:Name", "Home")));
 
         Assert.Contains("Pv:Inverter:Host", error.Message);
     }
 
-    [Fact]
-    public void NoChargerIsTheChargerBehindAPlugin()
-    {
-        // The charger isn't part of setup (#442): whichever plugin connects to the charger hub is the charger.
-        var site = Resolve(("Pv:Inverter:Host", "192.168.2.10"));
-
-        var charger = Assert.Single(site.Chargers);
-        Assert.Equal("external", charger.Driver);
-        Assert.Equal("charger", charger.Id);
-    }
-
     [Theory]
-    [InlineData("", "", "external")]
-    [InlineData("", "192.168.2.6", "solax")]
-    [InlineData("goe", "192.168.2.6", "goe")]
-    public void AnEmptyDriverIsSolaxWithAHostAndThePluginWithout(string driver, string host, string expected)
+    [InlineData("", "192.168.2.6")]
+    [InlineData("goe", "")]
+    [InlineData("wallco", "")]
+    public void A_charger_from_before_1_4_is_ignored_rather_than_refused(string driver, string host)
     {
-        var site = Resolve(("Pv:Inverter:Host", "192.168.2.10"), ("Pv:Chargers:0:Driver", driver), ("Pv:Chargers:0:Host", host));
+        // #445: no built-in charger drivers are left. An upgraded installation's charger starts on the plugin.
+        var site = Resolve(WithDevices(("Pv:Chargers:0:Driver", driver), ("Pv:Chargers:0:Host", host), ("Pv:Chargers:1:Host", "192.168.2.7")));
 
-        Assert.Equal(expected, Assert.Single(site.Chargers).Driver);
-    }
-
-    [Fact]
-    public void ASecondChargerIsRefusedRatherThanSilentlyIgnored()
-    {
-        // Configuration can express two so that it need not change shape when the control logic can
-        // drive two. Accepting the first and dropping the second would mean a car that never charges
-        // and nothing anywhere saying why.
-        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(
-            ("Pv:Inverter:Host", "192.168.2.10"),
-            ("Pv:Chargers:0:Host", "192.168.2.6"),
-            ("Pv:Chargers:1:Host", "192.168.2.7")));
-
-        Assert.Contains("Only 1 EV charger is supported", error.Message);
+        Assert.Equal("192.168.2.10", site.Inverter.Connection.Host);
     }
 
     [Fact]
@@ -211,19 +167,6 @@ public class PvSystemResolverTests
         var site = Resolve(WithDevices());
 
         Assert.Equal(string.Empty, site.Id);
-    }
-
-    [Fact]
-    public void TwoChargersCannotShareAnId()
-    {
-        var error = Assert.ThrowsAny<InvalidOperationException>(() => Resolve(
-            ("Pv:Inverter:Host", "192.168.2.10"),
-            ("Pv:Chargers:0:Id", "wallbox"),
-            ("Pv:Chargers:0:Host", "192.168.2.6"),
-            ("Pv:Chargers:1:Id", "wallbox"),
-            ("Pv:Chargers:1:Host", "192.168.2.7")));
-
-        Assert.Contains("used by more than one charger", error.Message);
     }
 
     [Theory]

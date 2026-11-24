@@ -111,18 +111,6 @@
   <data name="Probe_InverterImplausible" xml:space="preserve">
     <value>{0} odpovídá, ale nevypadá jako střídač zvolené značky (registr baterie: {1}). Není to adresa nabíječky?</value>
   </data>
-  <data name="Probe_ChargerOk" xml:space="preserve">
-    <value>{0} odpovídá: provozní režim nabíječky {1}.</value>
-  </data>
-  <data name="Probe_ChargerImplausible" xml:space="preserve">
-    <value>{0} odpovídá, ale registr provozního režimu ukazuje {1}, což žádná nabíječka nehlásí. Není to adresa střídače?</value>
-  </data>
-  <data name="Probe_ChargerApiOk" xml:space="preserve">
-    <value>{0} odpovídá: API nabíječky hlásí stav auta {1}.</value>
-  </data>
-  <data name="Probe_ChargerApiImplausible" xml:space="preserve">
-    <value>{0} odpovídá (HTTP {1}), ale ne API zvolené nabíječky. Je zapnuté její místní HTTP API?</value>
-  </data>
   <data name="Probe_NoAnswer" xml:space="preserve">
     <value>{0} neodpovídá ({1}).</value>
   </data>
@@ -366,9 +354,6 @@
   <data name="Config_PvDriver" xml:space="preserve">
     <value>Pv:Inverter:Driver ('{0}') není ovladač střídače, který tento Gleanvolt zná. Známé ovladače: {1}. Prázdná hodnota znamená {2}.</value>
   </data>
-  <data name="Config_PvChargerDriver" xml:space="preserve">
-    <value>{0}:Driver ('{1}') není ovladač nabíječky, který tento Gleanvolt zná. Známé ovladače: {2}. Prázdná hodnota znamená {3}.</value>
-  </data>
   <data name="Config_ChargerMinAmps" xml:space="preserve">
     <value>ChargeControl:MinChargingCurrentAmps ({0} A) je pod nejnižším proudem, při kterém nabíječka {1} nabíjí ({2} A).</value>
   </data>
@@ -398,18 +383,6 @@
   </data>
   <data name="Config_PvNoInverter" xml:space="preserve">
     <value>Není nastaven žádný střídač. Nastavte Pv:Inverter:Host.</value>
-  </data>
-  <data name="Config_PvOneCharger" xml:space="preserve">
-    <value>Podporována je jen {0} nabíječka; Pv:Chargers jich obsahuje {1}. Konfigurace umožňuje zadat víc nabíječek, aby se nemusela měnit, až je řízení bude umět obsluhovat. Zatím to neumí.</value>
-  </data>
-  <data name="Config_PvChargerIdSlug" xml:space="preserve">
-    <value>{0}:Id ('{1}') musí být slug: malá písmena, číslice, '-' a '_'.</value>
-  </data>
-  <data name="Config_PvChargerIdTwice" xml:space="preserve">
-    <value>{0}:Id ('{1}') používá víc nabíječek; každé ID musí být jedinečné.</value>
-  </data>
-  <data name="Config_PvHostRequired" xml:space="preserve">
-    <value>{0}:Host je povinný.</value>
   </data>
   <data name="Config_PvPort" xml:space="preserve">
     <value>{0}:Port ({1}) není port TCP.</value>
@@ -777,12 +750,6 @@
   </data>
   <data name="Config_SetupBadWeatherSource" xml:space="preserve">
     <value>Weather:Source ('{0}') musí být NotProvided nebo External: OpenWeatherMap teď dodává plugin OpenWeather, vybraný jako External.</value>
-  </data>
-  <data name="Probe_ChargerPluginOk" xml:space="preserve">
-    <value>Plugin nabíječky odpovídá: nabíječka dodává {0} W.</value>
-  </data>
-  <data name="Probe_ChargerPluginMissing" xml:space="preserve">
-    <value>Žádný plugin nabíječky neodpovídá ({0}). Spusťte ho s tokenem z Nastavení → Externí zdroje dat; Gleanvolt ho přijme po restartu.</value>
   </data>
   <data name="Charger_Empty" xml:space="preserve">
     <value>Údaj je prázdný.</value>

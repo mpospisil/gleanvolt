@@ -170,6 +170,12 @@ while (true)
             host.Services.GetRequiredService<PvSystemInfo>().Describe(),
             PvSystemOverrides.DescribeLoaded(builder.Configuration));
 
+        // A built-in charger configured before 1.4 (#445): ignored, and said so.
+        if (RemovedChargerSettings.Warning(builder.Configuration) is { } removed)
+        {
+            log.LogWarning("{Warning}", removed);
+        }
+
         // Recommended but not set: the controller runs without these, so a line each rather than a stop.
         foreach (var problem in setup.AtStartup.Recommended)
         {

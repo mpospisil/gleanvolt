@@ -4,6 +4,45 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-24 — The built-in charger drivers are removed; the charger is always a plugin's (#445)
+
+**Found.** After #444 every built-in charger driver had a plugin in gleanvolt-chargers, and the Pi already ran its
+SolaX charger through one. What kept the drivers alive was the overlay (`ExternalCharger:UsePlugin`) that stopped
+them and the plugin from both opening a charger that serves one Modbus client. That safety depended on a deploy
+setting being right, and every charger fix still had to be made twice.
+
+**Decided.**
+- **No charger code in Gleanvolt.** Gone: `Gleanvolt.Devices.GoE`, the SCharger driver and its register map, the
+  SolaX charger driver, its register map and use-modes, `IEvChargerDriverFactory` with `EvChargerConnection` and
+  `EvChargerTransport`, `ChargerDrivers`, the charger HTTP client, the HTTP dump, the charger's register snapshot
+  (#350) and the charger rules in discovery (SolaX charger serials, the SCharger's phase voltages, go-e's API).
+  `IEvChargerDriver` stays as the control path's seam, with one implementation, `ExternalChargerDriver`.
+- **Gleanvolt opens no connection to the charger.** No keyed Modbus or HTTP client for it, in any mode. The charger
+  hub is always on. A test asserts the container has no charger client.
+- **`Pv:Chargers` is ignored with a warning, not refused.** Unlike a retired key, it can't run the controller
+  against the wrong device any more, and an upgraded `.env` still has `EV_CHARGER_HOST`, which the plugin's container
+  reads. The warning names the plugin that replaced the driver it chose (`ChargerPlugins.Replacing(driver, host)`:
+  an empty driver with a host was SolaX). A charger saved on Settings in 1.3 is dropped from `pv-system.json` by the
+  next save of Settings → Installation, since nothing else can remove it.
+- **The upgrade is the deploy script's.** With `EV_CHARGER_HOST` set and no charger plugin in `GLEANVOLT_PLUGINS`, it
+  runs the plugin for `PV_CHARGER_DRIVER` (`solax` when unset) and says so. `ExternalCharger:UsePlugin` and
+  `GLEANVOLT_CHARGER_PLUGIN` are gone.
+- **Startup no longer checks `ChargeControl`'s limits;** the hub does at the plugin's hello (#440), by the same
+  `PvSystemRules.CheckChargeLimits`, which now takes a name and capabilities instead of a driver description.
+- **The site API drops `chargers` and `chargerDriver`,** and `PvSystemInfo` its `Chargers`. Discovery's roles keep
+  `PvDeviceRole` with only `Inverter`, so a result still says what it found.
+
+**Consequences accepted.**
+- A breaking release: the API's site response, the `Gleanvolt.Devices.Abstractions` package (no factory, no
+  connection types, no `ProbeAsync`) and the end of the `Gleanvolt.Devices.GoE` package.
+- The wizard's search no longer tells a charger from an unknown device. A charger shows as *not an inverter
+  Gleanvolt knows*, which still stops it being picked as the inverter; each plugin has its own search.
+- An installation run by hand that set none of this up has no charger until a plugin connects, and no mode starts
+  until then (#441). The warning at startup says which plugin to start.
+- Settings → Installation's "Test connection" probes only the inverter.
+
+---
+
 ## 2026-11-24 — In charge-control dry run, no mode holds the battery
 
 **Found.** On the Pi, a dry-run FastNoBattery charge armed the battery discharge hold, because the hold has its

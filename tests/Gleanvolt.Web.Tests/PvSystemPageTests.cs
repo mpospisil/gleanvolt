@@ -30,8 +30,7 @@ public class PvSystemPageTests : BunitContext
         double? peakPowerWatts = 9_200,
         double? inverterCapacityWatts = 8_000,
         double? lossFactor = 0.9,
-        DateOnly? installDate = null,
-        IReadOnlyList<PvDeviceInfo>? chargers = null) =>
+        DateOnly? installDate = null) =>
         new(
             id,
             name,
@@ -44,8 +43,7 @@ public class PvSystemPageTests : BunitContext
             inverterCapacityWatts,
             lossFactor,
             installDate ?? new DateOnly(2024, 5, 1),
-            Device("Inverter", string.Empty, "SolaX X3-HYB-G4 PRO", "192.168.2.10"),
-            chargers ?? [Device("wallbox", "Garage wallbox", "SolaX X3-HAC", "192.168.2.6")]);
+            Device("Inverter", string.Empty, "SolaX X3-HYB-G4 PRO", "192.168.2.10"));
 
     /// <summary>An ID.4 Pro: 77 kWh usable, three phases, 6–16 A.</summary>
     private static EvInfo Car(int? phases = 3, int? minAmps = 6, int? maxAmps = 16) => new(

@@ -39,7 +39,7 @@
 {
     case WizardStep.Inverter:
         <p class="muted">@SetupText.InverterIntro</p>
-        <DeviceDiscoveryPanel OnChosen="Choose" InverterOnly="true" />
+        <DeviceDiscoveryPanel OnChosen="Choose" />
         <PvSystemEditorForm Sections="InverterSections" Suggested="_suggested" OnSaved="StateHasChanged" />
         break;
 

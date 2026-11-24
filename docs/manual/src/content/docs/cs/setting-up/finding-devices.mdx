@@ -12,18 +12,17 @@ nastavuje na vlastní stránce svého pluginu: viz [Vaše nabíječka](../charge
 V kroku průvodce **Střídač** klikněte na **Hledat**. Gleanvolt zkusí každou adresu v domácí síti, jestli
 na ní není zařízení, které zná. Domácí síť zabere minutu nebo dvě.
 
-![Výsledky hledání: střídač na 192.168.1.10 a nabíječka na 192.168.1.11, každý s tlačítkem „Use as inverter“, a nerozpoznané zařízení na 192.168.1.1.](../../../../assets/screenshots/wizard-search.png)
+![Výsledky hledání: střídač na 192.168.1.10 a nerozpoznaná nabíječka na 192.168.1.11, každý s tlačítkem „Use as inverter“, a webová stránka na 192.168.1.1.](../../../../assets/screenshots/wizard-search.png)
 
 Každý řádek je jedno zařízení, které odpovědělo:
 
 - **Adresa**: kde v síti je, například `192.168.1.10:502 · unit 1`. Číslo za dvojtečkou je port a unit je
   číslo zařízení na tom portu. Pamatovat si je nemusíte: výběr zařízení je vyplní.
-- **Rozpoznáno jako**: model, který zařízení nahlásilo, a zda o sobě říká, že je střídač, nebo nabíječka.
-- **nerozpoznáno**: něco odpovědělo, ale není to zařízení, které Gleanvolt zná, třeba váš router.
-  Nevšímejte si ho.
+- **Rozpoznáno jako**: model, který střídač nahlásil.
+- **nerozpoznáno**: něco odpovědělo, ale není to střídač, který Gleanvolt zná, třeba váš router.
+  Takhle se ukáže i vaše nabíječka: najde ji její plugin, ne Gleanvolt.
 
-U svého střídače klikněte na **Použít jako střídač** a potom pod seznamem na **Uložit**. Nabíječka je
-v seznamu také, abyste obě zařízení rozlišili, ale průvodce ji nenastavuje.
+U svého střídače klikněte na **Použít jako střídač** a potom pod seznamem na **Uložit**.
 
 :::tip[Hledat můžete i později]
 Po nastavení je průvodce stále na `http://gleanvolt.local:8090/wizard`. Otevřete ho a hledejte znovu,
@@ -34,7 +33,7 @@ například po výměně zařízení.
 
 | Co vidíte | Co to znamená | Co dělat |
 |---|---|---|
-| Nic, nebo jen řádky „nerozpoznáno“ | Modbus TCP (nebo místní API go-e) je vypnutý | Zapněte ho: viz [Příprava střídače a nabíječky](../../installation/preparing-devices/) |
+| Nic, nebo jen řádky „nerozpoznáno“ | Modbus TCP je na střídači vypnutý | Zapněte ho: viz [Příprava střídače a nabíječky](../../installation/preparing-devices/) |
 | *Port open, no Modbus reply* | K zařízení je připojené něco jiného | Vypněte integraci Home Assistant, evcc nebo jiný software, který s ním mluví, a hledejte znovu |
 | Píše, že prohledal síť 172.x | Gleanvolt běží v kontejneru, který domácí síť nevidí | Do pole **Síť** napište rozsah domácí sítě, například `192.168.1.0/24`, nebo spusťte kontejner v síti hostitele |
 | Zařízení je v jiné síti, třeba v oddělené Wi-Fi pro chytrá zařízení | Hledání hledá jen tam, kam mu řeknete | Napište do pole **Síť** rozsah té sítě |
@@ -57,19 +56,13 @@ nepotřebujete. Vyplňte formulář pod ním:
 Značka vyplní svůj obvyklý port a unit ID. Střídač Huawei za EMMA potřebuje ještě **Připojení přes:
 EMMA** a jako adresu adresu EMMA.
 
-:::note[Nabíječka zabudovaná v Gleanvoltu]
-**Nastavení → Instalace** má stále část **Nabíječka** se zabudovanými ovladači SolaX, Huawei SCharger
-a go-e, pro instalace, které je už používají. Nahrazují je pluginy. Nová instalace nechá značku nabíječky
-na **Externí plugin** a postupuje podle stránky [Vaše nabíječka](../charger/).
-:::
-
 ## Při uložení
 
 Gleanvolt ze střídače přečte jednu hodnotu, aby ověřil, že adresa odpovídá a že zařízení je to, za co jste
 ho označili:
 
-- Pokud adresa odpovídá jako nabíječka, upozorní vás. Obě používají stejný port, takže adresa nabíječky
-  by se připojila bez potíží a potom ukazovala zamrzlou baterii a žádné slunce.
+- Pokud to, co odpoví, nevypadá jako střídač zvolené značky, upozorní vás. Nabíječka používá stejný port,
+  takže adresa nabíječky by se připojila bez potíží a potom ukazovala zamrzlou baterii a žádné slunce.
 - Pokud střídač neodpoví, zeptá se před uložením. Klikněte na **Přesto uložit**, jen pokud jste si
   adresou jistí.
 

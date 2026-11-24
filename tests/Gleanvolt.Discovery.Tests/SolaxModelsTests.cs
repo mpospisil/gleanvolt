@@ -24,28 +24,12 @@ public class SolaxModelsTests
     }
 
     [Theory]
-    [InlineData("C3110000000000", "X3-EVC 11 kW", SupportTier.Expected)]
-    [InlineData("5030B000000000", "X3-HAC 11 kW", SupportTier.Verified)]
-    [InlineData("5020M000000000", "X1-HAC 22 kW", SupportTier.Verified)]
-    [InlineData("50707000000000", "X3-HAC-S 7.2 kW", SupportTier.Expected)]
-    public void A_charger_serial_names_its_model_and_tier(string serial, string model, SupportTier tier)
-    {
-        var found = SolaxModels.Charger(serial);
-
-        Assert.NotNull(found);
-        Assert.Equal(PvDeviceRole.Charger, found.Role);
-        Assert.Equal(model, found.Model);
-        Assert.Equal(tier, found.Tier);
-    }
-
-    [Theory]
     [InlineData("ZZZ0000000000")]
-    [InlineData("5990B00000000")] // a HAC-shaped serial with a model code nobody lists
+    [InlineData("5030B00000000")] // a SolaX charger's: chargers are their plugins' to find (#445)
     [InlineData(null)]
     public void An_unknown_serial_names_nothing(string? serial)
     {
         Assert.Null(SolaxModels.Inverter(serial));
-        Assert.Null(SolaxModels.Charger(serial));
     }
 
     [Fact]
@@ -66,20 +50,18 @@ public class SolaxModelsTests
     }
 
     /// <summary>
-    /// The prefix table is in code once and in <c>SUPPORTED_INVERTERS.md</c> and <c>SUPPORTED_CHARGERS.md</c>
-    /// once, by hand. A prefix the tool names a device by and the docs do not list is a device the owner
+    /// The prefix table is in code once and in <c>SUPPORTED_INVERTERS.md</c> once, by hand. A prefix the tool names a device by and the docs do not list is a device the owner
     /// cannot look up.
     /// </summary>
     [Fact]
     public void Every_prefix_the_scan_names_a_device_by_is_listed_in_the_supported_systems_doc()
     {
-        var doc = File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "SUPPORTED_INVERTERS.md"))
-            + File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "SUPPORTED_CHARGERS.md"));
+        var doc = File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "SUPPORTED_INVERTERS.md"));
         var listed = Regex.Matches(doc, "`([0-9A-Z]+)…?`").Select(match => match.Groups[1].Value).ToHashSet();
 
-        foreach (var prefix in SolaxModels.InverterPrefixes.Concat(SolaxModels.ChargerPrefixes))
+        foreach (var prefix in SolaxModels.InverterPrefixes)
         {
-            Assert.True(listed.Contains(prefix), $"{prefix} is in SolaxModels but in neither docs/SUPPORTED_INVERTERS.md nor docs/SUPPORTED_CHARGERS.md.");
+            Assert.True(listed.Contains(prefix), $"{prefix} is in SolaxModels but not in docs/SUPPORTED_INVERTERS.md.");
         }
     }
 

@@ -29,12 +29,6 @@ namespace Gleanvolt.Hosting.Configuration;
 /// </summary>
 public static class PvSystemResolver
 {
-    /// <summary>The id a charger takes when none was configured.</summary>
-    public const string DefaultChargerId = PvSystemRules.DefaultChargerId;
-
-    /// <summary>How many chargers the control logic can actually drive. See <see cref="PvSystemOptions.Chargers"/>.</summary>
-    public const int SupportedChargerCount = PvSystemRules.SupportedChargerCount;
-
     /// <summary>Reads the <c>Pv</c> section into one validated system.</summary>
     /// <exception cref="InvalidOperationException">
     /// The configuration does not describe a usable system. The message lists every problem found, each
@@ -42,12 +36,10 @@ public static class PvSystemResolver
     /// </exception>
     public static PvSystemInfo Resolve(IConfiguration configuration)
     {
-        configuration = ChargerDrivers.WithPluginCharger(configuration);
         var pv = configuration.GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
 
         var problems = new ConfigurationProblems();
-        var site = PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, problems, InverterDrivers.Known, ChargerDrivers.Known);
-        ChargerDrivers.CheckLimits(configuration, site, problems);
+        var site = PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, problems, InverterDrivers.Known);
 
         if (problems.Count > 0)
         {

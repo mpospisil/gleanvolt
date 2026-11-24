@@ -243,7 +243,6 @@ public sealed class DeviceDiscoveryService : IDeviceDiscovery, IDisposable
             (device.Finding, device.Role) switch
             {
                 (DiscoveryFinding.SolaxDevice, PvDeviceRole.Inverter) => PvSystemRules.DefaultInverterDriver,
-                (DiscoveryFinding.SolaxDevice, PvDeviceRole.Charger) => PvSystemRules.DefaultChargerDriver,
                 _ => device.Driver,
             },
             device.Topology);

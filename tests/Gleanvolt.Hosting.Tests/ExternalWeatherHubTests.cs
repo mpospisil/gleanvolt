@@ -287,8 +287,7 @@ public sealed class ExternalWeatherHubTests : IAsyncLifetime, IDisposable
         InverterCapacityWatts: null,
         LossFactor: null,
         InstallDate: null,
-        Inverter: new PvDeviceInfo("Inverter", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.1" }),
-        Chargers: []);
+        Inverter: new PvDeviceInfo("Inverter", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.1" }));
 
     // The plugin as Program.cs wires it, on this TestServer and this clock.
     private WeatherProviderConnection Plugin(out OpenWeatherFeed feed, string? key = "owm-test-key")

@@ -12,19 +12,18 @@ up on its plugin's own page instead: see [Your charger](../charger/).
 In the wizard's **Inverter** step, press **Search**. Gleanvolt checks every address on your home network
 for a device it knows. A home network takes a minute or two.
 
-![The search results: an inverter at 192.168.1.10 and a charger at 192.168.1.11, each with a "Use as inverter" button, and an unidentified device at 192.168.1.1.](../../../../assets/screenshots/wizard-search.png)
+![The search results: an inverter at 192.168.1.10, a charger at 192.168.1.11 that isn't identified, each with a "Use as inverter" button, and a web page at 192.168.1.1.](../../../../assets/screenshots/wizard-search.png)
 
 Each row is one device that answered:
 
 - **Address**: where it is on your network, such as `192.168.1.10:502 · unit 1`. The number after the
   colon is the port, and the unit is a device number on that port. You don't need to remember either:
   choosing the device fills them in.
-- **Identified as**: the model the device reported, and whether it says it is an inverter or a charger.
-- **not identified**: something answered, but it isn't a device Gleanvolt knows, such as your router.
-  Ignore it.
+- **Identified as**: the model the inverter reported.
+- **not identified**: something answered, but it isn't an inverter Gleanvolt knows, such as your router.
+  Your charger shows up like this too: its plugin finds it, not Gleanvolt.
 
-Press **Use as inverter** on your inverter's row, then **Save** below the list. A charger is listed too, so
-you can tell the two apart, but the wizard doesn't set it up.
+Press **Use as inverter** on your inverter's row, then **Save** below the list.
 
 :::tip[You can search again later]
 After setup, the wizard is still at `http://gleanvolt.local:8090/wizard`. Open it to search again, for
@@ -35,7 +34,7 @@ example after you replace a device.
 
 | What you see | What it means | What to do |
 |---|---|---|
-| Nothing, or only "not identified" rows | Modbus TCP (or go-e's local API) is off | Turn it on: see [Preparing your inverter and charger](../../installation/preparing-devices/) |
+| Nothing, or only "not identified" rows | Modbus TCP is off on the inverter | Turn it on: see [Preparing your inverter and charger](../../installation/preparing-devices/) |
 | *Port open, no Modbus reply* | Something else is connected to the device | Stop Home Assistant's integration, evcc or other software that talks to it, then search again |
 | It says it searched a 172.x network | Gleanvolt runs in a container that can't see your home network | Type your home network's range in **Network**, such as `192.168.1.0/24`, or run the container on the host network |
 | The device is on another network, such as a separate IoT Wi-Fi | The search only looks where you tell it | Type that network's range in **Network** |
@@ -58,19 +57,13 @@ need the search. Fill in the form below it:
 The brand fills in its usual port and unit id. A Huawei inverter behind an EMMA also needs
 **Connected through: EMMA**, and the EMMA's address as the host.
 
-:::note[A charger built into Gleanvolt]
-**Settings → Installation** still has a **Charger** section with the built-in SolaX, Huawei SCharger and
-go-e drivers, for an installation that already uses one. They are being replaced by plugins. A new
-installation leaves the charger's brand at **External plugin** and follows [Your charger](../charger/).
-:::
-
 ## When you save
 
 Gleanvolt reads one value from the inverter, to check that the address answers and that the device is
 what you said:
 
-- If the address answers like a charger, it warns you. Both use the same port, so the charger's address
-  would connect fine and then show a frozen battery and no sun.
+- If what answers doesn't look like an inverter of that brand, it warns you. A charger uses the same port,
+  so the charger's address would connect fine and then show a frozen battery and no sun.
 - If the inverter doesn't answer, it asks before it saves. Press **Save anyway** only if you are sure the
   address is right.
 

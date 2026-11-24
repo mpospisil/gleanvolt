@@ -8,5 +8,4 @@ public enum PvEditorSection
     Capacity,
     HomeBattery,
     Inverter,
-    Charger,
 }

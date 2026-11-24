@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Gleanvolt.Infrastructure.RegisterMaps;
 using Gleanvolt.Devices.Solax;
 
 namespace Gleanvolt.Infrastructure.Tests;

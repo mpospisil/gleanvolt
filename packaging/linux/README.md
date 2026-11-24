@@ -82,7 +82,6 @@ What is saved in the web UI wins over this file, key by key.
 
 ```ini
 Pv__Inverter__Host=192.168.1.50
-Pv__Chargers__0__Host=192.168.1.51
 Solcast__ApiKey=...
 ```
 

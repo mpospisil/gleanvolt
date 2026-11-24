@@ -50,12 +50,12 @@ public sealed class SetupDocument
 
     /// <summary>
     /// Every key a setup document may hold. Not the charger's (#442): a charger is a plugin, set up on its own page,
-    /// and Gleanvolt's setup doesn't ask about it. Settings can still edit a built-in one.
+    /// and Gleanvolt has no charger settings since 1.4 (#445).
     /// </summary>
     public static IReadOnlyList<string> AllowedKeys { get; } =
     [
         WebPassword,
-        .. PvSystemSettingKeys.All.Where(key => !IsChargerKey(key)),
+        .. PvSystemSettingKeys.All,
         SolcastApiKey,
         SolcastResourceId,
         WeatherSourceKey,
@@ -432,7 +432,7 @@ public sealed class SetupDocument
 
     // A device the configuration does not have yet, as opposed to one it has wrong.
     private static bool IsAbsence(Phrase? phrase) =>
-        phrase?.Key is "Config.PvNoInverter" or "Config.PvHostRequired";
+        phrase?.Key is "Config.PvNoInverter";
 
     // The resolver throws its problems; the car's rules return them; a value that is not a number at
     // all is the binder's own InvalidOperationException. All three end up in one list.

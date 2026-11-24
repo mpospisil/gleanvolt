@@ -55,12 +55,9 @@ public sealed class SiteEndpointTests : IAsyncDisposable
         Assert.Equal("192.168.2.10", inverter.Text("host"));
         Assert.Equal(502, inverter.Number("port"));
 
-        var charger = Assert.Single(site.GetProperty("chargers").EnumerateArray().ToList());
-        Assert.Equal("wallbox", charger.Text("id"));
-        Assert.Equal("Garage wallbox", charger.Text("name"));
-        Assert.Equal("SolaX X3-HAC", charger.Text("model"));
-        Assert.Equal("192.168.2.6", charger.Text("host"));
-        Assert.Equal(1, charger.Number("unitId"));
+        // The charger is its plugin's since 1.4 (#445): the site names no charger and no charger driver.
+        Assert.False(site.TryGetProperty("chargers", out _));
+        Assert.False(site.TryGetProperty("chargerDriver", out _));
     }
 
     [Fact]

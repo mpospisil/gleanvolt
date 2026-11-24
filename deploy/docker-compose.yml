@@ -138,19 +138,8 @@ services:
       # as it is, which is right for every correctly wired installation. See .env.example.
       Pv__Inverter__UnmeteredGridPhase: ${PV_INVERTER_UNMETERED_GRID_PHASE:-}
 
-      # A list, of which exactly one entry is supported -- a second is refused at startup rather than
-      # silently ignored. The index is in the key rather than in .env so that an operator with one
-      # charger never has to think about arrays.
-      Pv__Chargers__0__Id: ${PV_CHARGER_ID:-charger}
-      # Which charger family the controller speaks to: solax (unset), huawei-7ks, huawei-22kt or goe.
-      # See .env.example.
-      Pv__Chargers__0__Driver: ${PV_CHARGER_DRIVER:-}
-      Pv__Chargers__0__Model: ${PV_CHARGER_MODEL:-SolaX X1/X3-HAC}
-      Pv__Chargers__0__Host: ${EV_CHARGER_HOST:-}
-      # True while a charger plugin runs (#444): the deploy scripts set GLEANVOLT_CHARGER_PLUGIN when GLEANVOLT_PLUGINS
-      # names one, and the controller then drives the charger through it, whatever PV_CHARGER_DRIVER or Settings says,
-      # so the built-in driver and the plugin never both open the charger. Run by hand: set it in .env yourself.
-      ExternalCharger__UsePlugin: ${GLEANVOLT_CHARGER_PLUGIN:-false}
+      # No charger here (#445): the controller never opens a connection to it. The charger plugin's container
+      # below reaches it, at EV_CHARGER_HOST.
 
       # Off by default -- see .env.example. Turning it on means both this and the `mosquitto` (and
       # usually `homeassistant`) profiles need to agree, which is why .env.example ships them
@@ -370,9 +359,9 @@ services:
         max-file: "3"
 
   # The solax charger plugin (#443, #444): SolaX X1/X3-HAC and X1/X3-EVC, over Modbus TCP. From gleanvolt-chargers, released on its own tags,
-  # so its version is SOLAX_PLUGIN_TAG, not IMAGE_TAG. At most one charger plugin runs: the deploy scripts refuse two,
-  # and set GLEANVOLT_CHARGER_PLUGIN so the controller drives the charger through it. The charger's address is
-  # EV_CHARGER_HOST, as it was for the built-in driver; one saved on the plugin's page wins over it.
+  # so its version is SOLAX_PLUGIN_TAG, not IMAGE_TAG. At most one charger plugin runs: the deploy scripts refuse two.
+  # It is how the controller reaches the charger (#445). The charger's address is EV_CHARGER_HOST; one saved on the
+  # plugin's page wins over it.
   gleanvolt-plugin-solax:
     image: ghcr.io/mpospisil/gleanvolt-plugin-solax:${SOLAX_PLUGIN_TAG:-latest}
     container_name: gleanvolt-plugin-solax
@@ -399,9 +388,9 @@ services:
         max-file: "3"
 
   # The huawei charger plugin (#443, #444): Huawei SCharger-7KS-S0 and -22KT-S0, over Modbus TCP. From gleanvolt-chargers, released on its own tags,
-  # so its version is HUAWEI_PLUGIN_TAG, not IMAGE_TAG. At most one charger plugin runs: the deploy scripts refuse two,
-  # and set GLEANVOLT_CHARGER_PLUGIN so the controller drives the charger through it. The charger's address is
-  # EV_CHARGER_HOST, as it was for the built-in driver; one saved on the plugin's page wins over it.
+  # so its version is HUAWEI_PLUGIN_TAG, not IMAGE_TAG. At most one charger plugin runs: the deploy scripts refuse two.
+  # It is how the controller reaches the charger (#445). The charger's address is EV_CHARGER_HOST; one saved on the
+  # plugin's page wins over it.
   gleanvolt-plugin-huawei:
     image: ghcr.io/mpospisil/gleanvolt-plugin-huawei:${HUAWEI_PLUGIN_TAG:-latest}
     container_name: gleanvolt-plugin-huawei
@@ -428,9 +417,9 @@ services:
         max-file: "3"
 
   # The goe charger plugin (#443, #444): the go-e Charger, over its local HTTP API v2. From gleanvolt-chargers, released on its own tags,
-  # so its version is GOE_PLUGIN_TAG, not IMAGE_TAG. At most one charger plugin runs: the deploy scripts refuse two,
-  # and set GLEANVOLT_CHARGER_PLUGIN so the controller drives the charger through it. The charger's address is
-  # EV_CHARGER_HOST, as it was for the built-in driver; one saved on the plugin's page wins over it.
+  # so its version is GOE_PLUGIN_TAG, not IMAGE_TAG. At most one charger plugin runs: the deploy scripts refuse two.
+  # It is how the controller reaches the charger (#445). The charger's address is EV_CHARGER_HOST; one saved on the
+  # plugin's page wins over it.
   gleanvolt-plugin-goe:
     image: ghcr.io/mpospisil/gleanvolt-plugin-goe:${GOE_PLUGIN_TAG:-latest}
     container_name: gleanvolt-plugin-goe
@@ -457,9 +446,9 @@ services:
         max-file: "3"
 
   # The shelly charger plugin (#443, #444): the Shelly TopAC, over its local Gen2 RPC API. From gleanvolt-chargers, released on its own tags,
-  # so its version is SHELLY_PLUGIN_TAG, not IMAGE_TAG. At most one charger plugin runs: the deploy scripts refuse two,
-  # and set GLEANVOLT_CHARGER_PLUGIN so the controller drives the charger through it. The charger's address is
-  # EV_CHARGER_HOST, as it was for the built-in driver; one saved on the plugin's page wins over it.
+  # so its version is SHELLY_PLUGIN_TAG, not IMAGE_TAG. At most one charger plugin runs: the deploy scripts refuse two.
+  # It is how the controller reaches the charger (#445). The charger's address is EV_CHARGER_HOST; one saved on the
+  # plugin's page wins over it.
   gleanvolt-plugin-shelly:
     image: ghcr.io/mpospisil/gleanvolt-plugin-shelly:${SHELLY_PLUGIN_TAG:-latest}
     container_name: gleanvolt-plugin-shelly

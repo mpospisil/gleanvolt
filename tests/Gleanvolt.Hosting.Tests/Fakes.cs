@@ -162,8 +162,7 @@ internal static class Sites
         InverterCapacityWatts: null,
         LossFactor: null,
         InstallDate: null,
-        Inverter: new PvDeviceInfo("Inverter", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.1" }),
-        Chargers: [new PvDeviceInfo("charger", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.2" })]);
+        Inverter: new PvDeviceInfo("Inverter", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.1" }));
 }
 
 /// <summary>A tariff schedule that says what the test tells it to, at every instant.</summary>

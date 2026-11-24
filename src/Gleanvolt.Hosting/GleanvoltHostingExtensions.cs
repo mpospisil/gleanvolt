@@ -24,7 +24,6 @@ using Gleanvolt.Infrastructure.Vehicles.Skoda;
 using Gleanvolt.Infrastructure.Vehicles.VwGroup;
 using Gleanvolt.Infrastructure.Vehicles.VwWebsite;
 using Gleanvolt.Infrastructure;
-using Gleanvolt.Infrastructure.Http;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Infrastructure.Monitoring;
 using Gleanvolt.Infrastructure.Secrets;
@@ -125,8 +124,7 @@ public static class GleanvoltHostingExtensions
             configuration,
             runningPv,
             provider.GetRequiredService<ILogger<PvSystemEditor>>(),
-            inverterDrivers: [.. provider.GetServices<IInverterDriverFactory>()],
-            chargerDrivers: [.. provider.GetServices<IEvChargerDriverFactory>()]));
+            inverterDrivers: [.. provider.GetServices<IInverterDriverFactory>()]));
 
         // The Home Assistant link and the API, editable on Settings and in the setup wizard. Read once at
         // startup like the installation, so the snapshot is what "running" means.
@@ -252,12 +250,10 @@ public static class GleanvoltHostingExtensions
 
         if (setupMode)
         {
-            // No devices to talk to: the addresses are missing or wrong, which is why this is setup
-            // mode. A client that refuses every call, under both keys, so that nothing reached by
-            // accident in setup mode can open a socket to an address nobody confirmed.
+            // No inverter to talk to: its address is missing or wrong, which is why this is setup mode. A
+            // client that refuses every call, so that nothing reached by accident in setup mode can open a
+            // socket to an address nobody confirmed.
             services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.Inverter, (_, _) => new NotConfiguredModbusClient());
-            services.AddKeyedSingleton<IModbusClient>(ModbusClientKeys.EvCharger, (_, _) => new NotConfiguredModbusClient());
-            services.AddKeyedSingleton(ModbusClientKeys.EvCharger, (_, _) => ChargerHttpClients.NotConfigured());
         }
         else
         {
@@ -272,51 +268,6 @@ public static class GleanvoltHostingExtensions
                     provider,
                     new ModbusTcpClient(site.Inverter.Connection.ToEndpoint()),
                     batteryHold.Enabled && !batteryHold.DryRun);
-            });
-
-            // A loop that runs once today. The composition root is what the charger list has to reach
-            // first: registering each charger under its own id is what makes a second one a matter of
-            // control logic rather than of wiring. What still cannot handle two is everything downstream —
-            // one mode, one set of Home Assistant controls, one surplus to divide — which is why the
-            // resolver refuses a second entry rather than this loop quietly accepting it.
-            foreach (var charger in site.Chargers)
-            {
-                services.AddKeyedSingleton<IModbusClient>(charger.Id, (provider, _) =>
-                {
-                    // Writable unless dry-run: the service always boots in Off, but Home Assistant can select
-                    // a controlling mode at any time, so the client has to be ready for it.
-                    var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
-                    return WriteProof(provider, new ModbusTcpClient(charger.Connection.ToEndpoint()), !chargeControl.DryRun);
-                });
-            }
-
-            // The charger the control path drives, under the fixed key, because [FromKeyedServices] takes a
-            // compile-time constant and the charger driver's registration is written against one. It
-            // resolves the registration above rather than constructing a second client: two clients would be
-            // two sockets to the same wallbox, which is precisely the desynchronised-stream failure a single
-            // client exists to prevent. The two keyspaces cannot collide — a charger id is a slug and this
-            // key is not — so this is an alias and never a self-reference.
-            var controlledCharger = site.Chargers[0].Id;
-            services.AddKeyedSingleton<IModbusClient>(
-                ModbusClientKeys.EvCharger,
-                (provider, _) => provider.GetRequiredKeyedService<IModbusClient>(controlledCharger));
-
-            // The same charger over HTTP, for a family whose local interface is a web API (go-e, #352): one
-            // client, made only if something asks for it, and in dry-run one that passes only the requests the
-            // driver marked as reads. A Modbus family never resolves it, so it never connects.
-            var controlledConnection = site.Chargers[0].Connection;
-            services.AddKeyedSingleton(ModbusClientKeys.EvCharger, (provider, _) =>
-            {
-                // A charger behind a plugin has no address here: the plugin reaches it. The device snapshot
-                // still asks for this client, so it gets one that refuses every request instead of a crash.
-                if (string.IsNullOrWhiteSpace(controlledConnection.Host))
-                {
-                    return ChargerHttpClients.NotConfigured();
-                }
-
-                var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
-                return ChargerHttpClients.Create(
-                    controlledConnection, !chargeControl.DryRun, provider.GetRequiredService<ILogger<ReadOnlyHttpHandler>>());
             });
         }
 
@@ -354,16 +305,8 @@ public static class GleanvoltHostingExtensions
                 });
         });
 
-        // The charger's driver (issues #348, #349): the one Pv:Chargers:0:Driver names, which the resolver has
-        // already checked is one of these, on the controlled charger's client as registered above -- Modbus or
-        // HTTP, as the family says (#352), and read-only in dry-run.
-        foreach (var make in ChargerDrivers.Factories)
-        {
-            services.AddSingleton(provider => make(provider));
-        }
-
-        // A charger behind a plugin (#435): its hub on the web port, on while the controlled charger's driver is
-        // "external", and the link its driver reads and commands through.
+        // The charger (#445): always behind a plugin, on the charger hub on the web port. Gleanvolt never opens a
+        // connection to the charger itself: a charger that serves one Modbus client drops a second.
         services.Configure<ExternalChargerOptions>(configuration.GetSection(ExternalChargerOptions.SectionName));
         services.AddSingleton<ExternalChargerLink>();
         services.AddSingleton<IRememberedProviders, RememberedProviders>();
@@ -372,42 +315,20 @@ public static class GleanvoltHostingExtensions
         services.AddSingleton<IEvChargerDriver>(provider =>
         {
             var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
-            var id = provider.GetRequiredService<PvSystemInfo>().Chargers is [var charger, ..] && charger.Driver.Length > 0
-                ? charger.Driver
-                : ChargerDrivers.DefaultId;
-            var factory = provider.GetServices<IEvChargerDriverFactory>().SingleOrDefault(candidate => candidate.Id == id)
-                ?? throw new InvalidOperationException($"No charger driver '{id}' is registered.");
-
-            // The built-in charger drivers go in 1.4 (#444, #445): each start says which plugin replaces this one.
-            if (ChargerPlugins.Replacing(id) is { } plugin)
-            {
-                provider.GetRequiredService<ILoggerFactory>().CreateLogger("Gleanvolt.Chargers").LogWarning(
-                    "The built-in {Driver} charger driver is deprecated and is removed in Gleanvolt 1.4. The {Plugin} plugin replaces it: "
-                    + "add {Profile} to GLEANVOLT_PLUGINS in .env and deploy again, or see {Url}.",
-                    factory.DisplayName, plugin.Name, plugin.Profile, plugin.Url);
-            }
-            var connection = factory.Transport switch
-            {
-                EvChargerTransport.Http => EvChargerConnection.Over(provider.GetRequiredKeyedService<HttpClient>(ModbusClientKeys.EvCharger)),
-                EvChargerTransport.External => EvChargerConnection.External,
-                _ => EvChargerConnection.Over(provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.EvCharger)),
-            };
-
-            return factory.Create(
-                connection,
+            return new ExternalChargerDriver(
+                provider.GetRequiredService<ExternalChargerLink>(),
+                provider.GetRequiredService<ILogger<ExternalChargerDriver>>(),
                 new EvChargerDriverOptions
                 {
                     DryRun = chargeControl.DryRun,
                     CurrentChangeThresholdAmps = chargeControl.CurrentChangeThresholdAmps,
-                    Phases = chargeControl.Phases,
-                    NominalVoltage = chargeControl.NominalVoltage,
                 });
         });
 
         services.AddSingleton<IEnergyStateReader, EnergyStateReader>();
 
-        // Settings -> "Save register snapshot" (#319, #350), under the inverter and under the charger, on
-        // each one's keyed client. In setup mode both clients refuse every call, and the page says so.
+        // Settings -> "Save register snapshot" (#319), under the inverter, on its keyed client. In setup mode
+        // the client refuses every call, and the page says so.
         services.AddSingleton<IDeviceSnapshot, DeviceSnapshot>();
 
         // Solcast solar-forecast integration. The account is a secret and is not stored in
@@ -467,8 +388,8 @@ public static class GleanvoltHostingExtensions
         services.AddExternalProvider<WeatherHub>(WeatherHub.Kind);
         services.AddHostedService<ExternalWeatherSelectionWatcher>();
 
-        // Forecast-driven EV charge control (issue #10). Disabled by default -- it writes to the
-        // charger and the control register addresses must be verified first (see EvChargerRegister).
+        // Forecast-driven EV charge control (issue #10). It commands the charger, through its plugin, only once a
+        // mode is chosen.
         services.Configure<ChargeControlOptions>(configuration.GetSection(ChargeControlOptions.SectionName));
 
         services.AddSingleton<IEvChargerControl>(provider =>
@@ -1209,14 +1130,14 @@ public static class GleanvoltHostingExtensions
         PvSystemOptions pv;
         try
         {
-            pv = ChargerDrivers.WithPluginCharger(configuration).GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
+            pv = configuration.GetSection(PvSystemOptions.SectionName).Get<PvSystemOptions>() ?? new PvSystemOptions();
         }
         catch (InvalidOperationException)
         {
             pv = new PvSystemOptions();
         }
 
-        return PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, new ConfigurationProblems(), InverterDrivers.Known, ChargerDrivers.Known);
+        return PvSystemRules.Resolve(pv, ModbusClientKeys.Inverter, new ConfigurationProblems(), InverterDrivers.Known);
     }
 
     // The configured zone where it resolves, the host's own where it does not: setup mode is there to

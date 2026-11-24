@@ -188,13 +188,12 @@ public class SolaxInverterDriverTests
     private static EnergyStateReader Reader(IInverterDriver driver, GridPhase? unmetered) =>
         new(
             driver,
-            new SolaxChargerDriver(new FakeModbusClient()),
+            new FakeCharger(),
             NullLogger<EnergyStateReader>.Instance,
             new PvSystemInfo(
                 Id: "", Name: "", Address: "", Latitude: null, Longitude: null, AzimuthDegrees: null, TiltDegrees: null,
                 PeakPowerWatts: null, InverterCapacityWatts: null, LossFactor: null, InstallDate: null,
-                Inverter: new PvDeviceInfo("Inverter", "", "", new DeviceConfig { Host = "inverter" }),
-                Chargers: [])
+                Inverter: new PvDeviceInfo("Inverter", "", "", new DeviceConfig { Host = "inverter" }))
             {
                 UnmeteredGridPhase = unmetered,
             },

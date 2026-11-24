@@ -23,7 +23,6 @@ namespace Gleanvolt.Core.Models;
 /// <param name="LossFactor">System loss factor in (0, 1].</param>
 /// <param name="InstallDate">Commissioning date.</param>
 /// <param name="Inverter">The inverter — always present; a controller with no inverter does not start.</param>
-/// <param name="Chargers">The EV chargers, in configuration order. Exactly one today.</param>
 public sealed record PvSystemInfo(
     string Id,
     string Name,
@@ -36,8 +35,7 @@ public sealed record PvSystemInfo(
     double? InverterCapacityWatts,
     double? LossFactor,
     DateOnly? InstallDate,
-    PvDeviceInfo Inverter,
-    IReadOnlyList<PvDeviceInfo> Chargers)
+    PvDeviceInfo Inverter)
 {
     /// <summary>Whether the site has a usable pair of coordinates. Both or neither, by construction.</summary>
     public bool HasLocation => Latitude is not null && Longitude is not null;
@@ -71,15 +69,11 @@ public sealed record PvSystemInfo(
         var name = string.IsNullOrWhiteSpace(Name) ? "unnamed" : Name;
         var id = string.IsNullOrWhiteSpace(Id) ? "no id" : Id;
         var where = HasLocation ? Invariant($"{Latitude:0.####},{Longitude:0.####}") : "no coordinates";
-        var chargers = Chargers.Count == 0
-            ? "no charger"
-            : string.Join(", ", Chargers.Select(charger => charger.Describe()));
-
         var meter = UnmeteredGridPhase is { } blind
             ? $"; grid meter blind on {blind}, its flow estimated from the inverter's output"
             : string.Empty;
 
-        return $"{name} ({id}) at {where}; inverter {Inverter.Describe()}; charger {chargers}{meter}";
+        return $"{name} ({id}) at {where}; inverter {Inverter.Describe()}{meter}";
     }
 }
 
@@ -97,19 +91,10 @@ public sealed record PvSystemInfo(
 /// <param name="Connection">Where and how to reach it, as the Modbus client wants it.</param>
 public sealed record PvDeviceInfo(string Id, string Name, string Model, DeviceConfig Connection)
 {
-    /// <summary>
-    /// The id of the driver that reads and controls it, lower case: for a charger, <c>Pv:Chargers:N:Driver</c>
-    /// (issue #349), <c>solax</c> when the configuration leaves it empty. Empty for the inverter, whose driver
-    /// is <see cref="PvSystemInfo.InverterDriver"/>.
-    /// </summary>
-    public string Driver { get; init; } = string.Empty;
-
-    /// <summary>The device in a log line: the model if it is known, and the address, or that a plugin reaches it.</summary>
+    /// <summary>The device in a log line: the model if it is known, and the address.</summary>
     public string Describe()
     {
         var what = string.IsNullOrWhiteSpace(Model) ? Id : Model;
-
-        // A charger behind a plugin (#435) has no address of Gleanvolt's.
-        return string.IsNullOrEmpty(Connection.Host) ? $"{what} through a plugin" : $"{what} at {Connection.Host}:{Connection.Port}";
+        return $"{what} at {Connection.Host}:{Connection.Port}";
     }
 }

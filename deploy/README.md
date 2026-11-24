@@ -230,7 +230,6 @@ PV_LOSS_FACTOR=0.9                    # fraction of DC yield that reaches the me
 PV_INSTALL_DATE=2026-04-01
 
 PV_INVERTER_MODEL=SolaX X3-HYB-G4 PRO # what the box is; documentation, not a selector
-PV_CHARGER_MODEL=SolaX X1/X3-HAC
 ```
 
 
@@ -557,20 +556,19 @@ To run one:
    OpenWeatherMap key and press **Save and check**. `OPENWEATHER_API_KEY` in `.env`, or the older
    `WEATHER_API_KEY`, is its key until then.
 
-**Moving to a charger plugin** (#444). The built-in charger drivers still work in 1.3, and go in 1.4. To move, add the
-plugin to the list and deploy, with nothing else changed:
+**The charger plugin** (#444, #445). Since 1.4 it is the only way Gleanvolt drives the charger. Add it to the list:
 
 ```bash
-GLEANVOLT_PLUGINS=openweather,solax     # or huawei, goe; at most one charger plugin
+GLEANVOLT_PLUGINS=openweather,solax     # or huawei, goe, shelly; at most one charger plugin
 ```
 
-The deploy then runs the plugin with `EV_CHARGER_HOST` as its address, and tells the controller to drive the charger
-through it (`ExternalCharger:UsePlugin`), whatever `PV_CHARGER_DRIVER` or Settings names. The two never both open the
-charger, which matters for one that serves a single Modbus client. Gleanvolt takes the first charger plugin that
-connects and remembers it; **Settings → External providers** shows it. To go back, take it off the list and deploy:
-the built-in driver is used again. Run by hand rather than by the scripts, set `GLEANVOLT_CHARGER_PLUGIN=true` in
-`.env` with the profile; without it the controller keeps its built-in driver and refuses the plugin, which then
-leaves the charger alone.
+The deploy runs it with `EV_CHARGER_HOST` as its address. Gleanvolt takes the first charger plugin that connects and
+remembers it; **Settings → External providers** shows it.
+
+**Upgrading from a built-in charger driver (1.3 → 1.4).** Nothing to change: an `.env` with `EV_CHARGER_HOST` and no
+charger plugin in `GLEANVOLT_PLUGINS` gets the plugin that replaced its `PV_CHARGER_DRIVER` (`solax` when unset), and
+the deploy says so. Add it to `GLEANVOLT_PLUGINS` to silence that. `PV_CHARGER_DRIVER`, `PV_CHARGER_MODEL`,
+`PV_CHARGER_ID` and `GLEANVOLT_CHARGER_PLUGIN` are no longer read; delete them.
 
 **Upgrading from the built-in OpenWeather** (#425): the controller moves the weather to **External** by
 itself and says so under **Settings → Weather**. Turn the plugin on as above, and enter the key on its

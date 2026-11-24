@@ -23,7 +23,6 @@
   <ItemGroup>
     <None Update="Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Gleanvolt.Devices.Solax.Tests\Fixtures\solax-night-importing.json" Link="Fixtures\solax-inverter.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\Gleanvolt.Devices.Solax.Tests\Fixtures\solax-charger-idle.json" Link="Fixtures\solax-charger-idle.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

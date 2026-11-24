@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Gleanvolt.Hosting.Chargers;
 
 /// <summary>
-/// The charger driver for a charger behind a plugin (#435). It keeps on Gleanvolt's side everything the driver
+/// The charger driver: since 1.4 (#445), the only one. The charger is behind a plugin (#435). It keeps on Gleanvolt's side everything the driver
 /// contract promises, so a plugin cannot get it wrong: the setpoint is sent only when it moved by the threshold,
 /// clamped to the charger's range; in dry-run nothing is sent and what would have been stands in for the
 /// device's; a read that fails or is refused throws, so the poll says unknown. The plugin only maps the two
@@ -134,65 +134,8 @@ public sealed class ExternalChargerDriver : IEvChargerDriver
         await _link.SetChargingAllowedAsync(allowed, reason, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// A fresh reading from the plugin: recognised when one arrives, with its power as the reading. Throws when
-    /// no plugin is connected or it does not answer, as an address that does not answer would.
-    /// </summary>
-    public async Task<EvChargerProbeResult> ProbeAsync(CancellationToken cancellationToken = default)
-    {
-        var reading = await _link.ReadAsync(cancellationToken).ConfigureAwait(false);
-        return new EvChargerProbeResult(true, reading.PowerWatts);
-    }
-
     // The charger's ceiling from its hello, lowered by what a reading says now, never above what the contract allows.
     private int Ceiling => Math.Min(
         Math.Min(_link.DeviceMaxAmps ?? int.MaxValue, Capabilities.MaxCurrentAmps),
         ChargerReadingValidator.MaxCurrentAmps);
-}
-
-/// <summary>
-/// The <c>external</c> charger driver (#435): the charger is behind a plugin on the charger hub. It needs no
-/// address and no connection; Settings hides both when it is chosen.
-/// </summary>
-public sealed class ExternalChargerDriverFactory : IEvChargerDriverFactory
-{
-    /// <summary>The id in <c>Pv:Chargers:0:Driver</c>.</summary>
-    public const string DriverId = "external";
-
-    private readonly ExternalChargerLink? _link;
-    private readonly ILoggerFactory? _loggers;
-
-    /// <param name="link">The hub's side; null for a factory that only describes the driver.</param>
-    /// <param name="loggers">For the driver's log. Null logs nothing.</param>
-    public ExternalChargerDriverFactory(ExternalChargerLink? link, ILoggerFactory? loggers = null)
-    {
-        _link = link;
-        _loggers = loggers;
-    }
-
-    public string Id => DriverId;
-
-    /// <summary>Shown translated on Settings; this is the English for the log and the API.</summary>
-    public string DisplayName => "External plugin";
-
-    public EvChargerTransport Transport => EvChargerTransport.External;
-
-    public ModbusDefaults? Defaults => null;
-
-    public EvChargerCapabilities Capabilities => ExternalChargerDriver.ExternalCapabilities;
-
-    public RegisterSnapshotSpec? Snapshot => null;
-
-    public IEvChargerDriver Create(EvChargerConnection connection, EvChargerDriverOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(connection);
-
-        if (connection.Transport != EvChargerTransport.External)
-        {
-            throw new ArgumentException($"A charger behind a plugin takes no connection, not one over {connection.Transport}.");
-        }
-
-        var link = _link ?? throw new InvalidOperationException("This host has no charger hub for a plugin to connect to.");
-        return new ExternalChargerDriver(link, _loggers?.CreateLogger<ExternalChargerDriver>(), options);
-    }
 }

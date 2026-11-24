@@ -91,21 +91,6 @@
                             }
                         </select>
                     }
-                    else if (key == PvSystemSettingKeys.ChargerDriver)
-                    {
-                        <select id="@id" disabled="@(!Editable || _busy)" value="@SelectedChargerDriverId"
-                                @onchange="e => SelectChargerDriver(e.Value?.ToString() ?? string.Empty)">
-                            @foreach (var driver in Editor.ChargerDrivers)
-                            {
-                                <option value="@driver.Id">@ChargerDriverName(driver)</option>
-                            }
-                            @if (SelectedChargerDriver is null)
-                            {
-                                @* As for the inverter: an id this build does not have, shown as configured. *@
-                                <option value="@SelectedChargerDriverId">@SelectedChargerDriverId</option>
-                            }
-                        </select>
-                    }
                     else if (key == PvSystemSettingKeys.InverterTopology && SelectedDriver is { } topologyDriver)
                     {
                         <select id="@id" disabled="@(!Editable || _busy)" value="@SelectedTopologyId"
@@ -137,23 +122,6 @@
                     {
                         <span class="field-note" id="pv-emma-one-client">@SettingsText.NoteEmmaOneClient</span>
                     }
-                    @if (key == PvSystemSettingKeys.ChargerDriver && Editor.ChargerPluginForced)
-                    {
-                        @* The deployment runs a charger plugin (#444): this choice waits until it no longer does. *@
-                        <span class="field-note warning" id="pv-charger-plugin-forced">@SettingsText.NoteChargerPluginForced</span>
-                    }
-                    else if (key == PvSystemSettingKeys.ChargerDriver && ChargerThroughPlugin)
-                    {
-                        <span class="field-note" id="pv-charger-plugin">@SettingsText.NoteChargerPlugin</span>
-                    }
-                    else if (key == PvSystemSettingKeys.ChargerDriver && ChargerPlugins.Replacing(SelectedChargerDriverId) is { } replacement)
-                    {
-                        @* The built-in drivers go in 1.4 (#444, #445): which plugin takes this one's place. *@
-                        <span class="field-note warning" id="pv-charger-deprecated">
-                            @Localized.Format(SettingsText.NoteChargerDeprecated, ChargerDriverName(SelectedChargerDriver!), replacement.Name, replacement.Profile)
-                            @(" ")<a href="@replacement.Url" target="_blank" rel="noopener">@SettingsText.NoteChargerDeprecatedLink</a>
-                        </span>
-                    }
                     @if (setting.IsPending)
                     {
                         <span class="field-pending">@Localized.Format(SettingsText.RunningRestartToApply, Show(setting.Running))</span>
@@ -168,9 +136,9 @@
             }
         </div>
 
-        @if (OfferSnapshot && !ReadOnly && (section is PvEditorSection.Inverter || (section is PvEditorSection.Charger && !ChargerThroughPlugin)))
+        @if (OfferSnapshot && !ReadOnly && section is PvEditorSection.Inverter)
         {
-            <DeviceSnapshotPanel Role="@(section == PvEditorSection.Inverter ? PvDeviceRole.Inverter : PvDeviceRole.Charger)" />
+            <DeviceSnapshotPanel />
         }
     }
 
@@ -251,7 +219,7 @@
     /// <summary>Raised after a save that wrote something.</summary>
     [Parameter] public EventCallback OnSaved { get; set; }
 
-    // Settings offers "Save register snapshot" under the inverter (#319) and the charger (#350); the wizard
+    // Settings offers "Save register snapshot" under the inverter (#319); the wizard
     // does not, because in setup mode there is no running device to read.
     [Parameter] public bool OfferSnapshot { get; set; }
 
@@ -277,10 +245,6 @@
             {
                 SelectTopology(value);
             }
-            else if (key.Equals(PvSystemSettingKeys.ChargerDriver, StringComparison.OrdinalIgnoreCase))
-            {
-                SelectChargerDriver(value);
-            }
             else if (_values.ContainsKey(key))
             {
                 _values[key] = value;
@@ -295,7 +259,6 @@
         (PvEditorSection.Capacity, SettingsText.GroupCapacity, [PvSystemSettingKeys.CapacityKwp, PvSystemSettingKeys.InverterCapacityKw, PvSystemSettingKeys.LossFactor]),
         (PvEditorSection.HomeBattery, SettingsText.GroupHomeBattery, [PvSystemSettingKeys.HomeBatteryCapacityKWh, PvSystemSettingKeys.HomeBatteryChargeEfficiency]),
         (PvEditorSection.Inverter, SettingsText.Inverter, [PvSystemSettingKeys.InverterDriver, PvSystemSettingKeys.InverterTopology, PvSystemSettingKeys.InverterModel, PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId, PvSystemSettingKeys.InverterUnmeteredGridPhase]),
-        (PvEditorSection.Charger, SettingsText.Charger, [PvSystemSettingKeys.ChargerId, PvSystemSettingKeys.ChargerDriver, PvSystemSettingKeys.ChargerModel, PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId]),
     ];
 
     private static Dictionary<string, string> Labels => new(StringComparer.OrdinalIgnoreCase)
@@ -321,12 +284,6 @@
         [PvSystemSettingKeys.InverterPort] = SettingsText.FieldInverterPort,
         [PvSystemSettingKeys.InverterUnitId] = SettingsText.FieldInverterUnitId,
         [PvSystemSettingKeys.InverterUnmeteredGridPhase] = SettingsText.FieldUnmeteredPhase,
-        [PvSystemSettingKeys.ChargerId] = SettingsText.FieldChargerId,
-        [PvSystemSettingKeys.ChargerDriver] = SettingsText.FieldChargerDriver,
-        [PvSystemSettingKeys.ChargerModel] = SettingsText.FieldChargerModel,
-        [PvSystemSettingKeys.ChargerHost] = SettingsText.FieldChargerHost,
-        [PvSystemSettingKeys.ChargerPort] = SettingsText.FieldChargerPort,
-        [PvSystemSettingKeys.ChargerUnitId] = SettingsText.FieldChargerUnitId,
     };
 
     // What each field means, first in its (i): the label alone does not say what a value is used for,
@@ -354,12 +311,6 @@
         [PvSystemSettingKeys.InverterPort] = SettingsText.HelpPort,
         [PvSystemSettingKeys.InverterUnitId] = SettingsText.HelpUnitId,
         [PvSystemSettingKeys.InverterUnmeteredGridPhase] = SettingsText.HelpUnmeteredPhase,
-        [PvSystemSettingKeys.ChargerId] = SettingsText.HelpChargerId,
-        [PvSystemSettingKeys.ChargerDriver] = SettingsText.HelpChargerDriver,
-        [PvSystemSettingKeys.ChargerModel] = SettingsText.HelpChargerModel,
-        [PvSystemSettingKeys.ChargerHost] = SettingsText.HelpChargerHost,
-        [PvSystemSettingKeys.ChargerPort] = SettingsText.HelpPort,
-        [PvSystemSettingKeys.ChargerUnitId] = SettingsText.HelpUnitId,
     };
 
     private static Dictionary<string, string> Hints => new(StringComparer.OrdinalIgnoreCase)
@@ -376,9 +327,7 @@
         [PvSystemSettingKeys.HomeBatteryChargeEfficiency] = SettingsText.HintHomeBatteryEfficiency,
         [PvSystemSettingKeys.InverterUnmeteredGridPhase] = SettingsText.HintPhase,
         [PvSystemSettingKeys.InverterPort] = "502",
-        [PvSystemSettingKeys.ChargerPort] = "502",
         [PvSystemSettingKeys.InverterUnitId] = "1",
-        [PvSystemSettingKeys.ChargerUnitId] = "1",
     };
 
     private static readonly string[] InverterAddress =
@@ -394,15 +343,7 @@
 
     // A field the selected driver has no use for is not shown: the topology, for a driver reached one way.
     private bool Shown(string key) =>
-        (key != PvSystemSettingKeys.InverterTopology || SelectedDriver is { Topologies.Count: > 0 })
-        // A charger behind a plugin (#435) is reached by the plugin: Gleanvolt has no address for it.
-        && !(ChargerThroughPlugin && ChargerAddress.Contains(key));
-
-    private bool ChargerThroughPlugin => SelectedChargerDriver?.Transport == EvChargerTransport.External;
-
-    // A brand is its own name; the plugin's entry is a description, so it is said in the viewer's language.
-    private static string ChargerDriverName(EvChargerDriverInfo driver) =>
-        driver.Transport == EvChargerTransport.External ? SettingsText.ChargerDriverExternal : driver.DisplayName;
+        key != PvSystemSettingKeys.InverterTopology || SelectedDriver is { Topologies.Count: > 0 };
 
     // The topology the form has selected, as an id: empty means the driver's first, as in configuration.
     private string SelectedTopologyId =>
@@ -444,39 +385,14 @@
                 : string.Empty;
     }
 
-    // The placeholder: what an empty field means. Each device's port and unit id are its selected driver's.
+    // The placeholder: what an empty field means. The inverter's port and unit id are its selected driver's.
     private string? Hint(string key) =>
-        (key, SelectedDriver?.Defaults, SelectedChargerDriver?.Defaults) switch
+        (key, SelectedDriver?.Defaults) switch
         {
-            (PvSystemSettingKeys.InverterPort, { } defaults, _) => defaults.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            (PvSystemSettingKeys.InverterUnitId, { } defaults, _) => defaults.UnitId.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            (PvSystemSettingKeys.ChargerPort, _, { } defaults) => defaults.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            (PvSystemSettingKeys.ChargerUnitId, _, { } defaults) => defaults.UnitId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            (PvSystemSettingKeys.InverterPort, { } defaults) => defaults.Port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            (PvSystemSettingKeys.InverterUnitId, { } defaults) => defaults.UnitId.ToString(System.Globalization.CultureInfo.InvariantCulture),
             _ => Hints.GetValueOrDefault(key),
         };
-
-    // The charger's driver, as the inverter's (#349): empty means the default, as in configuration.
-    private string SelectedChargerDriverId => NormaliseChargerDriver(_values.GetValueOrDefault(PvSystemSettingKeys.ChargerDriver));
-
-    // Empty means SolaX with a host and the plugin's charger without one (#442), as the rules read it.
-    private string ChargerHostValue => _values.GetValueOrDefault(PvSystemSettingKeys.ChargerHost) ?? string.Empty;
-
-    private EvChargerDriverInfo? SelectedChargerDriver =>
-        Editor.ChargerDrivers.FirstOrDefault(driver => driver.Id == SelectedChargerDriverId);
-
-    private string NormaliseChargerDriver(string? value) => PvSystemRules.ChargerDriverId(value, ChargerHostValue);
-
-    private void SelectChargerDriver(string id)
-    {
-        var configured = _settings[PvSystemSettingKeys.ChargerDriver].Saved ?? string.Empty;
-        _values[PvSystemSettingKeys.ChargerDriver] = NormaliseChargerDriver(id) == NormaliseChargerDriver(configured) ? configured : id;
-    }
-
-    private static readonly string[] ChargerAddress =
-        [PvSystemSettingKeys.ChargerHost, PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId];
-
-    // As for the inverter: the address, or the driver, whose probe decides whether the box is one it speaks to.
-    private static readonly string[] ChargerProbeKeys = [.. ChargerAddress, PvSystemSettingKeys.ChargerDriver];
 
     private PvSystemSettings _settings = new(string.Empty, []);
     private Dictionary<string, string> _values = [];
@@ -607,8 +523,8 @@
         return warnings;
     }
 
-    // One read against each device whose address changed, before the save: a swapped inverter and
-    // charger is invisible until it is running, and then it looks like a frozen battery.
+    // One read against the inverter when its address changed, before the save: the charger's address entered
+    // instead is invisible until it is running, and then it looks like a frozen battery.
     private async Task<List<(string Role, DeviceProbeResult Result)>> ProbeAsync(Dictionary<string, string> edits)
     {
         var probes = new List<(string, DeviceProbeResult)>();
@@ -616,20 +532,8 @@
         if (InverterProbeKeys.Any(edits.ContainsKey) && Address(InverterAddress, SelectedDriver?.Defaults) is { } inverter)
         {
             probes.Add((SettingsText.Inverter, await Editor.ProbeAsync(
-                PvDeviceRole.Inverter, inverter.Host, inverter.Port, inverter.UnitId, SelectedDriverId,
+                inverter.Host, inverter.Port, inverter.UnitId, SelectedDriverId,
                 _values.GetValueOrDefault(PvSystemSettingKeys.InverterTopology))));
-        }
-
-        if (ChargerProbeKeys.Any(edits.ContainsKey) && ChargerThroughPlugin)
-        {
-            // No address: the probe asks the connected plugin for a reading instead (#435).
-            probes.Add((SettingsText.Charger, await Editor.ProbeAsync(
-                PvDeviceRole.Charger, string.Empty, 0, 0, SelectedChargerDriverId)));
-        }
-        else if (ChargerProbeKeys.Any(edits.ContainsKey) && Address(ChargerAddress, SelectedChargerDriver?.Defaults) is { } charger)
-        {
-            probes.Add((SettingsText.Charger, await Editor.ProbeAsync(
-                PvDeviceRole.Charger, charger.Host, charger.Port, charger.UnitId, SelectedChargerDriverId)));
         }
 
         return probes;

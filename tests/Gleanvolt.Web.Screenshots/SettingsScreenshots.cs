@@ -26,7 +26,6 @@ public sealed class SettingsScreenshots : ScreenshotTest
     private readonly FakePvSystemEditor _pv = new()
     {
         InverterDrivers = InverterDrivers.Known,
-        ChargerDrivers = ChargerDrivers.Known,
     };
 
     private readonly FakeSolcastAccountEditor _solcast = new();
@@ -51,11 +50,6 @@ public sealed class SettingsScreenshots : ScreenshotTest
         _pv.Running[PvSystemSettingKeys.InverterModel] = "X3-HYB-G4 PRO";
         _pv.Running[PvSystemSettingKeys.InverterHost] = "192.168.1.10";
         _pv.Running[PvSystemSettingKeys.InverterUnitId] = "1";
-        _pv.Running[PvSystemSettingKeys.ChargerDriver] = "solax";
-        _pv.Running[PvSystemSettingKeys.ChargerModel] = "X3-HAC";
-        _pv.Running[PvSystemSettingKeys.ChargerHost] = "192.168.1.11";
-        _pv.Running[PvSystemSettingKeys.ChargerPort] = "502";
-        _pv.Running[PvSystemSettingKeys.ChargerUnitId] = "3";
         _pv.Running[PvSystemSettingKeys.TimeZone] = "Europe/Prague";
         _pv.Running[PvSystemSettingKeys.HomeBatteryCapacityKWh] = "11.6";
 

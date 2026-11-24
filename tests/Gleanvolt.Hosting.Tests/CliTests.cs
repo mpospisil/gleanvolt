@@ -240,7 +240,7 @@ public sealed class CliTests : IDisposable
         _found =
         [
             new DiscoveredDevice("192.168.1.10", 502, 1, DiscoveryFinding.SolaxDevice, PvDeviceRole.Inverter, "X3-HYB-G4 PRO", null, "H34", SupportTier.Verified, true, ""),
-            new DiscoveredDevice("192.168.1.11", 502, 3, DiscoveryFinding.SolaxDevice, PvDeviceRole.Charger, "X3-HAC", null, "C31", SupportTier.Verified, true, ""),
+            new DiscoveredDevice("192.168.1.11", 502, 3, DiscoveryFinding.NotSolax, null, null, null, null, SupportTier.NotSolax, null, ""),
         ];
 
         // Password twice; search yes; take the inverter's suggestion; the site; skip the optional ones; save.
@@ -254,7 +254,6 @@ public sealed class CliTests : IDisposable
         Assert.Equal("192.168.1.10", stored["Pv:Inverter:Host"]);
         Assert.False(stored.ContainsKey("Pv:Chargers:0:Host"));
         Assert.Equal("9", stored["ChargeControl:Forecast:BatteryCapacityKWh"]);
-        Assert.Contains("X3-HAC", _out.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("Charger address", _out.ToString(), StringComparison.Ordinal);
         Assert.Contains("The charger is a plugin", _out.ToString(), StringComparison.Ordinal);
         Assert.Contains("Recovery key:", _out.ToString(), StringComparison.Ordinal);
@@ -270,23 +269,6 @@ public sealed class CliTests : IDisposable
 
         Assert.Equal("External", PvSystemOverrides.Read(OverridesPath)["Weather:Source"]);
         Assert.DoesNotContain("OpenWeatherMap", _out.ToString(), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task A_swapped_choice_is_said_and_allowed()
-    {
-        _found =
-        [
-            new DiscoveredDevice("192.168.1.11", 502, 3, DiscoveryFinding.SolaxDevice, PvDeviceRole.Charger, "X3-HAC", null, null, SupportTier.Verified, true, ""),
-        ];
-
-        // A password exists, so no password prompt. The charger's address typed as the inverter.
-        var input = string.Join('\n', "y", "192.168.1.11", "50", "14", "Europe/Prague", "", "", "", "y") + "\n";
-
-        Assert.Equal(0, await Run(Context(input, current: (WebPasswordStore.Key, "hash")), "setup"));
-
-        Assert.Contains("identified itself as the charger", _out.ToString(), StringComparison.Ordinal);
-        Assert.Equal("192.168.1.11", PvSystemOverrides.Read(OverridesPath)["Pv:Inverter:Host"]);
     }
 
     [Fact]

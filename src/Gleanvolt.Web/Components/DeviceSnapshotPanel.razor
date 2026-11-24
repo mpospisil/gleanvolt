@@ -2,11 +2,10 @@
 @inject IJSRuntime JS
 
 @*
-    Settings -> inverter / charger -> "Save register snapshot" (issues #319, #350). One read of every register
-    the running driver uses, handed to the browser as a JSON file. It is how a tester sends a recording of a
-    family Gleanvolt does not drive yet, and how a driver's tests get their fixtures. Reads only, on the
-    device's own client: the charger serves one Modbus client at a time, so this is the only way to record it
-    without stopping the controller. The serial number leaves the house as its model prefix.
+    Settings -> inverter -> "Save register snapshot" (issue #319). One read of every register the running
+    inverter driver uses, handed to the browser as a JSON file. It is how a tester sends a recording of a family
+    Gleanvolt does not drive yet, and how a driver's tests get their fixtures. Reads only, on the inverter's own
+    client. The serial number leaves the house as its model prefix. A charger's recording is its plugin's.
 *@
 
 <div class="pv-fields pv-snapshot" id="@($"{Prefix}-snapshot")">
@@ -14,16 +13,16 @@
         <div class="field-head">
             <label for="@($"{Prefix}-snapshot-note")">@SettingsText.SnapshotNote</label>
             <InfoTip Topic="@SettingsText.SnapshotButton" Group="settings-info">
-                <p>@(Charger ? SettingsText.SnapshotHelpCharger : SettingsText.SnapshotHelp)</p>
+                <p>@SettingsText.SnapshotHelp</p>
             </InfoTip>
         </div>
         <input id="@($"{Prefix}-snapshot-note")" type="text" autocomplete="off"
-               placeholder="@(Charger ? SettingsText.SnapshotNoteHintCharger : SettingsText.SnapshotNoteHint)"
+               placeholder="@SettingsText.SnapshotNoteHint"
                disabled="@_busy" value="@_note" @oninput="e => _note = e.Value?.ToString() ?? string.Empty" />
     </div>
     <div class="pv-field snapshot-action">
         <button type="button" class="secondary" id="@($"{Prefix}-snapshot-save")" disabled="@_busy" @onclick="SaveAsync">
-            @(_busy ? (Charger ? SettingsText.SnapshotReadingCharger : SettingsText.SnapshotReading) : SettingsText.SnapshotButton)
+            @(_busy ? SettingsText.SnapshotReading : SettingsText.SnapshotButton)
         </button>
     </div>
 </div>
@@ -33,17 +32,12 @@
 }
 @if (_error is { } error)
 {
-    <p class="error" id="@($"{Prefix}-snapshot-error")">@Localized.Format(Charger ? SettingsText.SnapshotFailedCharger : SettingsText.SnapshotFailed, error)</p>
+    <p class="error" id="@($"{Prefix}-snapshot-error")">@Localized.Format(SettingsText.SnapshotFailed, error)</p>
 }
 
 @code {
-    /// <summary>Which device to read: the inverter, or the controlled charger.</summary>
-    [Parameter] public PvDeviceRole Role { get; set; } = PvDeviceRole.Inverter;
-
-    private bool Charger => Role == PvDeviceRole.Charger;
-
-    // The element ids: inverter-snapshot-save, charger-snapshot-save.
-    private string Prefix => Charger ? "charger" : "inverter";
+    // The element ids: inverter-snapshot-save, and so on.
+    private const string Prefix = "inverter";
 
     private string _note = string.Empty;
     private bool _busy;
@@ -58,7 +52,7 @@
 
         try
         {
-            var file = await Snapshot.TakeAsync(Role, _note);
+            var file = await Snapshot.TakeAsync(_note);
             await JS.InvokeVoidAsync("gleanvolt.downloadText", file.FileName, file.Json, "application/json");
             _saved = file.FileName;
         }

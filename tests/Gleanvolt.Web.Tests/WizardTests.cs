@@ -62,7 +62,7 @@ public class WizardTests : PageTest
         var page = Step("inverter");
 
         Assert.NotNull(page.Find(Field(PvSystemSettingKeys.InverterHost)));
-        Assert.Empty(page.FindAll(Field(PvSystemSettingKeys.ChargerHost)));
+        Assert.Empty(page.FindAll("[id^='pv-Pv-Chargers']"));
         Assert.Empty(page.FindAll(Field(PvSystemSettingKeys.Latitude)));
         Assert.Empty(page.FindAll(Field(PvSystemSettingKeys.HomeBatteryCapacityKWh)));
     }
@@ -114,7 +114,7 @@ public class WizardTests : PageTest
         var page = Step("inverter");
         page.Find("#discovery-scan").Click();
 
-        _discovery.Finish(Inverter, Charger, Inverter with { Host = "192.168.1.30", Port = 80, UnitId = null, Role = PvDeviceRole.Charger, Driver = "wallco" });
+        _discovery.Finish(Inverter, Charger, Inverter with { Host = "192.168.1.30", Port = 80, UnitId = null, Role = null, Driver = null });
 
         page.WaitForAssertion(() => Assert.Equal(3, page.FindAll("#discovery-results tbody tr").Count));
         var rows = page.FindAll("#discovery-results tbody tr");
@@ -177,19 +177,7 @@ public class WizardTests : PageTest
 
         var saved = Assert.Single(_pv.Saves);
         Assert.Equal("192.168.1.10", saved[PvSystemSettingKeys.InverterHost]);
-        Assert.False(saved.ContainsKey(PvSystemSettingKeys.ChargerHost));
-    }
-
-    [Fact]
-    public void A_charger_chosen_as_the_inverter_is_allowed_but_said()
-    {
-        _discovery.Finish(Inverter, Charger);
-        var page = Step("inverter");
-
-        page.FindAll("#discovery-results tbody tr")[1].QuerySelector("button")!.Click();
-
-        Assert.Contains("identified itself as a charger", page.Find("#discovery-role-warning").TextContent);
-        Assert.Equal("192.168.1.11", page.Find(Field(PvSystemSettingKeys.InverterHost)).GetAttribute("value"));
+        Assert.DoesNotContain(saved.Keys, key => key.StartsWith("Pv:Chargers", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -324,15 +312,16 @@ public class WizardTests : PageTest
 
         // The fixture's own data: addresses, models, file names.
         PseudoLocale.AssertTranslated(
-            page.Markup, "192.168.1.10", "192.168.1.11", "192.168.1.0/24", "X3-HYB-G4 PRO", "X3-HAC", ".env", "README", "SolaX Acme", "SolaX Wallco",
+            page.Markup, "192.168.1.10", "192.168.1.11", "192.168.1.0/24", "X3-HYB-G4 PRO", "Not an inverter Gleanvolt knows.", ".env", "README", "SolaX Acme", "SolaX Wallco",
             "502", "Home Roof", "home-roof", "SolaX X3-HYB-G4 PRO", "wallbox", "Home Assistant");
     }
 
     private static readonly FoundDevice Inverter =
         new("192.168.1.10", 502, 1, PvDeviceRole.Inverter, "X3-HYB-G4 PRO", "H34A10", true, "");
 
+    // A charger, as the search sees one since 1.4 (#445): it answers Modbus, and nothing says what it is.
     private static readonly FoundDevice Charger =
-        new("192.168.1.11", 502, 3, PvDeviceRole.Charger, "X3-HAC", "C31", true, "");
+        new("192.168.1.11", 502, 3, null, null, null, false, "Not an inverter Gleanvolt knows.");
 
     private sealed class SwitchableSetup : ISetupState
     {

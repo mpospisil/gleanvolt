@@ -14,8 +14,7 @@ namespace Gleanvolt.Hosting.Chargers;
 /// The charger's hub (#435): a plugin publishes readings of the charger and says how each command ended, and
 /// <see cref="ExternalChargerLink"/> hands both to the driver that waits for them. Nothing here waits.
 ///
-/// <para>On while the controlled charger's driver is <see cref="ExternalChargerDriverFactory.DriverId"/>. The
-/// driver is chosen with the installation, so changing it takes a restart, as for every other brand.</para>
+/// <para>Always on: since 1.4 (#445) every charger is behind a plugin.</para>
 /// </summary>
 public sealed class ChargerHub(
     ExternalProviderRegistry registry,
@@ -32,15 +31,12 @@ public sealed class ChargerHub(
         ChargerContract.Major,
         ChargerContract.Minor,
         ChargerContract.HubPath,
-        services => IsSelected(services.GetRequiredService<PvSystemInfo>()))
+        // Always on: since 1.4 (#445) every charger is behind a plugin.
+        _ => true)
     {
         // A plugin writes to a device: a second one started by mistake, a sample, must not take it over (#440).
         RemembersProvider = true,
     };
-
-    /// <summary>Whether the controlled charger is one behind a plugin.</summary>
-    public static bool IsSelected(PvSystemInfo site) =>
-        site.Chargers is [var charger, ..] && charger.Driver == ExternalChargerDriverFactory.DriverId;
 
     protected override ChargerWelcome CreateWelcome() => new()
     {
@@ -50,8 +46,7 @@ public sealed class ChargerHub(
     };
 
     /// <summary>
-    /// The charger's capabilities against the charge control's limits (#440), by the same rule the built-in drivers
-    /// are checked by at startup. A 1.0 plugin, which says none, is taken as <see cref="ChargerCapabilities.Default"/>.
+    /// The charger's capabilities against the charge control's limits (#440). A 1.0 plugin, which says none, is taken as <see cref="ChargerCapabilities.Default"/>.
     /// </summary>
     protected override (string? Code, string? Reason, IReadOnlyList<Phrase?>? Phrases) Admit(ProviderHello hello)
     {
@@ -67,7 +62,7 @@ public sealed class ChargerHub(
         var options = chargeControl.Value;
         var problems = new ConfigurationProblems();
         PvSystemRules.CheckChargeLimits(
-            Describe(hello.Name, capabilities), options.MinChargingCurrentAmps, options.MaxChargingCurrentAmps, options.Phases, problems);
+            hello.Name, ExternalChargerDriver.CapabilitiesOf(capabilities), options.MinChargingCurrentAmps, options.MaxChargingCurrentAmps, options.Phases, problems);
 
         return problems.Count > 0
             ? (RefusalCodes.Limits, string.Join(" ", problems), problems.Phrases)
@@ -75,14 +70,6 @@ public sealed class ChargerHub(
     }
 
     protected override void OnAttached(ProviderHello hello) => link.Attached(hello.Charger ?? ChargerCapabilities.Default);
-
-    /// <summary>A plugin's charger as the startup rule sees a driver.</summary>
-    internal static EvChargerDriverInfo Describe(string name, ChargerCapabilities capabilities) => new(
-        ExternalChargerDriverFactory.DriverId,
-        name,
-        EvChargerTransport.External,
-        null,
-        ExternalChargerDriver.CapabilitiesOf(capabilities));
 
     private ChargerLimits Limits
     {

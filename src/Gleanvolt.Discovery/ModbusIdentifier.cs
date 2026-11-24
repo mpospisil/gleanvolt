@@ -1,6 +1,5 @@
 using System.Net.Sockets;
 using Gleanvolt.Core.Models;
-using Gleanvolt.Infrastructure.RegisterMaps;
 using Gleanvolt.Devices;
 using Gleanvolt.Devices.Huawei;
 using Gleanvolt.Devices.Solax;
@@ -132,20 +131,6 @@ internal sealed class ModbusIdentifier(
                 .ConfigureAwait(false);
         }
 
-        // Something is at this unit id. The charger keeps its serial number elsewhere.
-        var chargerSerial = await ReadAsync(
-            pacer, () => client.ReadHoldingRegistersAsync(
-                EvChargerRegisterMap.SerialNumberStart, EvChargerRegisterMap.SerialNumberCount, cancellationToken),
-            cancellationToken).ConfigureAwait(false);
-
-        var otherSerial = Serial(chargerSerial);
-
-        if (SolaxModels.Charger(otherSerial) is { } charger)
-        {
-            return await IdentifiedAsync(client, pacer, host, port, unitId, otherSerial!, charger, cancellationToken)
-                .ConfigureAwait(false);
-        }
-
         // Huawei keeps a model name at 30000 rather than a serial number in SolaX's shape (#324).
         var huaweiName = await ReadAsync(
             pacer, () => client.ReadHoldingRegistersAsync(
@@ -171,22 +156,7 @@ internal sealed class ModbusIdentifier(
             }
         }
 
-        // Huawei's SCharger keeps no serial number and no model name: its phase voltages at 0x1000 are what
-        // its own driver's probe reads (#353).
-        if (serial is null && otherSerial is null)
-        {
-            var voltages = await ReadAsync(
-                pacer, () => client.ReadHoldingRegistersAsync(SChargerRegisterMap.PhaseL1Voltage, 6, cancellationToken),
-                cancellationToken).ConfigureAwait(false);
-
-            if (voltages is { Outcome: ReadOutcome.Data, Registers: { Length: >= 6 } phases }
-                && HuaweiSChargerDriver.IsMainsVoltage(Word32(phases, 0)))
-            {
-                return new UnitAttempt.Answered(SCharger(host, port, unitId, phases));
-            }
-        }
-
-        if ((serial ?? otherSerial) is { } unknown)
+        if (serial is { } unknown)
         {
             return new UnitAttempt.Answered(new DiscoveredDevice(
                 host, port, unitId, DiscoveryFinding.SolaxDevice, null, null, null, unknown,
@@ -197,8 +167,8 @@ internal sealed class ModbusIdentifier(
 
         return new UnitAttempt.Answered(new DiscoveredDevice(
             host, port, unitId, DiscoveryFinding.NotSolax, null, null, null, null, SupportTier.NotSolax, null,
-            "Answers Modbus, but has no SolaX serial number, no Huawei model name and is no SCharger: not a device "
-            + "Gleanvolt knows."));
+            "Answers Modbus, but has no SolaX serial number and no Huawei model name: not an inverter Gleanvolt "
+            + "knows. A charger? Its plugin's page has a search of its own."));
     }
 
     // A SUN2000 (#324): its serial number, to tell repeated answers apart; the battery's state of charge,
@@ -253,25 +223,6 @@ internal sealed class ModbusIdentifier(
             Topology: behindEmma ? HuaweiSun2000DriverFactory.EmmaTopology : null));
     }
 
-    // An SCharger (#353). The protocol names no model, so the phases decide it: L2 and L3 with no mains voltage
-    // is the one-phase 7KS. A 22KT wired to one phase reads the same, which the note says.
-    private static DiscoveredDevice SCharger(string host, int port, byte unitId, ushort[] phases)
-    {
-        var l1 = Word32(phases, 0);
-        var threePhase = HuaweiSChargerDriver.IsMainsVoltage(Word32(phases, 2)) || HuaweiSChargerDriver.IsMainsVoltage(Word32(phases, 4));
-
-        return new DiscoveredDevice(
-            host, port, unitId, DiscoveryFinding.HuaweiDevice, PvDeviceRole.Charger,
-            threePhase ? "SCharger-22KT-S0" : "SCharger-7KS-S0", "SCharger EV charger", null, SupportTier.Expected, true,
-            $"Phase L1 at {l1 / 10.0:0.#} V; {(threePhase ? "three phases" : "one phase")} live, so taken for the "
-            + $"{(threePhase ? "22KT" : "7KS")}: check the label. It reports no status, so an idle charger reads unknown. "
-            + "Untested on hardware; behind an EMMA, leave it to the EMMA.",
-            Driver: threePhase ? HuaweiSChargerDriverFactory.TwentyTwoKtId : HuaweiSChargerDriverFactory.SevenKsId);
-    }
-
-    private static uint Word32(ushort[] registers, int offset) =>
-        ((uint)registers[offset] << 16) | registers[offset + 1];
-
     // Unit 0 on the same connection -- the EMMA takes one client -- answering the grid register the driver
     // reads from it. An SDongle has nothing there.
     private static async Task<bool> AnswersAsEmmaAsync(IModbusClient client, HostPacer pacer, CancellationToken cancellationToken)
@@ -292,8 +243,8 @@ internal sealed class ModbusIdentifier(
         return read.Outcome == ReadOutcome.Data;
     }
 
-    // The serial number says what the box should be; the role check — the register /pv-system's probe
-    // reads — says whether it behaves like it.
+    // The serial number says what the box should be; the state of charge -- the register /pv-system's probe
+    // reads -- says whether it behaves like it.
     private async Task<UnitAttempt> IdentifiedAsync(
         IModbusClient client,
         HostPacer pacer,
@@ -304,7 +255,7 @@ internal sealed class ModbusIdentifier(
         SolaxModel model,
         CancellationToken cancellationToken)
     {
-        var register = DeviceRoleCheck.Register(model.Role);
+        var register = SolaxInverterDriver.ProbeRegister;
         var read = await ReadAsync(
             pacer, () => client.ReadInputRegistersAsync(register, 1, cancellationToken), cancellationToken)
             .ConfigureAwait(false);
@@ -314,19 +265,14 @@ internal sealed class ModbusIdentifier(
 
         if (read is { Outcome: ReadOutcome.Data, Registers: [var value, ..] })
         {
-            confirmed = DeviceRoleCheck.IsPlausible(model.Role, value);
-            note = (model.Role, confirmed) switch
-            {
-                (PvDeviceRole.Inverter, true) => $"Battery at {value} %.",
-                (PvDeviceRole.Inverter, _) =>
-                    $"The serial number says inverter, but its battery register reads {value}, which is no state of charge.",
-                (_, true) => $"Charger run mode {value}.",
-                _ => $"The serial number says charger, but its run-mode register reads {value}, which no charger reports.",
-            };
+            confirmed = SolaxInverterDriver.IsStateOfCharge(value);
+            note = confirmed.Value
+                ? $"Battery at {value} %."
+                : $"The serial number says inverter, but its battery register reads {value}, which is no state of charge.";
         }
         else
         {
-            note = $"Did not answer the role check at input register 0x{register:X2}.";
+            note = $"Did not answer the battery register at input register 0x{register:X2}.";
         }
 
         if (model.Tier == SupportTier.NotSupported)

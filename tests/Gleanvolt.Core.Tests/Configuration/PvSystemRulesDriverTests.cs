@@ -29,7 +29,6 @@ public class PvSystemRulesDriverTests
             UnitId = unitId,
             UnmeteredGridPhase = unmetered,
         },
-        Chargers = [new PvChargerOptions { Host = "192.168.2.6" }],
     };
 
     private static (PvSystemInfo Site, ConfigurationProblems Problems) Resolve(PvSystemOptions pv, IReadOnlyList<InverterDriverInfo>? drivers = null)

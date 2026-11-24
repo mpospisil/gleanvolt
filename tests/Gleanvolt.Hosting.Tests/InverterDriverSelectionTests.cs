@@ -4,13 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Devices;
-using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Huawei;
 using Gleanvolt.Devices.Solax;
 using Gleanvolt.Hosting.Chargers;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Setup;
 using Gleanvolt.Infrastructure;
+using Gleanvolt.Modbus;
 
 namespace Gleanvolt.Hosting.Tests;
 
@@ -130,151 +130,48 @@ public class InverterDriverSelectionTests
     }
 
     [Fact]
-    public void The_charger_catalog_has_solax_first_then_the_two_sChargers_then_go_e_then_the_plugin()
+    public async Task The_container_drives_the_charger_through_a_plugin_and_opens_no_connection_to_it()
     {
-        Assert.Equal(["solax", "huawei-7ks", "huawei-22kt", "goe", "external"], ChargerDrivers.Known.Select(driver => driver.Id));
-        Assert.Equal(EvChargerTransport.External, ChargerDrivers.Known[^1].Transport);
-    }
-
-    [Fact]
-    public async Task The_container_runs_a_charger_behind_a_plugin_with_no_address_and_turns_its_hub_on()
-    {
-        // #435: the plugin reaches the charger, so the configuration names none, and the start does not refuse it.
-        var builder = WebApplication.CreateSlimBuilder();
-        builder.Configuration.AddInMemoryCollection(
-            [.. UsableSite.Pairs.Where(pair => pair.Key != "Pv:Chargers:0:Host"), new("Pv:Chargers:0:Driver", "external"), new("Web:Enabled", "false")]);
-        builder.Services.AddGleanvolt(builder.Configuration);
-        await using var provider = builder.Services.BuildServiceProvider();
-
-        var site = provider.GetRequiredService<PvSystemInfo>();
-        Assert.Equal("external", site.Chargers[0].Driver);
-        Assert.Equal(string.Empty, site.Chargers[0].Connection.Host);
-        Assert.Contains("through a plugin", site.Describe());
-        Assert.IsType<ExternalChargerDriver>(provider.GetRequiredService<IEvChargerDriver>());
-
-        var registry = provider.GetRequiredService<Gleanvolt.Providers.Server.ExternalProviderRegistry>();
-        Assert.True(registry.IsEnabled(ChargerHub.Kind));
-
-        // The Settings page's device snapshot asks for the charger's HTTP client: with no address it must still
-        // resolve (it crashed the page on 1.3.2), and refuse to be used.
-        Assert.NotNull(provider.GetRequiredService<IDeviceSnapshot>());
-        var http = provider.GetRequiredKeyedService<HttpClient>(ModbusClientKeys.EvCharger);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => http.GetAsync("/"));
-    }
-
-    [Fact]
-    public async Task Any_other_charger_driver_leaves_the_charger_hub_off()
-    {
+        // #445: every charger is behind a plugin. The hub is on, and nothing in the container reaches the charger
+        // itself: a charger that serves one Modbus client drops a second.
         var builder = WebApplication.CreateSlimBuilder();
         builder.Configuration.AddInMemoryCollection([.. UsableSite.Pairs, new("Web:Enabled", "false")]);
         builder.Services.AddGleanvolt(builder.Configuration);
         await using var provider = builder.Services.BuildServiceProvider();
 
+        Assert.IsType<ExternalChargerDriver>(provider.GetRequiredService<IEvChargerDriver>());
+        Assert.Null(provider.GetKeyedService<IModbusClient>("EvCharger"));
+        Assert.Null(provider.GetKeyedService<IModbusClient>("charger"));
+        Assert.Null(provider.GetKeyedService<HttpClient>("EvCharger"));
+
         var registry = provider.GetRequiredService<Gleanvolt.Providers.Server.ExternalProviderRegistry>();
-        Assert.False(registry.IsEnabled(ChargerHub.Kind));
-    }
-
-    [Fact]
-    public void Headless_a_charger_with_neither_an_address_nor_the_plugin_driver_still_stops_the_start()
-    {
-        var error = Record.Exception(() => PvSystemResolver.Resolve(Configuration(
-            [.. UsableSite.Settings.Where(setting => setting.Key != "Pv:Chargers:0:Host"), ("Pv:Chargers:0:Driver", "goe")])));
-
-        Assert.NotNull(error);
-        Assert.Contains("Pv:Chargers:0:Host is required", error.Message);
-    }
-
-    [Fact]
-    public async Task The_container_runs_go_e_over_http_on_port_80_and_in_dry_run_passes_only_reads()
-    {
-        // go-e (#352): the driver gets the charger's HTTP client, at the configured host on the family's port,
-        // and in dry-run that client drops anything the driver did not mark as a read without sending it.
-        var builder = WebApplication.CreateSlimBuilder();
-        builder.Configuration.AddInMemoryCollection(
-            [.. UsableSite.Pairs, new("Pv:Chargers:0:Driver", "goe"), new("ChargeControl:DryRun", "true"), new("Web:Enabled", "false")]);
-        builder.Services.AddGleanvolt(builder.Configuration);
-        await using var provider = builder.Services.BuildServiceProvider();
-
-        Assert.IsType<GoeChargerDriver>(provider.GetRequiredService<IEvChargerDriver>());
-        Assert.Equal(80, provider.GetRequiredService<PvSystemInfo>().Chargers[0].Connection.Port);
-
-        var http = provider.GetRequiredKeyedService<HttpClient>(ModbusClientKeys.EvCharger);
-        Assert.Equal(new Uri("http://127.0.0.2:80/"), http.BaseAddress);
-
-        using var write = ChargerHttp.Write("api/set?amp=6");
-        using var answer = await http.SendAsync(write);
-        Assert.Equal("{}", await answer.Content.ReadAsStringAsync());
-    }
-
-    [Fact]
-    public async Task The_container_runs_the_sCharger_with_the_charge_controls_phases()
-    {
-        // The SCharger's setpoint is power, so the driver has to convert at the phases the car charges on (#351).
-        var builder = WebApplication.CreateSlimBuilder();
-        builder.Configuration.AddInMemoryCollection(
-            [.. UsableSite.Pairs, new("Pv:Chargers:0:Driver", "huawei-22kt"), new("ChargeControl:Phases", "1"), new("Web:Enabled", "false")]);
-        builder.Services.AddGleanvolt(builder.Configuration);
-        await using var provider = builder.Services.BuildServiceProvider();
-
-        var driver = Assert.IsType<HuaweiSChargerDriver>(provider.GetRequiredService<IEvChargerDriver>());
-        Assert.Equal(3, driver.Capabilities.Phases);
-        Assert.Equal(1, driver.SetpointPhases);
-        Assert.False(driver.Capabilities.ReportsStatus);
-    }
-
-    [Fact]
-    public void Headless_three_phases_on_the_single_phase_sCharger_stops_the_start()
-    {
-        var error = Record.Exception(() => PvSystemResolver.Resolve(Configuration(
-            [.. UsableSite.Settings, ("Pv:Chargers:0:Driver", "huawei-7ks"), ("ChargeControl:Phases", "3")])));
-
-        Assert.NotNull(error);
-        Assert.Contains("more than the Huawei SCharger-7KS charger supplies (1)", error.Message);
-    }
-
-    [Fact]
-    public async Task The_container_runs_the_configured_charger_driver()
-    {
-        var builder = WebApplication.CreateSlimBuilder();
-        builder.Configuration.AddInMemoryCollection([.. UsableSite.Pairs, new("Pv:Chargers:0:Driver", "SOLAX"), new("Web:Enabled", "false")]);
-        builder.Services.AddGleanvolt(builder.Configuration);
-        await using var provider = builder.Services.BuildServiceProvider();
-
-        Assert.IsType<SolaxChargerDriver>(provider.GetRequiredService<IEvChargerDriver>());
-        Assert.Equal("solax", provider.GetRequiredService<PvSystemInfo>().Chargers[0].Driver);
-    }
-
-    [Fact]
-    public void Headless_an_unknown_charger_driver_stops_the_start_naming_the_known_drivers()
-    {
-        var error = Record.Exception(() =>
-            PvSystemResolver.Resolve(Configuration([.. UsableSite.Settings, ("Pv:Chargers:0:Driver", "wallco")])));
-
-        Assert.NotNull(error);
-        Assert.Contains("Pv:Chargers:0:Driver ('wallco')", error.Message);
-        Assert.Contains("Known drivers: solax", error.Message);
+        Assert.True(registry.IsEnabled(ChargerHub.Kind));
     }
 
     [Theory]
-    [InlineData("ChargeControl:MaxChargingCurrentAmps", "40", "above the highest current the SolaX charger accepts (32 A)")]
-    [InlineData("ChargeControl:MinChargingCurrentAmps", "4", "below the lowest current the SolaX charger charges at (6 A)")]
-    [InlineData("ChargeControl:Phases", "4", "more than the SolaX charger supplies (3)")]
-    public void Headless_a_charge_limit_the_charger_cannot_honour_stops_the_start(string key, string value, string expected)
+    [InlineData("", "192.168.2.6")]
+    [InlineData("goe", "192.168.2.6")]
+    [InlineData("huawei-7ks", "")]
+    [InlineData("wallco", "")]
+    public async Task A_charger_configured_for_a_built_in_driver_is_ignored(string driver, string host)
     {
-        var error = Record.Exception(() => PvSystemResolver.Resolve(Configuration([.. UsableSite.Settings, (key, value)])));
+        // An installation upgraded from 1.3 still has its charger in Pv:Chargers. It starts, on the plugin.
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.Configuration.AddInMemoryCollection(
+            [.. UsableSite.Pairs, new("Pv:Chargers:0:Driver", driver), new("Pv:Chargers:0:Host", host), new("Web:Enabled", "false")]);
+        builder.Services.AddGleanvolt(builder.Configuration);
+        await using var provider = builder.Services.BuildServiceProvider();
 
-        Assert.NotNull(error);
-        Assert.Contains(expected, error.Message);
+        Assert.IsType<ExternalChargerDriver>(provider.GetRequiredService<IEvChargerDriver>());
+        Assert.Null(provider.GetKeyedService<IModbusClient>("charger"));
     }
 
     [Fact]
-    public void In_setup_mode_a_charge_limit_the_charger_cannot_honour_is_a_configuration_problem()
+    public void Charge_limits_are_the_plugins_to_check_not_the_starts()
     {
-        var status = SetupStatusEvaluator.Evaluate(
-            Configuration([.. UsableSite.Settings, ("ChargeControl:MaxChargingCurrentAmps", "40")]),
-            new SetupHost(TimeZoneInfo.Utc, IsWindows: false));
+        // Checked at the plugin's hello, against what its charger says it can do (#440).
+        var site = PvSystemResolver.Resolve(Configuration([.. UsableSite.Settings, ("ChargeControl:MaxChargingCurrentAmps", "40")]));
 
-        var problem = Assert.Single(status.MissingRequired);
-        Assert.Equal(SetupArea.Configuration, problem.Area);
+        Assert.Equal("127.0.0.1", site.Inverter.Connection.Host);
     }
 }

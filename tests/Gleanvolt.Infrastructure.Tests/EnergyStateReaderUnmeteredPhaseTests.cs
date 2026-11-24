@@ -14,8 +14,7 @@ public class EnergyStateReaderUnmeteredPhaseTests
     private static PvSystemInfo Site(GridPhase? unmetered) => new(
         Id: "", Name: "", Address: "", Latitude: null, Longitude: null, AzimuthDegrees: null, TiltDegrees: null,
         PeakPowerWatts: null, InverterCapacityWatts: null, LossFactor: null, InstallDate: null,
-        Inverter: new PvDeviceInfo("Inverter", "", "", new DeviceConfig { Host = "inverter" }),
-        Chargers: [])
+        Inverter: new PvDeviceInfo("Inverter", "", "", new DeviceConfig { Host = "inverter" }))
     {
         UnmeteredGridPhase = unmetered,
     };
@@ -37,7 +36,7 @@ public class EnergyStateReaderUnmeteredPhaseTests
     private static Task<EnergyState> Read(GridPhase? unmetered) =>
         new EnergyStateReader(
             new SolaxInverterDriver(Inverter()),
-            new SolaxChargerDriver(new FakeModbusClient()),
+            new FakeCharger(),
             NullLogger<EnergyStateReader>.Instance,
             Site(unmetered),
             new ChargingLimits(6, 16, 3)).ReadAsync();

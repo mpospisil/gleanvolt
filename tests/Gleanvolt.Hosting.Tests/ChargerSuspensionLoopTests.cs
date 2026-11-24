@@ -178,7 +178,7 @@ public sealed class ChargerSuspensionLoopTests : IDisposable
             var clock = new Clock { Now = states[0].Timestamp };
             var reader = new ClockedReader(clock, states);
             var monitor = new ChargerAvailabilityMonitor(
-                clock, TimeSpan.FromMinutes(2), () => false, () => null, NullLogger<ChargerAvailabilityMonitor>.Instance);
+                clock, TimeSpan.FromMinutes(2), () => null, NullLogger<ChargerAvailabilityMonitor>.Instance);
             Monitor = monitor;
             var fastController = new FastChargingController(chargeControl.MaxChargingCurrentAmps, chargeControl.CompletionDwell);
             var forecastOptions = Options.Create(new ForecastChargeOptions { BatteryCapacityKWh = 9.0 });

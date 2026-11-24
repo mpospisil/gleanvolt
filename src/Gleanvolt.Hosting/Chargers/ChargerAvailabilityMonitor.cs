@@ -20,7 +20,6 @@ public sealed class ChargerAvailabilityMonitor : IChargerAvailability
 {
     private readonly TimeProvider _time;
     private readonly TimeSpan _grace;
-    private readonly Func<bool> _behindPlugin;
     private readonly Func<ExternalProviderStatus?> _plugin;
     private readonly ILogger<ChargerAvailabilityMonitor> _logger;
     private readonly Lock _gate = new();
@@ -30,13 +29,11 @@ public sealed class ChargerAvailabilityMonitor : IChargerAvailability
     public ChargerAvailabilityMonitor(
         TimeProvider time,
         IOptions<ChargeControlOptions> options,
-        PvSystemInfo site,
         IServiceProvider services,
         ILogger<ChargerAvailabilityMonitor> logger)
         : this(
             time,
             options.Value.ChargerUnavailableAfter,
-            () => ChargerHub.IsSelected(site),
             () => services.GetService<IExternalProviders>()?.Find(ChargerContract.Kind),
             logger)
     {
@@ -44,19 +41,16 @@ public sealed class ChargerAvailabilityMonitor : IChargerAvailability
 
     /// <param name="time">The clock the grace period is measured on.</param>
     /// <param name="grace">How long an outage may last before it counts.</param>
-    /// <param name="behindPlugin">Whether the charger is behind a plugin.</param>
     /// <param name="plugin">The charger kind's session, or null when the host has none.</param>
     /// <param name="logger">For the transitions.</param>
     internal ChargerAvailabilityMonitor(
         TimeProvider time,
         TimeSpan grace,
-        Func<bool> behindPlugin,
         Func<ExternalProviderStatus?> plugin,
         ILogger<ChargerAvailabilityMonitor> logger)
     {
         _time = time;
         _grace = grace < TimeSpan.Zero ? TimeSpan.Zero : grace;
-        _behindPlugin = behindPlugin;
         _plugin = plugin;
         _logger = logger;
     }
@@ -122,7 +116,7 @@ public sealed class ChargerAvailabilityMonitor : IChargerAvailability
     // What is wrong right now, before the grace period: null when nothing is.
     private ChargerAvailability? Assess(string? readError)
     {
-        if (_behindPlugin() && _plugin() is { } plugin)
+        if (_plugin() is { } plugin)
         {
             if (plugin.State != ExternalProviderState.Connected)
             {

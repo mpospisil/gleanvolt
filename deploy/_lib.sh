@@ -22,8 +22,8 @@ say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
 # The plugins released with Gleanvolt (#426): each is the compose service gleanvolt-plugin-<name> under
 # the profile <name>, with its data in plugins/<name>. GLEANVOLT_PLUGINS in the Pi's .env picks which run. The
-# charger plugins (#444) come from gleanvolt-chargers; at most one runs, and the controller then drives the charger
-# through it (GLEANVOLT_CHARGER_PLUGIN below).
+# charger plugins (#444) come from gleanvolt-chargers; at most one runs, and since 1.4 (#445) it is the only way the
+# controller reaches the charger.
 CHARGER_PLUGINS="solax huawei goe shelly"
 KNOWN_PLUGINS="openweather $CHARGER_PLUGINS"
 
@@ -185,10 +185,8 @@ EOF
         esac
     done
 
-    # One charger plugin at most: one charger is supported, and two plugins would both want it. With one, the controller
-    # is told to drive the charger through it (ExternalCharger:UsePlugin), whatever PV_CHARGER_DRIVER or Settings says,
-    # so the built-in driver never opens the charger beside it: a charger that serves one Modbus client drops a second.
-    local charger_plugins="" charger_plugin=false
+    # One charger plugin at most: one charger is supported, and two plugins would both want it.
+    local charger_plugins=""
     for plugin in $enabled; do
         case " $CHARGER_PLUGINS " in
             *" $plugin "*) charger_plugins="$charger_plugins $plugin" ;;
@@ -202,7 +200,28 @@ One charger is supported. Keep the one for your charger and deploy again.
 EOF
         exit 1
     fi
-    [ -n "$charger_plugins" ] && charger_plugin=true
+
+    # An .env from before 1.4 (#445): the charger ran on a built-in driver, which is gone. Its address is still
+    # EV_CHARGER_HOST and its brand PV_CHARGER_DRIVER, so run the plugin that replaced that driver, and say so.
+    if [ -z "$charger_plugins" ] && [ -n "$(env_value EV_CHARGER_HOST)" ]; then
+        local replacing
+        case "$(env_value PV_CHARGER_DRIVER | tr '[:upper:]' '[:lower:]')" in
+            ""|solax) replacing=solax ;;
+            huawei-7ks|huawei-22kt) replacing=huawei ;;
+            goe) replacing=goe ;;
+            *) replacing="" ;;
+        esac
+        if [ -n "$replacing" ]; then
+            say "Running the $replacing charger plugin: Gleanvolt 1.4 has no built-in charger drivers"
+            cat <<EOF
+EV_CHARGER_HOST is set in $REMOTE_DIR/.env, and GLEANVOLT_PLUGINS names no charger plugin. The $replacing plugin
+replaced the built-in driver this .env ran on. Add it to GLEANVOLT_PLUGINS to say so yourself:
+
+    GLEANVOLT_PLUGINS=$(echo $enabled $replacing | tr ' ' ',')
+EOF
+            enabled="$enabled $replacing"
+        fi
+    fi
 
     if [ -n "$enabled" ]; then
         # Without the token a plugin stops at start, and its restart policy brings it back to stop
@@ -260,10 +279,10 @@ EOF
     esac
 
     say "Pulling images${IMAGE_TAG:+ (IMAGE_TAG=$IMAGE_TAG)}"
-    ssh_pi "cd '$REMOTE_DIR' && COMPOSE_PROFILES='$profiles' GLEANVOLT_CHARGER_PLUGIN=$charger_plugin ${IMAGE_TAG:+IMAGE_TAG='$IMAGE_TAG' }docker compose pull"
+    ssh_pi "cd '$REMOTE_DIR' && COMPOSE_PROFILES='$profiles' ${IMAGE_TAG:+IMAGE_TAG='$IMAGE_TAG' }docker compose pull"
 
     say "Starting"
-    ssh_pi "cd '$REMOTE_DIR' && COMPOSE_PROFILES='$profiles' GLEANVOLT_CHARGER_PLUGIN=$charger_plugin ${IMAGE_TAG:+IMAGE_TAG='$IMAGE_TAG' }docker compose up -d --remove-orphans"
+    ssh_pi "cd '$REMOTE_DIR' && COMPOSE_PROFILES='$profiles' ${IMAGE_TAG:+IMAGE_TAG='$IMAGE_TAG' }docker compose up -d --remove-orphans"
 
     # A plugin taken off GLEANVOLT_PLUGINS is stopped and removed: `up` leaves a service whose profile
     # is not active alone, and --remove-orphans only removes services the file no longer has. Its data
@@ -281,7 +300,7 @@ EOF
     done
 
     say "Status"
-    ssh_pi "cd '$REMOTE_DIR' && COMPOSE_PROFILES='$profiles' GLEANVOLT_CHARGER_PLUGIN=$charger_plugin docker compose ps"
+    ssh_pi "cd '$REMOTE_DIR' && COMPOSE_PROFILES='$profiles' docker compose ps"
 
     next="    ssh $PI_HOST 'cd $REMOTE_DIR && docker compose logs -f gleanvolt-controller'"
     case ",$profiles," in
