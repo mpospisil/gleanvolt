@@ -26,6 +26,9 @@
 
 <h1>@SettingsText.SettingsTitle</h1>
 
+@* The plugins come first, above both tabs (#457): the one token, and every kind's hub and session. *@
+<ExternalProvidersForm />
+
 <SettingsTabs Current="SettingsTab.Installation" />
 
 <SetupModeBanner />
@@ -34,13 +37,13 @@
 
 <PvSystemEditorForm OfferSnapshot="true" />
 
+<ChargerProviderForm />
+
 <SolcastAccountForm />
 
 <WeatherForm />
 
 <TariffEditorForm />
-
-<ExternalProvidersForm />
 
 <ChangePassword />
 

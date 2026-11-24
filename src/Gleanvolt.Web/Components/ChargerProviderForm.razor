@@ -1,0 +1,36 @@
+@inject IExternalProviders Providers
+@implements IDisposable
+
+@*
+    The charger (#457): since #445 always a plugin's, so there is nothing to choose here, only the plugin
+    connected and its own page, where its settings are. Before this the charger fields left the
+    installation form (#456) and Settings said nothing about the charger at all.
+
+    The plugin the charger remembers (#440), and forgetting it, stay in the External providers section.
+*@
+
+@if (Providers.Find("charger") is not null)
+{
+    <section class="controls pv-editor charger-editor" id="charger-editor">
+        <div class="section-head tip-head">
+            <h2>@SettingsText.Charger</h2>
+            <InfoTip Topic="@SettingsText.ChargerTopic" Group="settings-info" Wide="true">
+                <p>@SettingsText.ChargerTip1</p>
+            </InfoTip>
+        </div>
+
+        <ExternalProviderPanel Kind="charger" />
+        <ExternalProviderPage Kind="charger" Intro="@SettingsText.ExternalPageSettingsIntro" />
+    </section>
+}
+
+@code {
+    // The viewer's culture, for the renders a session change asks for (#290).
+    private readonly ViewerCulture _viewer = new();
+
+    protected override void OnInitialized() => Providers.Changed += Refresh;
+
+    public void Dispose() => Providers.Changed -= Refresh;
+
+    private void Refresh() => _ = InvokeAsync(_viewer.Wrap(StateHasChanged));
+}

@@ -20,15 +20,17 @@
     var name = status.ProviderName ?? status.Name;
 
     <div class="external-provider-page" id="external-@(status.Kind)-page">
-        <p class="muted">@Localized.Format(Intro ?? CarText.ExternalPageIntro, name)</p>
-
         <iframe id="external-@(status.Kind)-frame" src="@status.PagePath" title="@Localized.Format(CarText.ExternalPageFrameTitle, name)"
                 referrerpolicy="no-referrer"></iframe>
 
-        <p class="hint">
-            @CarText.ExternalPageNewTabHint
+        @* What the page is, and why it may stay blank, in the tip (#457); the link stays in sight. *@
+        <div class="hint tip-head external-provider-page-link">
             <a id="external-@(status.Kind)-page-link" href="@status.PagePath" target="_blank" rel="noopener">@CarText.ExternalPageNewTab</a>
-        </p>
+            <InfoTip Topic="@Localized.Format(CarText.ExternalPageFrameTitle, name)" Group="settings-info">
+                <p>@Localized.Format(Intro ?? CarText.ExternalPageIntro, name)</p>
+                <p>@CarText.ExternalPageNewTabHint</p>
+            </InfoTip>
+        </div>
     </div>
 }
 

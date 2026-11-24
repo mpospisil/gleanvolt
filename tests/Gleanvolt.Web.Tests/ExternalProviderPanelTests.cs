@@ -29,12 +29,13 @@ public class ExternalProviderPanelTests : BunitContext
         Render<ExternalProviderPanel>(parameters => parameters.Add(panel => panel.Kind, "tariff").Add(panel => panel.ReadOnly, readOnly));
 
     [Fact]
-    public void ShowsWhereAProviderConnects()
+    public void LeavesTheAddressAndHubToTheExternalProvidersSection()
     {
+        // #457: where providers connect is said once, at the top of Settings.
         var panel = RenderPanel();
 
-        Assert.Equal("http://localhost", panel.Find("#external-tariff-address").TextContent);
-        Assert.Equal("/providers/tariff", panel.Find("#external-tariff-hub").TextContent);
+        Assert.Empty(panel.FindAll("#external-tariff-address"));
+        Assert.Empty(panel.FindAll("#external-tariff-hub"));
     }
 
     [Fact]
@@ -57,7 +58,9 @@ public class ExternalProviderPanelTests : BunitContext
 
         var panel = RenderPanel();
 
-        Assert.Equal("The provider token is under External providers.", panel.Find("#external-tariff-token-state").TextContent.Trim());
+        // With a token there is nothing to warn about: the pointer to it is in the (i).
+        Assert.Empty(panel.FindAll("#external-tariff-token-state"));
+        Assert.Contains("The provider token is under External providers.", panel.Find("details.info").TextContent);
         Assert.DoesNotContain("gvp_kept-in-the-secret-store", panel.Markup);
     }
 

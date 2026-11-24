@@ -2664,6 +2664,11 @@ a.seg-opt {
     margin: 0 0 var(--space-5);
 }
 
+/* External providers above the tabs (#457): a section's gap before the tabs, as between sections. */
+.external-providers + .settings-tabs {
+    margin-top: var(--space-6);
+}
+
 /* A checkbox that is a setting of its own, on the forms saved for the next start. */
 label.check {
     display: inline-flex;
@@ -2744,4 +2749,24 @@ label.check {
     border: 1px solid var(--line);
     border-radius: var(--radius-md);
     background: transparent;
+}
+
+/* A provider's session line and its (i), and the new-tab link under its page (#457): text and tip on one line. */
+.external-provider-head,
+.external-provider-page-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.external-provider-head p {
+    margin: 0;
+}
+
+.external-provider-head {
+    margin: var(--space-2) 0;
+}
+
+.external-provider-page-link {
+    margin: var(--space-2) 0 0;
 }

@@ -766,7 +766,7 @@
     <value>počasí</value>
   </data>
   <data name="WeatherTip1" xml:space="preserve">
-    <value>Gleanvolt se sám žádné služby počasí neptá: počasí mu posílá externí zdroj. Plugin OpenWeather, který vychází s Gleanvoltem, ho čte z bezplatného účtu OpenWeatherMap s klíčem zadaným na vlastní stránce pluginu.</value>
+    <value>Gleanvolt se sám žádné služby počasí neptá: počasí mu posílá externí zdroj a jeho nastavení se zadává na vlastní stránce zdroje.</value>
   </data>
   <data name="HomeAssistantLink" xml:space="preserve">
     <value>Home Assistant (MQTT)</value>
@@ -944,7 +944,7 @@
     <value>Externí</value>
   </data>
   <data name="ExternalProviderIntro" xml:space="preserve">
-    <value>Tato data dodává program mimo Gleanvolt. Připojuje se na tuto adresu s tokenem pro zdroje dat.</value>
+    <value>Tato data dodává program mimo Gleanvolt, plugin. Připojuje se s tokenem pro zdroje dat.</value>
   </data>
   <data name="ExternalAddress" xml:space="preserve">
     <value>Adresa Gleanvoltu</value>
@@ -1073,10 +1073,10 @@
     <value>Uloženo. Zdroj počasí: {0}.</value>
   </data>
   <data name="WeatherNotProvided" xml:space="preserve">
-    <value>Nabíjení se zaznamenává bez počasí. Pokud ho chcete zaznamenávat ze zdroje, například z pluginu OpenWeather, vyberte Externí.</value>
+    <value>Nabíjení se zaznamenává bez počasí. Pokud ho chcete zaznamenávat ze zdroje, vyberte Externí.</value>
   </data>
-  <data name="WeatherExternalIntro" xml:space="preserve">
-    <value>Počasí posílá zdroj připojený tady. Hotovým zdrojem je plugin OpenWeather, který vychází s Gleanvoltem: čte OpenWeatherMap s klíčem zadaným na jeho stránce níže. Gleanvolt se zdroje zeptá, když nabíjení začne a když skončí; pokud zdroj neodpoví, nabíjení se zaznamená bez počasí.</value>
+  <data name="WeatherTip2" xml:space="preserve">
+    <value>Gleanvolt se zdroje zeptá, když nabíjení začne a když skončí; pokud zdroj neodpoví, nabíjení se zaznamená bez počasí.</value>
   </data>
   <data name="WeatherExternalWizard" xml:space="preserve">
     <value>Zdroj připojíte po dokončení nastavení v Nastavení: najdete tam adresu, token i vlastní stránku zdroje.</value>
@@ -1098,5 +1098,17 @@
   </data>
   <data name="ExternalRefused" xml:space="preserve">
     <value>{0} byl odmítnut {1}: {2}</value>
+  </data>
+  <data name="ExternalProviderTopic" xml:space="preserve">
+    <value>zdroj</value>
+  </data>
+  <data name="ExternalPageSettingsIntro" xml:space="preserve">
+    <value>{0} má vlastní stránku, zobrazenou tady: zadává se na ní jeho nastavení. Stránka pochází přímo od zdroje, ne od Gleanvoltu.</value>
+  </data>
+  <data name="ChargerTopic" xml:space="preserve">
+    <value>nabíječka</value>
+  </data>
+  <data name="ChargerTip1" xml:space="preserve">
+    <value>Gleanvolt řídí nabíječku přes plugin: program mimo Gleanvolt, který se připojuje s tokenem pro zdroje dat. Která nabíječka to je a její nastavení najdete na vlastní stránce pluginu.</value>
   </data>
 </root>
