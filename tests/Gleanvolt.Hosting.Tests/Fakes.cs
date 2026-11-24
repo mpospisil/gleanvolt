@@ -36,8 +36,11 @@ internal sealed class FakeEvChargerControl : IEvChargerControl
     /// <summary>The target amps of the last write, or null if none.</summary>
     public int? LastTarget => CurrentWrites.Count == 0 ? null : CurrentWrites[^1].Target;
 
+    /// <summary>Makes every settings read fail with this exception: a charger with no plugin attached, say.</summary>
+    public Exception? ReadFailure { get; set; }
+
     public Task<EvChargerSettings> ReadSettingsAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(CurrentSettings);
+        ReadFailure is { } failure ? Task.FromException<EvChargerSettings>(failure) : Task.FromResult(CurrentSettings);
 
     public Task SetCurrentAsync(int activeAmps, int targetAmps, string reason, CancellationToken cancellationToken = default)
     {

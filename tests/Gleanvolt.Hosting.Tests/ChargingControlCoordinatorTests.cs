@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Core.Interfaces;
@@ -32,6 +33,33 @@ public class ChargingControlCoordinatorTests
 
     private Task<ChargeControlCycleResult> Cycle() =>
         _coordinator.RunCycleAsync(State(), ChargeControlMode.Solar, plan: null, CancellationToken.None);
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ACycleWithNoPluginAttachedIsOneLine_AnyOtherFailureAWarningWithItsException(bool notConnected)
+    {
+        // A mode resumed at start-up runs before the charger plugin attaches: a state, logged without a stack.
+        var logger = new CapturingLogger();
+        var coordinator = new ChargingControlCoordinator(
+            new Dictionary<ChargeControlMode, IChargingController> { [ChargeControlMode.Solar] = _controller },
+            _charger,
+            new SurplusMovingAverage(TimeSpan.FromMinutes(3)),
+            pauseCurrentAmps: 0,
+            idlePowerThresholdWatts: 200,
+            logger);
+        _charger.ReadFailure = notConnected
+            ? new ChargerNotConnectedException("No charger plugin is connected to Gleanvolt.")
+            : new IOException("timed out");
+        _controller.NextDecision = new(ChargingControlAction.Charge, 16, "charge");
+
+        var result = await coordinator.RunCycleAsync(State(), ChargeControlMode.Solar, plan: null, CancellationToken.None);
+
+        Assert.Equal(ChargeControlState.Idle, result.State);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(notConnected ? LogLevel.Information : LogLevel.Warning, entry.Level);
+        Assert.Equal(notConnected, entry.Exception is null);
+    }
 
     [Fact]
     public async Task ChargeDecision_WritesTheTargetCurrent()
@@ -749,5 +777,18 @@ public class ChargingControlCoordinatorTests
     private static EnergyState Finished(DateTimeOffset at) =>
         new(at, BatterySocPercent: 50, BatteryPowerWatts: 0, SolarPowerWatts: 0, GridPowerWatts: 0,
             EvChargerStatus.Finishing, EvChargerPowerWatts: 0);
-}
 
+    private sealed class CapturingLogger : ILogger<ChargingControlCoordinator>
+    {
+        public List<(LogLevel Level, string Message, Exception? Exception)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter) =>
+            Entries.Add((logLevel, formatter(state, exception), exception));
+    }
+}

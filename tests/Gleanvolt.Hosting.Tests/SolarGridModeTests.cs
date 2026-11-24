@@ -44,6 +44,22 @@ public class SolarGridModeTests
         Assert.NotNull(_status.Current?.SolarGrid);
     }
 
+    [Fact]
+    public async Task InDryRunABridgedSurplusLeavesThePackFree_BecauseTheCarDrawsNothing()
+    {
+        // The bridge's hold is for the car's draw, and in dry run the charger is never started.
+        await RunAsync(
+            new SunForecastService(Now, from: Now, until: Now.AddHours(6), watts: 5_000),
+            tariff: null,
+            lowTariffOnly: false,
+            dryRun: true,
+            Exporting(Now, 3_000),
+            Exporting(Now.AddMinutes(1), 3_000));
+
+        Assert.All(_inverter.Applied, hold => Assert.False(hold));
+        Assert.Equal(ChargeControlMode.SolarGrid, _mode.Mode);
+    }
+
     // -- The end of the day (#280): Solar ends itself the way this mode does.
 
     [Fact]
@@ -253,10 +269,15 @@ public class SolarGridModeTests
     private Task RunAsync(ISolarForecastService forecast, params EnergyState[] states) =>
         RunAsync(forecast, tariff: null, lowTariffOnly: false, states);
 
-    private async Task RunAsync(ISolarForecastService forecast, ITariffSchedule? tariff, bool lowTariffOnly, params EnergyState[] states)
+    private Task RunAsync(ISolarForecastService forecast, ITariffSchedule? tariff, bool lowTariffOnly, params EnergyState[] states) =>
+        RunAsync(forecast, tariff, lowTariffOnly, dryRun: false, states);
+
+    private async Task RunAsync(
+        ISolarForecastService forecast, ITariffSchedule? tariff, bool lowTariffOnly, bool dryRun, params EnergyState[] states)
     {
         var chargeControl = new ChargeControlOptions
         {
+            DryRun = dryRun,
             Phases = 3,
             MaxChargingCurrentAmps = 16,
             PauseCurrentAmps = 0,

@@ -15,7 +15,9 @@ the last word.
 
 **Nothing is written until a button is pressed.** The service always starts with charging **off**, so
 there is no `ChargeControl:Enabled` to forget. With `ChargeControl:DryRun` set, the controller decides
-and logs what it would write, without writing.
+and logs what it would write, without writing. The modes then don't switch on the
+[battery discharge hold](BATTERY_HOLD.md) either: the car draws nothing, so a hold would only put the house on
+the grid. The owner's hold switch still works.
 
 ## The surplus
 

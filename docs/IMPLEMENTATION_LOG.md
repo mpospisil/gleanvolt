@@ -4,6 +4,28 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-24 — No battery hold in charge-control dry run, and a quiet resume before the plugin attaches
+
+**What.** Two things seen on the Pi on 1.3.2, with the SolaX charger through its plugin and `ChargeControl:DryRun`
+on:
+
+- **The hold in dry run.** FastNoBattery, started from the web UI at 16:42, switched the battery discharge hold on
+  (`BatteryHold:DryRun` is false there). The charger was never started, so the car drew nothing, and the house ran on
+  about 3.2 kW from the grid until the high tariff stood the mode down at 17:15. Now, in charge-control dry run,
+  FastNoBattery doesn't arm its hold, and Targeted and Solar + grid don't arm their automatic one. The log says so once.
+  The owner's switch still works: it is the owner's, not a mode's.
+- **A resumed mode before the plugin attaches.** A restart resumes the running mode at once, and its first commands
+  ran before the plugin connected: "Could not set the charge current..." and "Charge-control cycle failed" were
+  logged as warnings with stack traces. Both now catch `ChargerNotConnectedException` (#452) and log one line at
+  Information. The availability monitor (#441) still suspends the mode if the plugin stays away.
+
+**Files.** `src/Gleanvolt.Hosting/PollingService.cs` (`SetFastHoldForCharging`, `AutoHold`, `NoteNoHoldInDryRun`),
+`src/Gleanvolt.Hosting/ChargeActions.cs`, `src/Gleanvolt.Hosting/ChargingControlCoordinator.cs`; tests in
+`FastNoBatteryModeTests`, `SolarGridModeTests`, `ChargingControlCoordinatorTests` (and `Fakes.FakeEvChargerControl.ReadFailure`);
+`docs/BATTERY_HOLD.md`, `docs/CHARGE_CONTROL.md`.
+
+---
+
 ## 2026-11-24 — A charger behind a plugin no longer crashes a web page
 
 **What.** On the Pi, 1.3.2 with the SolaX plugin, opening a web page threw `UriFormatException: Invalid URI: The
