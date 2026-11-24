@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Enums;
 using Gleanvolt.Devices;
@@ -82,6 +83,39 @@ public class EnergyStateReaderTests
         Assert.Equal(7000, afterRecovery.EvChargerPowerWatts);
     }
 
+    [Fact]
+    public async Task Logs_a_charger_that_is_not_connected_yet_as_one_line_without_a_stack_trace()
+    {
+        // A plugin attaches seconds after start-up, so the first poll often finds none: that is a state,
+        // and a warning with a stack trace on every start only alarms whoever reads the log.
+        var logger = new CapturingLogger();
+        var reader = new EnergyStateReader(
+            new SolaxInverterDriver(new FakeModbusClient()),
+            new SolaxChargerDriver(new UnreachableModbusClient(() => new ChargerNotConnectedException("No charger plugin is connected to Gleanvolt."))),
+            logger);
+
+        var state = await reader.ReadAsync();
+
+        Assert.Equal(EvChargerStatus.Unknown, state.EvChargerStatus);
+        var entry = Assert.Single(logger.Entries, e => e.Message.Contains("not connected yet"));
+        Assert.Equal(LogLevel.Information, entry.Level);
+        Assert.Null(entry.Exception);
+        Assert.DoesNotContain(logger.Entries, e => e.Level >= LogLevel.Warning);
+    }
+
+    [Fact]
+    public async Task Logs_an_unreachable_charger_as_a_warning_with_its_exception()
+    {
+        var logger = new CapturingLogger();
+        var reader = new EnergyStateReader(
+            new SolaxInverterDriver(new FakeModbusClient()), new SolaxChargerDriver(new UnreachableModbusClient()), logger);
+
+        await reader.ReadAsync();
+
+        var entry = Assert.Single(logger.Entries, e => e.Level == LogLevel.Warning);
+        Assert.IsType<IOException>(entry.Exception);
+    }
+
     // The charger's two raw readings, decoded by its driver (#348) and composed here.
     [Fact]
     public async Task Maps_the_charger_run_mode_to_its_status()
@@ -106,24 +140,26 @@ public class EnergyStateReaderTests
     }
 
     /// <summary>Nothing at the address at all: every operation fails, the connect included.</summary>
-    private sealed class UnreachableModbusClient : IModbusClient
+    private sealed class UnreachableModbusClient(Func<Exception>? failure = null) : IModbusClient
     {
+        private readonly Func<Exception> _failure = failure ?? (() => new IOException("no route to host"));
+
         public bool IsConnected => false;
 
         public Task ConnectAsync(CancellationToken cancellationToken = default) =>
-            throw new IOException("no route to host");
+            throw _failure();
 
         public Task<ushort[]> ReadHoldingRegistersAsync(ushort startAddress, ushort numberOfPoints, CancellationToken cancellationToken = default) =>
-            throw new IOException("no route to host");
+            throw _failure();
 
         public Task<ushort[]> ReadInputRegistersAsync(ushort startAddress, ushort numberOfPoints, CancellationToken cancellationToken = default) =>
-            throw new IOException("no route to host");
+            throw _failure();
 
         public Task WriteSingleRegisterAsync(ushort address, ushort value, CancellationToken cancellationToken = default) =>
-            throw new IOException("no route to host");
+            throw _failure();
 
         public Task WriteMultipleRegistersAsync(ushort startAddress, ushort[] values, CancellationToken cancellationToken = default) =>
-            throw new IOException("no route to host");
+            throw _failure();
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
@@ -161,5 +197,19 @@ public class EnergyStateReaderTests
 
         public override Task ConnectAsync(CancellationToken cancellationToken = default) =>
             Reachable ? base.ConnectAsync(cancellationToken) : throw new IOException("no route to host");
+    }
+
+    private sealed class CapturingLogger : ILogger<EnergyStateReader>
+    {
+        public List<(LogLevel Level, string Message, Exception? Exception)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter) =>
+            Entries.Add((logLevel, formatter(state, exception), exception));
     }
 }

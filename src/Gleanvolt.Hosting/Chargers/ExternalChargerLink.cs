@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Gleanvolt.Devices;
 using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Charger;
 using Gleanvolt.Providers.Server;
@@ -74,7 +75,7 @@ public sealed class ExternalChargerLink
 
         var timeout = _options.ReadTimeout;
         var request = Sessions?.BeginRequest(timeout)
-            ?? throw new InvalidOperationException("No charger plugin is connected to Gleanvolt.");
+            ?? throw new ChargerNotConnectedException("No charger plugin is connected to Gleanvolt.");
 
         var answer = new TaskCompletionSource<ChargerReading>(TaskCreationOptions.RunContinuationsAsynchronously);
         _reads[request.Id.Value] = answer;
@@ -115,7 +116,7 @@ public sealed class ExternalChargerLink
     private async Task CommandAsync(Func<IChargerClient, RequestId, Task> send, string what, CancellationToken cancellationToken)
     {
         var connection = Sessions?.ConnectionId
-            ?? throw new InvalidOperationException($"Could not {what}: no charger plugin is connected to Gleanvolt.");
+            ?? throw new ChargerNotConnectedException($"Could not {what}: no charger plugin is connected to Gleanvolt.");
 
         // Whatever happens next, the held reading no longer says what the charger has.
         if (_held is { } held)
