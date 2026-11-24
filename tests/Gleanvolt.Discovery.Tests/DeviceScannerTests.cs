@@ -1,9 +1,7 @@
 using System.Diagnostics;
-using System.Text.Json.Nodes;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Devices;
-using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Testing;
 using Gleanvolt.Modbus;
 
@@ -118,16 +116,17 @@ public class DeviceScannerTests
     }
 
     [Fact]
-    public async Task A_charger_is_found_by_its_own_serial_registers()
+    public async Task A_charger_is_not_identified_since_it_is_its_plugins_to_find()
     {
+        // #445: the charger rules left discovery. A SolaX charger answers Modbus and is said to be no inverter.
         await using var server = new FakeModbusServer();
         server.Units[1] = FakeUnit.Charger("5030BXXXXXXXXX", runMode: 2);
 
         var device = Assert.Single((await ScanAsync(Options(server.Port))).Devices);
 
-        Assert.Equal(PvDeviceRole.Charger, device.Role);
-        Assert.Equal("X3-HAC 11 kW", device.Model);
-        Assert.True(device.RoleConfirmed);
+        Assert.Equal(DiscoveryFinding.NotSolax, device.Finding);
+        Assert.Null(device.Role);
+        Assert.Contains("Its plugin's page has a search of its own", device.Note);
     }
 
     [Fact]
@@ -170,13 +169,13 @@ public class DeviceScannerTests
     public async Task A_gateway_exception_means_the_unit_id_is_not_there_and_the_scan_moves_on()
     {
         await using var server = new FakeModbusServer { UnknownUnitException = 0x0B };
-        server.Units[3] = FakeUnit.Charger("C311XXXXXXXXXX");
+        server.Units[3] = FakeUnit.Inverter("H34XXXXXXXXXXX");
 
         var report = await ScanAsync(Options(server.Port, 1, 0, 2, 3, 4));
 
         var device = Assert.Single(report.Devices);
         Assert.Equal((byte)3, device.UnitId);
-        Assert.Equal("X3-EVC 11 kW", device.Model);
+        Assert.Equal("X3-Hybrid G4", device.Model);
 
         // Stopped at the first unit id that answered: nothing was asked of unit 4.
         Assert.DoesNotContain(server.Requests, request => request.UnitId == 4);
@@ -198,14 +197,14 @@ public class DeviceScannerTests
     {
         await using var server = new FakeModbusServer { UnknownUnitException = 0x0B };
         server.Units[1] = FakeUnit.Inverter("H34XXXXXXXXXXX");
-        server.Units[3] = FakeUnit.Charger("5020BXXXXXXXXX");
+        server.Units[3] = FakeUnit.Inverter("10KXXXXXXXXXXX");
 
         var report = await ScanAsync(Options(server.Port, 1, 2, 3) with { AllUnitIds = true });
 
         Assert.Collection(
             report.Devices,
-            inverter => Assert.Equal((PvDeviceRole.Inverter, (byte?)1), (inverter.Role!.Value, inverter.UnitId)),
-            charger => Assert.Equal((PvDeviceRole.Charger, (byte?)3), (charger.Role!.Value, charger.UnitId)));
+            first => Assert.Equal(("X3-Hybrid G4", (byte?)1), (first.Model, first.UnitId)),
+            second => Assert.Equal(("X3-HYB-G4 PRO", (byte?)3), (second.Model, second.UnitId)));
     }
 
     [Fact]
@@ -362,113 +361,12 @@ public class DeviceScannerTests
             new DiscoveryOptions { Ports = [80] },
             new FakePortProbe(("192.168.1.20", 80)),
             _ => throw new InvalidOperationException("A web port is not spoken Modbus to."),
-            new FakeWebProbe(page),
-            httpClientFactory: _ => Http(new HttpDump()));
+            new FakeWebProbe(page));
 
         var report = await scanner.ScanAsync(ScanPlan.ForHosts(["192.168.1.20"]));
 
         Assert.Equal(reported, report.Devices.Any(device => device.Finding == DiscoveryFinding.SolaxDongle));
-        Assert.DoesNotContain(report.Devices, device => device.Finding == DiscoveryFinding.GoeCharger);
-    }
-
-    [Fact]
-    public async Task A_go_e_is_found_on_its_web_port_by_its_api_and_brings_its_driver()
-    {
-        ReplayHttpHandler? handler = null;
-        DeviceConfig? asked = null;
-        var scanner = new DeviceScanner(
-            new DiscoveryOptions { Ports = [80] },
-            new FakePortProbe(("192.168.1.30", 80)),
-            _ => throw new InvalidOperationException("A web port is not spoken Modbus to."),
-            new FakeWebProbe("<title>go-eCharger</title>"),
-            httpClientFactory: device =>
-            {
-                asked = device;
-                return Http(new HttpDump
-                {
-                    Responses = new Dictionary<string, JsonNode?>
-                    {
-                        [GoeChargerDriver.StatusRequest] = JsonNode.Parse("""{"car":3,"alw":true,"fwv":"59.4","typ":"go-eCharger"}"""),
-                    },
-                }, h => handler = h);
-            });
-
-        var device = Assert.Single((await scanner.ScanAsync(ScanPlan.ForHosts(["192.168.1.30"]))).Devices);
-
-        Assert.Equal(DiscoveryFinding.GoeCharger, device.Finding);
-        Assert.Equal(PvDeviceRole.Charger, device.Role);
-        Assert.Null(device.UnitId);
-        Assert.Equal(80, device.Port);
-        Assert.Equal("goe", device.Driver);
-        Assert.Equal(SupportTier.Expected, device.Tier);
-        Assert.True(device.Identified);
-        Assert.Contains("Car state 3", device.Note);
-        Assert.Equal(("192.168.1.30", 80), (asked!.Host, asked.Port));
-        Assert.Empty(handler!.Writes);
-    }
-
-    [Fact]
-    public async Task Nothing_answering_http_is_not_asked_for_a_go_e_api()
-    {
-        var asked = false;
-        var scanner = new DeviceScanner(
-            new DiscoveryOptions { Ports = [80] },
-            new FakePortProbe(("192.168.1.30", 80)),
-            _ => throw new InvalidOperationException("A web port is not spoken Modbus to."),
-            new NoWebPage(),
-            httpClientFactory: _ =>
-            {
-                asked = true;
-                return Http(new HttpDump());
-            });
-
-        Assert.Empty((await scanner.ScanAsync(ScanPlan.ForHosts(["192.168.1.30"]))).Devices);
-        Assert.False(asked);
-    }
-
-    [Theory]
-    [InlineData(true, "huawei-22kt", "SCharger-22KT-S0")]
-    [InlineData(false, "huawei-7ks", "SCharger-7KS-S0")]
-    public async Task An_sCharger_is_found_by_its_mains_voltage_and_its_phases_pick_the_driver(bool threePhase, string driver, string model)
-    {
-        await using var server = new FakeModbusServer();
-        server.Units[1] = FakeUnit.SCharger(threePhase);
-
-        var device = Assert.Single((await ScanAsync(Options(server.Port))).Devices);
-
-        Assert.Equal(DiscoveryFinding.HuaweiDevice, device.Finding);
-        Assert.Equal(PvDeviceRole.Charger, device.Role);
-        Assert.Equal(model, device.Model);
-        Assert.Equal(driver, device.Driver);
-        Assert.Equal(SupportTier.Expected, device.Tier);
-        Assert.True(device.RoleConfirmed);
-        Assert.Contains("231.1 V", device.Note);
-        Assert.Equal(0, server.Writes);
-    }
-
-    [Fact]
-    public async Task A_device_with_no_mains_voltage_at_0x1000_is_not_an_sCharger()
-    {
-        await using var server = new FakeModbusServer();
-        server.Units[1] = new FakeUnit().WithHolding(0x1000, 0).WithHolding(0x1001, 57).WithHolding(0x1002, 0)
-            .WithHolding(0x1003, 0).WithHolding(0x1004, 0).WithHolding(0x1005, 0);
-
-        var device = Assert.Single((await ScanAsync(Options(server.Port))).Devices);
-
-        Assert.Equal(DiscoveryFinding.NotSolax, device.Finding);
-    }
-
-    private static HttpClient Http(HttpDump dump, Action<ReplayHttpHandler>? made = null)
-    {
-        var handler = new ReplayHttpHandler(dump);
-        made?.Invoke(handler);
-        return new HttpClient(handler) { BaseAddress = new Uri("http://charger.test/") };
-    }
-
-    private sealed class NoWebPage : IWebProbe
-    {
-        public Task<string?> ReadAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken) =>
-            Task.FromResult<string?>(null);
+        Assert.Equal(reported ? 1 : 0, report.Devices.Count);
     }
 
     [Fact]

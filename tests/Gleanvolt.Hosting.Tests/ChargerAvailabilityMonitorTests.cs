@@ -103,7 +103,7 @@ public sealed class ChargerAvailabilityMonitorTests
     public ChargerAvailabilityMonitorTests()
     {
         _monitor = new ChargerAvailabilityMonitor(
-            _clock, TimeSpan.FromMinutes(2), () => _plugin is not null, () => _plugin, NullLogger<ChargerAvailabilityMonitor>.Instance);
+            _clock, TimeSpan.FromMinutes(2), () => _plugin, NullLogger<ChargerAvailabilityMonitor>.Instance);
     }
 
     private ChargerAvailability Observe(EnergyState state) => _monitor.Observe(state);

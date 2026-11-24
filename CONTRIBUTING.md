@@ -72,8 +72,7 @@ Gleanvolt.slnx
 ├── src/
 │   ├── Gleanvolt.Devices.Abstractions/ # The driver contract: IModbusClient, IInverterDriver, the battery hold
 │   ├── Gleanvolt.Devices.Solax/        # The SolaX Gen4 inverter driver: register map, decoding, power control
-│   ├── Gleanvolt.Devices.Huawei/       # The Huawei SUN2000 driver: readings, the EMMA topology, the battery hold; and the SCharger
-│   ├── Gleanvolt.Devices.GoE/          # The go-e Charger driver, over its local HTTP API v2
+│   ├── Gleanvolt.Devices.Huawei/       # The Huawei SUN2000 driver: readings, the EMMA topology, the battery hold
 │   │
 │   ├── Gleanvolt.Core/                 # Domain logic, free of hardware and hosting
 │   │   ├── Models/                 # Strongly typed models (EnergyState, DeviceConfig, ...)
@@ -83,7 +82,6 @@ Gleanvolt.slnx
 │   │
 │   ├── Gleanvolt.Infrastructure/       # External communication
 │   │   ├── Modbus/                 # Concrete Modbus TCP client (and a read-only decorator)
-│   │   ├── RegisterMaps/           # Hex address mappings for the SolaX EV charger
 │   │   ├── Monitoring/             # SQLite energy-interval store (the analytics tables)
 │   │   ├── Sessions/               # SQLite charging-session store and its JSON contract
 │   │   ├── Solcast/                # Solar-forecast HTTP client
@@ -125,11 +123,10 @@ Gleanvolt.slnx
 │   ├── Gleanvolt.Web.Screenshots/      # Renders the pages the user manual's screenshots show
 │   ├── Gleanvolt.Hosting.Tests/        # Coordinator, selector and HA discovery tests
 │   ├── Gleanvolt.Discovery.Tests/      # The scan against a fake Modbus TCP server
-│   ├── Gleanvolt.Devices.Testing/      # The driver test kit: Modbus and HTTP replays, and the conformance tests
+│   ├── Gleanvolt.Devices.Testing/      # The driver test kit: the Modbus replay and the inverter conformance tests
 │   ├── Gleanvolt.Devices.Tests/        # The dump format, the snapshot and the replay
 │   ├── Gleanvolt.Devices.Solax.Tests/  # The SolaX driver against the conformance tests and its recordings
-│   ├── Gleanvolt.Devices.Huawei.Tests/ # The Huawei drivers against the same tests, on synthetic recordings
-│   └── Gleanvolt.Devices.GoE.Tests/    # The go-e driver against the charger tests, on synthetic HTTP recordings
+│   └── Gleanvolt.Devices.Huawei.Tests/ # The Huawei driver against the same tests, on synthetic recordings
 ├── deploy/                         # Raspberry Pi production stack (compose, broker config, deploy.sh)
 ├── dev/homeassistant/              # Local HA + MQTT dev stack (anonymous broker, host-run worker)
 ├── Dockerfile                      # Cross-compiled linux/arm64 image for the Pi

@@ -34,7 +34,7 @@ public static class GleanvoltCli
           setup --print-schema       Print the JSON schema of what a setup file may hold.
           set-password               Set a new web UI password and print its recovery key.
           reset-password             The same: being able to run this as the service user is the proof.
-          discover [options]         Search the network for the inverter and charger (--help for options).
+          discover [options]         Search the network for the inverter (--help for options).
 
         Under the .deb, run as the service user:  sudo -u gleanvolt /opt/gleanvolt/Gleanvolt.Worker setup …
         In Docker:  docker compose run --rm gleanvolt-controller setup --file /app/data/site.json
@@ -322,7 +322,7 @@ public static class GleanvoltCli
                 }
             }
 
-            ChooseDevice(console, configuration, values, found, PvDeviceRole.Inverter,
+            ChooseInverter(console, configuration, values, found,
                 PvSystemSettingKeys.InverterHost, PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId);
             console.Out.WriteLine();
 
@@ -382,34 +382,25 @@ public static class GleanvoltCli
         return Apply(document, context);
     }
 
-    // A found device of the role, or the current address, offered as the default; the port and unit id
-    // follow the address chosen when the search found it.
-    private static void ChooseDevice(
+    // A found inverter, or the current address, offered as the default; the port and unit id follow the
+    // address chosen when the search found it.
+    private static void ChooseInverter(
         CliConsole console,
         IConfiguration configuration,
         Dictionary<string, string> values,
         IReadOnlyList<DiscoveredDevice> found,
-        PvDeviceRole role,
         string hostKey,
         string portKey,
         string unitKey)
     {
-        var suggested = found.FirstOrDefault(device => device.Role == role)?.Host;
-        var label = role == PvDeviceRole.Inverter ? "Inverter address" : "Charger address";
+        var suggested = found.FirstOrDefault(device => device.Role == PvDeviceRole.Inverter)?.Host;
 
-        var host = Ask(console, configuration, values, hostKey, label, fallback: suggested);
+        var host = Ask(console, configuration, values, hostKey, "Inverter address", fallback: suggested);
 
         if (host is not null && found.FirstOrDefault(device => device.Host == host) is { } device)
         {
             values[portKey] = device.Port.ToString(CultureInfo.InvariantCulture);
             values[unitKey] = (device.UnitId ?? 1).ToString(CultureInfo.InvariantCulture);
-
-            if (device.Role is { } identified && identified != role)
-            {
-                console.Out.WriteLine(
-                    $"  Note: {host} identified itself as the {identified.ToString().ToLowerInvariant()}. "
-                    + "A swapped pair answers like the right one and shows only once running.");
-            }
         }
     }
 

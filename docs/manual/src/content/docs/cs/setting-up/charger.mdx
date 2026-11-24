@@ -35,23 +35,17 @@ ukazuje výkon slunce a domácí baterii, ale žádný režim nabíjení nelze s
 
 ## Přechod ze zabudovaného ovladače
 
-Do verze 1.3 řídil Gleanvolt nabíječky SolaX, Huawei a go-e sám. Tyto zabudované ovladače ve verzi 1.3 stále fungují,
-ale ve verzi 1.4 budou odstraněny: **Nastavení → Instalace** u značky nabíječky řekne, který plugin váš nahrazuje.
+Do verze 1.3 řídil Gleanvolt nabíječky SolaX, Huawei a go-e sám. Verze 1.4 tyto zabudované ovladače
+odstranila: každá nabíječka má teď plugin a Gleanvolt se k nabíječce sám nikdy nepřipojuje.
 
-Na Raspberry Pi nebo jiné instalaci v Dockeru s nasazovacími skripty:
+Na Raspberry Pi s nasazovacími skripty nemusíte dělat nic. Při nasazení verze 1.4 skript najde adresu
+nabíječky (`EV_CHARGER_HOST`) v `/opt/gleanvolt/.env`, spustí plugin pro značku vaší nabíječky a řekne
+který. Potřebuje token pro zdroje dat (`GLEANVOLT_PROVIDER_TOKEN`, viz krok 1 výše), a pokud není
+nastavený, zastaví se a řekne vám to. Aby hlášení zmizelo, přidejte plugin do `GLEANVOLT_PLUGINS`,
+například `GLEANVOLT_PLUGINS=solax`, nebo `openweather,solax` s počasím.
 
-<Steps>
-
-1. Zkontrolujte, že je v `/opt/gleanvolt/.env` nastavený `GLEANVOLT_PROVIDER_TOKEN` (viz krok 1 výše).
-
-2. Přidejte plugin do `GLEANVOLT_PLUGINS` ve stejném souboru, například `GLEANVOLT_PLUGINS=solax`, nebo
-   `openweather,solax` s počasím. Nic jiného neměňte: `EV_CHARGER_HOST` se stane adresou pluginu.
-
-3. Nasaďte znovu. Gleanvolt pak řídí nabíječku přes plugin a sám ji vedle pluginu nikdy neotevře.
-
-</Steps>
-
-Chcete-li se vrátit, odeberte plugin ze seznamu a nasaďte znovu.
+Jinde spusťte plugin sami, jako v části [Přidání nabíječky](#přidání-nabíječky). Dokud staré nastavení
+nabíječky nezmizí, zapíše Gleanvolt při každém spuštění do logu varování, které plugin jmenuje.
 
 ## Když je plugin odmítnut
 

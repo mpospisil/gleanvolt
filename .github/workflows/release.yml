@@ -178,7 +178,7 @@ jobs:
       - name: Pack the libraries
         run: |
           set -euo pipefail
-          for project in Gleanvolt.Modbus Gleanvolt.Devices.Abstractions Gleanvolt.Devices.Solax Gleanvolt.Devices.Huawei Gleanvolt.Devices.GoE Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting Gleanvolt.Providers.Contracts Gleanvolt.Providers.Client Gleanvolt.Providers.Testing Gleanvolt.Providers.Server Gleanvolt.Chargers.Hosting; do
+          for project in Gleanvolt.Modbus Gleanvolt.Devices.Abstractions Gleanvolt.Devices.Solax Gleanvolt.Devices.Huawei Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting Gleanvolt.Providers.Contracts Gleanvolt.Providers.Client Gleanvolt.Providers.Testing Gleanvolt.Providers.Server Gleanvolt.Chargers.Hosting; do
             dotnet pack "src/$project/$project.csproj" --no-build --configuration Release \
               -p:BuildNumber=${{ needs.version.outputs.build }} \
               -p:SourceRevisionId=${{ github.sha }} \
@@ -597,7 +597,7 @@ jobs:
 
           # By name, like the zips and the .debs: a missing library is named, and a new packable
           # project fails here until it is added, rather than shipping a release short of it.
-          expected="Api Chargers.Hosting Core Devices.Abstractions Devices.GoE Devices.Huawei Devices.Solax Hosting Infrastructure Modbus Providers.Client Providers.Contracts Providers.Server Providers.Testing Web"
+          expected="Api Chargers.Hosting Core Devices.Abstractions Devices.Huawei Devices.Solax Hosting Infrastructure Modbus Providers.Client Providers.Contracts Providers.Server Providers.Testing Web"
           for package in $expected; do
             if [ ! -f "artifacts/Gleanvolt.${package}.${VERSION}.nupkg" ]; then
               echo "No Gleanvolt.${package}.${VERSION}.nupkg; the packable projects and this list disagree." >&2
@@ -709,8 +709,7 @@ jobs:
             echo "sudo apt install ./gleanvolt_${VERSION}_arm64.deb"
             echo '```'
             echo
-            echo "Then open \`http://<device>:8090\` and set your inverter and charger addresses in"
-            echo "\`/etc/gleanvolt/gleanvolt.env\`."
+            echo "Then open \`http://<device>:8090\` and follow the setup wizard."
             echo
             echo "### Docker"
             echo
@@ -731,7 +730,13 @@ jobs:
             echo
             echo "The charger plugins (SolaX, Huawei SCharger, go-e, Shelly TopAC) are released on their own, from"
             echo "[gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers); the compose stack runs one with"
-            echo "\`GLEANVOLT_PLUGINS\`. The built-in charger drivers are deprecated and go in 1.4."
+            echo "\`GLEANVOLT_PLUGINS\`. Since 1.4 a charger plugin is the only way Gleanvolt drives a charger."
+            echo
+            echo "**Breaking since 1.4: the built-in charger drivers are removed** (#445). \`Pv:Chargers\` is ignored,"
+            echo "with a warning at startup naming the plugin that replaced the driver it chose. The deploy scripts run that"
+            echo "plugin for a Pi whose \`.env\` has \`EV_CHARGER_HOST\` and no charger plugin; elsewhere, start it yourself."
+            echo "The site API no longer has \`chargers\` or \`chargerDriver\`, and Settings has no charger section or charger"
+            echo "register snapshot. See [Your charger](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md)."
             echo
             echo "The \`.nupkg\` files are the libraries. The MIT ones a plugin is built on are also on nuget.org:"
             echo "\`Gleanvolt.Providers.Contracts\`, \`Gleanvolt.Providers.Client\`, \`Gleanvolt.Providers.Testing\`,"

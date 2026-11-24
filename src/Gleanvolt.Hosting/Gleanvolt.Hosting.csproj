@@ -53,7 +53,6 @@
     <ProjectReference Include="..\Gleanvolt.Api\Gleanvolt.Api.csproj" />
     <ProjectReference Include="..\Gleanvolt.Core\Gleanvolt.Core.csproj" />
     <ProjectReference Include="..\Gleanvolt.Devices.Huawei\Gleanvolt.Devices.Huawei.csproj" />
-    <ProjectReference Include="..\Gleanvolt.Devices.GoE\Gleanvolt.Devices.GoE.csproj" />
     <ProjectReference Include="..\Gleanvolt.Discovery\Gleanvolt.Discovery.csproj" />
     <ProjectReference Include="..\Gleanvolt.Infrastructure\Gleanvolt.Infrastructure.csproj" />
     <ProjectReference Include="..\Gleanvolt.Providers.Server\Gleanvolt.Providers.Server.csproj" />

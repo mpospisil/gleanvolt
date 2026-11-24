@@ -7,8 +7,8 @@ namespace Gleanvolt.Core.Models;
 /// a key that is not on it.
 ///
 /// <para>Configuration paths rather than property names, because that is what the overrides file,
-/// the environment variables and the source of each value are all keyed by. The charger is the first
-/// and only one, <c>Chargers:0</c>: one is what the control logic can drive.</para>
+/// the environment variables and the source of each value are all keyed by. The charger isn't here: since
+/// 1.4 (#445) it is set up on its plugin's own page.</para>
 /// </summary>
 public static class PvSystemSettingKeys
 {
@@ -30,12 +30,6 @@ public static class PvSystemSettingKeys
     public const string InverterPort = "Pv:Inverter:Port";
     public const string InverterUnitId = "Pv:Inverter:UnitId";
     public const string InverterUnmeteredGridPhase = "Pv:Inverter:UnmeteredGridPhase";
-    public const string ChargerId = "Pv:Chargers:0:Id";
-    public const string ChargerDriver = "Pv:Chargers:0:Driver";
-    public const string ChargerModel = "Pv:Chargers:0:Model";
-    public const string ChargerHost = "Pv:Chargers:0:Host";
-    public const string ChargerPort = "Pv:Chargers:0:Port";
-    public const string ChargerUnitId = "Pv:Chargers:0:UnitId";
 
     // Outside the Pv section, but facts about the same installation (#301): where its day begins and
     // ends, and the battery the forecast modes plan around. Setup needs both, and an owner who cannot
@@ -58,7 +52,6 @@ public static class PvSystemSettingKeys
         CapacityKwp, InverterCapacityKw, LossFactor,
         HomeBatteryCapacityKWh, HomeBatteryChargeEfficiency,
         InverterDriver, InverterTopology, InverterModel, InverterHost, InverterPort, InverterUnitId, InverterUnmeteredGridPhase,
-        ChargerId, ChargerDriver, ChargerModel, ChargerHost, ChargerPort, ChargerUnitId,
     ];
 
     /// <summary>Whether <paramref name="key"/> is one the web UI may edit. Case-insensitive, as configuration is.</summary>
@@ -90,11 +83,13 @@ public sealed record PvSystemSettings(
     public IEnumerable<ConfiguredSetting> Pending => Settings.Where(setting => setting.IsPending);
 }
 
-/// <summary>Which of the two devices an address is supposed to reach.</summary>
+/// <summary>
+/// Which device an address is supposed to reach: since 1.4 (#445) only the inverter, because the charger is its
+/// plugin's to find and reach. Kept as a role so a scan result still says what it found.
+/// </summary>
 public enum PvDeviceRole
 {
     Inverter,
-    Charger,
 }
 
 /// <summary>

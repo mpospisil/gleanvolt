@@ -824,8 +824,6 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
         [PvSystemSettingKeys.TiltDegrees] = "35",
         [PvSystemSettingKeys.InverterHost] = "192.168.2.10",
         [PvSystemSettingKeys.InverterPort] = "502",
-        [PvSystemSettingKeys.ChargerId] = "wallbox",
-        [PvSystemSettingKeys.ChargerHost] = "192.168.2.6",
     };
 
     public Dictionary<string, string> Stored { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -840,7 +838,7 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
 
     public List<string> Reverts { get; } = [];
 
-    public List<(PvDeviceRole Role, string Host, int Port, byte UnitId)> Probes { get; } = [];
+    public List<(string Host, int Port, byte UnitId)> Probes { get; } = [];
 
     /// <summary>The driver each probe in <see cref="Probes"/> asked for, in the same order.</summary>
     public List<string?> ProbeDrivers { get; } = [];
@@ -855,19 +853,6 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
         new("solax", "SolaX", new ModbusDefaults(502, 1, TimeSpan.FromMilliseconds(250)), new InverterCapabilities(true, true)),
         new("acme", "Acme", new ModbusDefaults(6607, 0, TimeSpan.FromMilliseconds(50)), new InverterCapabilities(false, false),
             [new InverterTopology("hub", "Hub"), new InverterTopology("emma", "EMMA")]),
-    ];
-
-    // SolaX as the host has it, and a second charger family with its own port and unit id, so a test can see
-    // the form follow the selected charger driver's defaults (#349).
-    /// <summary>Whether the deployment runs a charger plugin (#444).</summary>
-    public bool ChargerPluginForced { get; set; }
-
-    public IReadOnlyList<EvChargerDriverInfo> ChargerDrivers { get; set; } =
-    [
-        new("solax", "SolaX", EvChargerTransport.Modbus, new ModbusDefaults(502, 1, TimeSpan.FromMilliseconds(250)),
-            new EvChargerCapabilities(6, 32, 0, 3, false, true)),
-        new("wallco", "Wallco", EvChargerTransport.Modbus, new ModbusDefaults(5020, 2, TimeSpan.Zero),
-            new EvChargerCapabilities(6, 16, 0, 3, true, false)),
     ];
 
     public PvSystemSettings Read() => new(
@@ -913,9 +898,9 @@ internal sealed class FakePvSystemEditor : IPvSystemEditor
     }
 
     public Task<DeviceProbeResult> ProbeAsync(
-        PvDeviceRole role, string host, int port, byte unitId, string? driver = null, string? inverterTopology = null, CancellationToken cancellationToken = default)
+        string host, int port, byte unitId, string? driver = null, string? inverterTopology = null, CancellationToken cancellationToken = default)
     {
-        Probes.Add((role, host, port, unitId));
+        Probes.Add((host, port, unitId));
         ProbeDrivers.Add(driver);
         ProbeTopologies.Add(inverterTopology);
         return Task.FromResult(ProbeResult);
@@ -1424,14 +1409,12 @@ internal sealed class FakeDeviceSnapshot : IDeviceSnapshot
 {
     public Exception? Failure { get; set; }
 
-    public List<(PvDeviceRole Role, string Note)> Calls { get; } = [];
+    public List<string> Calls { get; } = [];
 
-    public Task<RegisterSnapshotFile> TakeAsync(PvDeviceRole role, string note, CancellationToken cancellationToken = default)
+    public Task<RegisterSnapshotFile> TakeAsync(string note, CancellationToken cancellationToken = default)
     {
-        Calls.Add((role, note));
-        var name = role == PvDeviceRole.Charger
-            ? "gleanvolt-registers-solax-charger-20261108-213000.json"
-            : "gleanvolt-registers-solax-20261108-213000.json";
+        Calls.Add(note);
+        const string name = "gleanvolt-registers-solax-20261108-213000.json";
         return Failure is { } failure
             ? Task.FromException<RegisterSnapshotFile>(failure)
             : Task.FromResult(new RegisterSnapshotFile(name, "{\"format\":\"gleanvolt-register-dump\"}"));

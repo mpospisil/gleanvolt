@@ -18,9 +18,8 @@ public sealed class EvOptions
 
     /// <summary>
     /// The vehicles, in configuration order. <b>Exactly one is supported</b> — the list exists so the
-    /// second one does not need a configuration break, which is the same promise
-    /// <see cref="PvSystemOptions.Chargers"/> makes and for the same reason. Nothing selects between
-    /// them, and a second entry is refused at startup rather than silently ignored.
+    /// second one does not need a configuration break. Nothing selects between them, and a second entry is
+    /// refused at startup rather than silently ignored.
     /// </summary>
     public EvVehicleOptions[] Vehicles { get; init; } = [];
 }

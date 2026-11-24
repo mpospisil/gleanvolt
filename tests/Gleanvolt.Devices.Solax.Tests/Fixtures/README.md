@@ -27,9 +27,6 @@ fails on a file that keeps more, because these are committed to a public reposit
 
 | File | State | Used for |
 |---|---|---|
-| `solax-charger-idle.json` | No car, use-mode Stop, setpoint 16 A (**real**, 2026-11-09 13:51 UTC) | Idle reads `Available` and about 0 W |
-| `solax-charger-plugged-in.json` | A car plugged in and waiting, use-mode Stop (**real**, 2026-11-09 13:55 UTC) | A plugged-in state with no power: the HAC reports `Finishing` (RunMode 3), not `Preparing` |
-| `solax-charger-charging.json` | Charging at 16 A on three phases, use-mode Fast, 10661 W (**real**, 2026-11-09 14:00 UTC) | `Charging` and positive power; setpoint, start/stop and snapshot checks |
 | `solax-night-importing.json` | The SolaX inverter (above) | The probe refuses the inverter at the charger's address |
 
 **All three are real**: **Settings -> charger -> Save register snapshot**s of the reference installation,

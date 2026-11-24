@@ -20,7 +20,7 @@ Another device already uses `gleanvolt.local`, usually a second Gleanvolt. That 
 Check that Gleanvolt is running: see [Is it running?](#is-it-running) below.
 
 **Every page goes to the setup wizard.**
-Something required is still missing: the password, the inverter or the charger. Gleanvolt waits, and
+Something required is still missing: the password or the inverter. Gleanvolt waits, and
 controls nothing, until they are set. Finish [the setup wizard](../setting-up/setup-wizard/) and press
 **Restart** on its last step.
 
@@ -65,8 +65,8 @@ The code works once, for 15 minutes.
 ## Devices and readings
 
 **The home battery level never changes, and solar and grid show 0.**
-The inverter's and the charger's addresses are swapped. Both answer on the same port, so Gleanvolt
-connects to either. Swap them on **Settings**, save and restart.
+The inverter's address is your charger's. Both answer on the same port, so Gleanvolt connects to either.
+Correct it on **Settings**, save and restart. The charger's address goes on its plugin's page.
 
 **Everything reads zero.**
 Gleanvolt can't reach the devices. Check the addresses on **Settings**, and that

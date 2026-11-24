@@ -72,12 +72,9 @@ services:
     environment:
       TZ: ${TZ:-Europe/Prague}
       Web__Port: ${WEB_PORT:-8090}
-      # Optional: the setup wizard finds and asks for both. Setting them here only saves it the asking.
+      # Optional: the setup wizard finds and asks for it. Setting it here only saves it the asking. The charger is
+      # its plugin's (#445), below, at EV_CHARGER_HOST: the controller never opens a connection to it.
       Pv__Inverter__Host: ${INVERTER_HOST:-}
-      Pv__Chargers__0__Host: ${EV_CHARGER_HOST:-}
-      # Set to true with a charger plugin's profile (#444): the controller then drives the charger through the plugin,
-      # whatever the charger's brand says, so the two never both open it. docs/NAS.md has it.
-      ExternalCharger__UsePlugin: ${GLEANVOLT_CHARGER_PLUGIN:-false}
     volumes:
       - ${GLEANVOLT_DIR:-.}/data:/app/data
       - ${GLEANVOLT_DIR:-.}/logs:/app/logs
@@ -120,8 +117,8 @@ services:
         max-size: "5m"
         max-file: "3"
 
-  # The solax charger plugin (#444): SolaX X1/X3-HAC and X1/X3-EVC, from gleanvolt-chargers. Opt-in with the `solax` profile, and with
-  # GLEANVOLT_CHARGER_PLUGIN=true for the controller; at most one charger plugin. The charger's address is EV_CHARGER_HOST.
+  # The solax charger plugin (#444): SolaX X1/X3-HAC and X1/X3-EVC, from gleanvolt-chargers. Opt-in with the `solax` profile; at most one charger
+  # plugin. It is how the controller reaches the charger (#445). The charger's address is EV_CHARGER_HOST.
   gleanvolt-plugin-solax:
     image: ghcr.io/mpospisil/gleanvolt-plugin-solax:${SOLAX_PLUGIN_TAG:-latest}
     container_name: gleanvolt-plugin-solax
@@ -148,8 +145,8 @@ services:
         max-size: "5m"
         max-file: "3"
 
-  # The huawei charger plugin (#444): Huawei SCharger-7KS-S0 and -22KT-S0, from gleanvolt-chargers. Opt-in with the `huawei` profile, and with
-  # GLEANVOLT_CHARGER_PLUGIN=true for the controller; at most one charger plugin. The charger's address is EV_CHARGER_HOST.
+  # The huawei charger plugin (#444): Huawei SCharger-7KS-S0 and -22KT-S0, from gleanvolt-chargers. Opt-in with the `huawei` profile; at most one charger
+  # plugin. It is how the controller reaches the charger (#445). The charger's address is EV_CHARGER_HOST.
   gleanvolt-plugin-huawei:
     image: ghcr.io/mpospisil/gleanvolt-plugin-huawei:${HUAWEI_PLUGIN_TAG:-latest}
     container_name: gleanvolt-plugin-huawei
@@ -176,8 +173,8 @@ services:
         max-size: "5m"
         max-file: "3"
 
-  # The goe charger plugin (#444): the go-e Charger, from gleanvolt-chargers. Opt-in with the `goe` profile, and with
-  # GLEANVOLT_CHARGER_PLUGIN=true for the controller; at most one charger plugin. The charger's address is EV_CHARGER_HOST.
+  # The goe charger plugin (#444): the go-e Charger, from gleanvolt-chargers. Opt-in with the `goe` profile; at most one charger
+  # plugin. It is how the controller reaches the charger (#445). The charger's address is EV_CHARGER_HOST.
   gleanvolt-plugin-goe:
     image: ghcr.io/mpospisil/gleanvolt-plugin-goe:${GOE_PLUGIN_TAG:-latest}
     container_name: gleanvolt-plugin-goe
@@ -204,8 +201,8 @@ services:
         max-size: "5m"
         max-file: "3"
 
-  # The shelly charger plugin (#444): the Shelly TopAC, from gleanvolt-chargers. Opt-in with the `shelly` profile, and with
-  # GLEANVOLT_CHARGER_PLUGIN=true for the controller; at most one charger plugin. The charger's address is EV_CHARGER_HOST.
+  # The shelly charger plugin (#444): the Shelly TopAC, from gleanvolt-chargers. Opt-in with the `shelly` profile; at most one charger
+  # plugin. It is how the controller reaches the charger (#445). The charger's address is EV_CHARGER_HOST.
   gleanvolt-plugin-shelly:
     image: ghcr.io/mpospisil/gleanvolt-plugin-shelly:${SHELLY_PLUGIN_TAG:-latest}
     container_name: gleanvolt-plugin-shelly

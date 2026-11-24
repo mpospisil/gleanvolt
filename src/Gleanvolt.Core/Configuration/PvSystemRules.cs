@@ -30,44 +30,8 @@ namespace Gleanvolt.Core.Configuration;
 /// </summary>
 public static partial class PvSystemRules
 {
-    /// <summary>The id a charger takes when none was configured.</summary>
-    public const string DefaultChargerId = "charger";
-
-    /// <summary>How many chargers the control logic can actually drive. See <see cref="PvSystemOptions.Chargers"/>.</summary>
-    public const int SupportedChargerCount = 1;
-
     /// <summary>The inverter driver an empty <c>Pv:Inverter:Driver</c> means (issue #318).</summary>
     public const string DefaultInverterDriver = "solax";
-
-    /// <summary>
-    /// The charger driver an empty <c>Pv:Chargers:N:Driver</c> means when the charger has a host (issue #349): an
-    /// installation configured before the charger became a plugin keeps its SolaX charger.
-    /// </summary>
-    public const string DefaultChargerDriver = "solax";
-
-    /// <summary>
-    /// The charger behind a plugin (#435), and what Gleanvolt uses when no charger is configured (#442): no charger
-    /// in <c>Pv:Chargers</c>, or one with neither a driver nor a host. The charger is whichever plugin connects to
-    /// the charger hub, set up on its own page; Gleanvolt's setup doesn't ask about it.
-    /// </summary>
-    public const string ExternalChargerDriver = "external";
-
-    // As DefaultInverterDrivers, for a caller that names no charger drivers: SolaX's X3-HAC, as the host has it.
-    private static readonly IReadOnlyList<EvChargerDriverInfo> DefaultChargerDrivers =
-    [
-        new(
-            DefaultChargerDriver,
-            "SolaX",
-            EvChargerTransport.Modbus,
-            new ModbusDefaults(Port: 502, UnitId: 1, MinRequestInterval: TimeSpan.FromMilliseconds(250)),
-            new EvChargerCapabilities(MinCurrentAmps: 6, MaxCurrentAmps: 32, PauseCurrentAmps: 0, Phases: 3, CanSwitchPhases: false, HasUseMode: true)),
-        new(
-            ExternalChargerDriver,
-            "External plugin",
-            EvChargerTransport.External,
-            null,
-            new EvChargerCapabilities(MinCurrentAmps: 6, MaxCurrentAmps: 32, PauseCurrentAmps: 0, Phases: 3, CanSwitchPhases: false, HasUseMode: false)),
-    ];
 
     // What a caller that names no drivers is held to: the default, with DeviceConfig's defaults and SolaX's
     // capabilities. A host passes the drivers it has registered instead; this is for the portal, and for
@@ -109,8 +73,7 @@ public static partial class PvSystemRules
         PvSystemOptions pv,
         string inverterDeviceId,
         ConfigurationProblems problems,
-        IReadOnlyList<InverterDriverInfo>? inverterDrivers = null,
-        IReadOnlyList<EvChargerDriverInfo>? chargerDrivers = null)
+        IReadOnlyList<InverterDriverInfo>? inverterDrivers = null)
     {
         ArgumentNullException.ThrowIfNull(pv);
         ArgumentNullException.ThrowIfNull(problems);
@@ -146,8 +109,7 @@ public static partial class PvSystemRules
             InverterCapacityWatts: Positive(pv.InverterCapacityKw, "Pv:InverterCapacityKw", problems) * 1000,
             LossFactor: Fraction(pv.LossFactor, "Pv:LossFactor", problems),
             InstallDate: ParseInstallDate(pv.InstallDate, problems),
-            Inverter: ResolveInverter(pv, inverterDeviceId, driver?.Defaults, problems),
-            Chargers: ResolveChargers(pv, chargerDrivers ?? DefaultChargerDrivers, problems))
+            Inverter: ResolveInverter(pv, inverterDeviceId, driver?.Defaults, problems))
         {
             UnmeteredGridPhase = unmeteredGridPhase,
             InverterDriver = driver?.Id ?? NormaliseDriverId(pv),
@@ -217,86 +179,50 @@ public static partial class PvSystemRules
         return driver;
     }
 
-    // As the inverter's: empty is SolaX, anything else must be a driver this host has.
-    private static EvChargerDriverInfo? ResolveChargerDriver(
-        PvChargerOptions charger, string path, IReadOnlyList<EvChargerDriverInfo> drivers, ConfigurationProblems problems)
-    {
-        var id = NormaliseChargerDriverId(charger);
-        var driver = drivers.FirstOrDefault(candidate => string.Equals(candidate.Id, id, StringComparison.Ordinal));
-
-        if (driver is null)
-        {
-            var known = string.Join(", ", drivers.Select(candidate => candidate.Id));
-            problems.Add(
-                $"{path}:Driver ('{id}') is not a charger driver this Gleanvolt knows. Known drivers: {known}. "
-                + $"Empty means {DefaultChargerDriver} with a host, and a charger plugin without one.",
-                Phrase.Of("Config.PvChargerDriver", new PhraseArg.Text(path), new PhraseArg.Text(id), new PhraseArg.Text(known),
-                    new PhraseArg.Text(DefaultChargerDriver)));
-        }
-
-        return driver;
-    }
-
-    // Empty with a host is SolaX, as it always was; empty without one is no built-in charger at all, so the plugin's.
-    private static string NormaliseChargerDriverId(PvChargerOptions charger) => ChargerDriverId(charger.Driver, charger.Host);
-
     /// <summary>
-    /// The charger driver <c>Pv:Chargers:0</c> names (#442): its <paramref name="driver"/>, or when that is empty,
-    /// <see cref="DefaultChargerDriver"/> with a <paramref name="host"/> and <see cref="ExternalChargerDriver"/> without.
+    /// The charge-control limits against what the charger can do (issues #349, #440): a minimum below its
+    /// lowest setpoint, a maximum above its highest, or more phases than it supplies would have the controller
+    /// command something the charger cannot honour. Checked when a charger plugin says hello.
     /// </summary>
-    public static string ChargerDriverId(string? driver, string? host)
-    {
-        var id = driver?.Trim().ToLowerInvariant() ?? string.Empty;
-        return id.Length > 0 ? id : string.IsNullOrWhiteSpace(host) ? ExternalChargerDriver : DefaultChargerDriver;
-    }
-
-    /// <summary>
-    /// The charge-control limits against what the charger's driver can do (issue #349): a minimum below the
-    /// family's lowest setpoint, a maximum above its highest, or more phases than it supplies would have the
-    /// controller command something the charger cannot honour. One rule, for every host that checks them.
-    /// </summary>
-    /// <param name="driver">The charger's driver.</param>
+    /// <param name="charger">The charger's name, for the message.</param>
+    /// <param name="capabilities">What the charger can do.</param>
     /// <param name="minAmps"><c>ChargeControl:MinChargingCurrentAmps</c>.</param>
     /// <param name="maxAmps"><c>ChargeControl:MaxChargingCurrentAmps</c>.</param>
     /// <param name="phases"><c>ChargeControl:Phases</c>.</param>
     /// <param name="problems">Where a refusal goes.</param>
     public static void CheckChargeLimits(
-        EvChargerDriverInfo driver, int minAmps, int maxAmps, int phases, ConfigurationProblems problems)
+        string charger, EvChargerCapabilities capabilities, int minAmps, int maxAmps, int phases, ConfigurationProblems problems)
     {
-        ArgumentNullException.ThrowIfNull(driver);
+        ArgumentNullException.ThrowIfNull(charger);
+        ArgumentNullException.ThrowIfNull(capabilities);
         ArgumentNullException.ThrowIfNull(problems);
-        var capabilities = driver.Capabilities;
 
         if (minAmps < capabilities.MinCurrentAmps)
         {
             problems.Add(
-                $"ChargeControl:MinChargingCurrentAmps ({minAmps} A) is below the lowest current the {driver.DisplayName} "
+                $"ChargeControl:MinChargingCurrentAmps ({minAmps} A) is below the lowest current the {charger} "
                 + $"charger charges at ({capabilities.MinCurrentAmps} A).",
-                Phrase.Of("Config.ChargerMinAmps", new PhraseArg.Number(minAmps), new PhraseArg.Text(driver.DisplayName),
+                Phrase.Of("Config.ChargerMinAmps", new PhraseArg.Number(minAmps), new PhraseArg.Text(charger),
                     new PhraseArg.Number(capabilities.MinCurrentAmps)));
         }
 
         if (maxAmps > capabilities.MaxCurrentAmps)
         {
             problems.Add(
-                $"ChargeControl:MaxChargingCurrentAmps ({maxAmps} A) is above the highest current the {driver.DisplayName} "
+                $"ChargeControl:MaxChargingCurrentAmps ({maxAmps} A) is above the highest current the {charger} "
                 + $"charger accepts ({capabilities.MaxCurrentAmps} A).",
-                Phrase.Of("Config.ChargerMaxAmps", new PhraseArg.Number(maxAmps), new PhraseArg.Text(driver.DisplayName),
+                Phrase.Of("Config.ChargerMaxAmps", new PhraseArg.Number(maxAmps), new PhraseArg.Text(charger),
                     new PhraseArg.Number(capabilities.MaxCurrentAmps)));
         }
 
         if (phases > capabilities.Phases)
         {
             problems.Add(
-                $"ChargeControl:Phases ({phases}) is more than the {driver.DisplayName} charger supplies ({capabilities.Phases}).",
-                Phrase.Of("Config.ChargerPhases", new PhraseArg.Number(phases), new PhraseArg.Text(driver.DisplayName),
+                $"ChargeControl:Phases ({phases}) is more than the {charger} charger supplies ({capabilities.Phases}).",
+                Phrase.Of("Config.ChargerPhases", new PhraseArg.Number(phases), new PhraseArg.Text(charger),
                     new PhraseArg.Number(capabilities.Phases)));
         }
     }
-
-    /// <summary>The driver description <paramref name="id"/> names among <paramref name="drivers"/>, or null.</summary>
-    public static EvChargerDriverInfo? ChargerDriver(string id, IReadOnlyList<EvChargerDriverInfo>? drivers = null) =>
-        (drivers ?? DefaultChargerDrivers).FirstOrDefault(candidate => candidate.Id == id);
 
     private static string NormaliseDriverId(PvSystemOptions pv)
     {
@@ -403,76 +329,6 @@ public static partial class PvSystemRules
         ValidateConnection(pv.Inverter, "Pv:Inverter", problems);
 
         return new PvDeviceInfo(inverterDeviceId, name, model, pv.Inverter.ToDeviceConfig(defaults));
-    }
-
-    private static IReadOnlyList<PvDeviceInfo> ResolveChargers(
-        PvSystemOptions pv, IReadOnlyList<EvChargerDriverInfo> drivers, ConfigurationProblems problems)
-    {
-        // No charger configured is a charger behind a plugin (#442): the charger isn't part of Gleanvolt's setup.
-        if (pv.Chargers.Length == 0)
-        {
-            return [new PvDeviceInfo(DefaultChargerId, string.Empty, string.Empty, new DeviceConfig { Host = string.Empty })
-            {
-                Driver = ExternalChargerDriver,
-            }];
-        }
-
-        // A second charger says what the operator expects rather than what is wired: two listed means two
-        // cars are meant to be managed, and one of them would silently not be. Not "the first one wins" --
-        // said at startup instead.
-        if (pv.Chargers.Length > SupportedChargerCount)
-        {
-            problems.Add(
-                $"Only {SupportedChargerCount} EV charger is supported; Pv:Chargers has {pv.Chargers.Length}. "
-                + "The configuration can express more so that it need not change when the control logic can "
-                + "drive more, which it cannot yet.", Phrase.Of("Config.PvOneCharger", new PhraseArg.Number(SupportedChargerCount), new PhraseArg.Number(pv.Chargers.Length)));
-        }
-
-        var chargers = new List<PvDeviceInfo>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-
-        for (var index = 0; index < pv.Chargers.Length; index++)
-        {
-            var charger = pv.Chargers[index];
-            var path = $"Pv:Chargers:{index}";
-            var id = string.IsNullOrWhiteSpace(charger.Id) ? DefaultChargerId : charger.Id.Trim();
-
-            if (!Slug().IsMatch(id))
-            {
-                problems.Add($"{path}:Id ('{id}') must be a slug: lower-case letters, digits, '-' and '_'.", Phrase.Of("Config.PvChargerIdSlug", new PhraseArg.Text(path), new PhraseArg.Text(id)));
-            }
-
-            if (!seen.Add(id))
-            {
-                problems.Add($"{path}:Id ('{id}') is used by more than one charger; each id must be unique.", Phrase.Of("Config.PvChargerIdTwice", new PhraseArg.Text(path), new PhraseArg.Text(id)));
-            }
-
-            var driver = ResolveChargerDriver(charger, path, drivers, problems);
-
-            // A charger behind a plugin (#435) is reached by the plugin: Gleanvolt has no address to check.
-            if (driver?.Transport == EvChargerTransport.External)
-            {
-                chargers.Add(new PvDeviceInfo(id, charger.Name.Trim(), charger.Model.Trim(), new DeviceConfig { Host = string.Empty })
-                {
-                    Driver = driver.Id,
-                });
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(charger.Host))
-            {
-                problems.Add($"{path}:Host is required.", Phrase.Of("Config.PvHostRequired", new PhraseArg.Text(path)));
-                continue;
-            }
-
-            ValidateConnection(charger, path, problems);
-            chargers.Add(new PvDeviceInfo(id, charger.Name.Trim(), charger.Model.Trim(), charger.ToDeviceConfig(driver?.Defaults))
-            {
-                Driver = driver?.Id ?? NormaliseChargerDriverId(charger),
-            });
-        }
-
-        return chargers;
     }
 
     private static void ValidateConnection(PvDeviceOptions device, string path, ConfigurationProblems problems)

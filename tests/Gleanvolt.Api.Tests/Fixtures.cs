@@ -26,8 +26,7 @@ internal static class Fixtures
         InverterCapacityWatts: 8_000,
         LossFactor: 0.9,
         InstallDate: new DateOnly(2024, 5, 1),
-        Inverter: new PvDeviceInfo("Inverter", string.Empty, "SolaX X3-HYB-G4 PRO", new DeviceConfig { Host = "192.168.2.10" }),
-        Chargers: [new PvDeviceInfo("wallbox", "Garage wallbox", "SolaX X3-HAC", new DeviceConfig { Host = "192.168.2.6", Port = 502, UnitId = 1 })]);
+        Inverter: new PvDeviceInfo("Inverter", string.Empty, "SolaX X3-HYB-G4 PRO", new DeviceConfig { Host = "192.168.2.10" }));
 
     internal static ChargeControlStatus Status(
         ChargeControlMode mode = ChargeControlMode.Solar,

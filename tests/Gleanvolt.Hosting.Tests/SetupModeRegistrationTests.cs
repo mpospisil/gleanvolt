@@ -54,12 +54,10 @@ public class SetupModeRegistrationTests
         Assert.True(setup.SetupMode);
         Assert.Contains(setup.AtStartup.MissingRequired, problem => problem.Area == Core.Models.SetupArea.Inverter);
 
-        // Both clients refuse: nothing reached by accident can open a socket to an unconfirmed address.
+        // The client refuses: nothing reached by accident can open a socket to an unconfirmed address.
         var inverter = provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.Inverter);
-        var charger = provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.EvCharger);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => inverter.ConnectAsync());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => charger.WriteSingleRegisterAsync(0x60D, 0));
     }
 
     [Fact]

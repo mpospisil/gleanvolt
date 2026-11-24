@@ -2,8 +2,8 @@
 
 > **Using Gleanvolt?** The user manual has this step by step: [Finding your devices](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/finding-devices/). This page is the reference behind it.
 
-Don't know the inverter's or the charger's address, or which port and unit id they speak Modbus on?
-The setup wizard's **Search** finds them, and so does `gleanvolt discover` on an installed Gleanvolt.
+Don't know the inverter's address, or which port and unit id it speaks Modbus on?
+The setup wizard's **Search** finds it, and so does `gleanvolt discover` on an installed Gleanvolt.
 On a machine with no Gleanvolt, the standalone `gleanvolt-discover` scans your LAN — from any laptop or
 Pi on the same network. All three only ever read.
 
@@ -23,10 +23,11 @@ dotnet publish src/Gleanvolt.Discovery.Cli -c Release -r linux-x64 --self-contai
 ```
 
 It tries ports 502 (Modbus TCP), 8899 (the usual RS485 bridge) and 80 (where it recognises a SolaX
-dongle's web page, which is not Modbus, or a go-e's local API), unit ids `1,0,2,3,4,5,247`, and names each
-box from its serial number (SolaX), its model name (Huawei SUN2000, with a Huawei EMMA noticed in front of
-it), its phase voltages (Huawei SCharger) or its API (go-e), with the driver to use and the support tier
-from [SUPPORTED_PV_SYSTEMS.md](SUPPORTED_PV_SYSTEMS.md). Under the
+dongle's web page, which is not Modbus), unit ids `1,0,2,3,4,5,247`, and names each inverter from its
+serial number (SolaX) or its model name (Huawei SUN2000, with a Huawei EMMA noticed in front of it), with
+the driver to use and the support tier
+from [SUPPORTED_PV_SYSTEMS.md](SUPPORTED_PV_SYSTEMS.md). A charger isn't named since 1.4 (#445): it answers as
+*not an inverter Gleanvolt knows*, and its plugin's page has a search of its own. Under the
 table it prints what it found in the form of configuration lines; enter the addresses on **Settings →
 Installation** (or in the wizard), or optionally paste the lines into `.env`:
 

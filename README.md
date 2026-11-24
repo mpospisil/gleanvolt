@@ -60,16 +60,20 @@ Every mode stops by itself when the car is full or unplugged. The service always
 | Others | — | — | Not supported yet (GoodWe is planned) |
 <!-- end include -->
 
-**EV chargers** — over Modbus TCP, or a go-e over its local HTTP API:
+**EV chargers** — each through its plugin, from [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers):
 
 <!-- include: docs/SUPPORTED_CHARGERS.md#chargers-at-a-glance -->
-| Manufacturer | Models | Driver | Tier |
+| Manufacturer | Models | Plugin | Tier |
 |---|---|---|---|
-| [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#solax-chargers) | **X1/X3-HAC**; the other HAC variants; X1/X3-EVC | `solax` | **Verified** (X1/X3-HAC); Expected |
-| [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#huawei-scharger) | SCharger-7KS-S0, SCharger-22KT-S0 | `huawei-7ks`, `huawei-22kt` | Expected |
-| [go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#go-e-charger) | Gemini, Gemini flex, HOMEfix, HOME+ (hardware V3 or later) | `goe` | Expected |
-| [Shelly](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#shelly-topac-portable-ev-charger) | TopAC Portable EV Charger (EVE01-11R) | `external`, with the Shelly plugin | Expected |
-| Others | — | `external`, with a plugin someone writes | Not supported yet |
+| [SolaX](https://github.com/mpospisil/gleanvolt-chargers/tree/main/solax) | **X1/X3-HAC**; the other HAC variants; X1/X3-EVC | `solax` | **Verified** (X1/X3-HAC); Expected |
+| [Huawei](https://github.com/mpospisil/gleanvolt-chargers/tree/main/huawei) | SCharger-7KS-S0, SCharger-22KT-S0 | `huawei` | Expected |
+| [go-e](https://github.com/mpospisil/gleanvolt-chargers/tree/main/goe) | Gemini, Gemini flex, HOMEfix, HOME+ (hardware V3 or later) | `goe` | Expected |
+| [Shelly](https://github.com/mpospisil/gleanvolt-chargers/tree/main/shelly) | TopAC Portable EV Charger (EVE01-11R) | `shelly` | Expected |
+| Others | — | a plugin someone writes | Not supported yet |
+
+The plugin's name is its compose profile, its name in `GLEANVOLT_PLUGINS` and its image,
+`ghcr.io/mpospisil/gleanvolt-plugin-<name>`. Each README in gleanvolt-chargers has the models, the setup and the
+hardware's caveats.
 <!-- end include -->
 
 **Verified** means run on the reference installation (SolaX X3-HYB-G4 PRO, SolaX X1/X3-HAC, VW ID.4);

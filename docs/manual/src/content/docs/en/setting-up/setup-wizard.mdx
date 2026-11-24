@@ -72,12 +72,12 @@ Here you tell Gleanvolt which device is your inverter.
 1. Press **Search**. Gleanvolt looks through your home network for the devices it knows. This takes a
    minute or two.
 
-   ![The search results: an inverter at 192.168.1.10 and a charger at 192.168.1.11, each with a "Use as inverter" button.](../../../../assets/screenshots/wizard-search.png)
+   ![The search results: an inverter at 192.168.1.10, and a charger at 192.168.1.11 that isn't identified, each with a "Use as inverter" button.](../../../../assets/screenshots/wizard-search.png)
 
 2. In the list, find your inverter and press **Use as inverter**.
 
-   The **Identified as** column says what each device reported itself as. Gleanvolt warns you if you
-   pick a device that said it is something else, such as your charger.
+   The **Identified as** column names each inverter it recognised. Your charger answers too, as
+   **not identified**: don't pick it.
 
 3. Check the form below the list. The inverter's brand, address, port and unit id are now filled in.
 
@@ -102,7 +102,7 @@ Here you tell Gleanvolt which device is your inverter.
 :::caution[Don't pick the charger]
 A charger with Modbus answers on the same port as the inverter, so Gleanvolt connects to it either way.
 If the charger is chosen as the inverter, the battery level looks frozen and the solar power shows zero.
-Check the **Identified as** column before you save.
+Pick the row identified as an inverter.
 :::
 
 If the inverter doesn't answer when you save, Gleanvolt asks before it saves. Press **Save anyway** only

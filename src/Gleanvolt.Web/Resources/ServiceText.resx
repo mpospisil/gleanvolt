@@ -118,20 +118,6 @@
   <data name="Probe_InverterImplausible" xml:space="preserve">
     <value>{0} answered, but it does not look like an inverter of the selected brand (battery register: {1}). Is this the charger's address?</value>
   </data>
-  <data name="Probe_ChargerOk" xml:space="preserve">
-    <value>{0} answered: charger run mode {1}.</value>
-  </data>
-  <data name="Probe_ChargerImplausible" xml:space="preserve">
-    <value>{0} answered, but its run-mode register reads {1}, which no charger reports. Is this the inverter's address?</value>
-  </data>
-  <data name="Probe_ChargerApiOk" xml:space="preserve">
-    <value>{0} answered: the charger's API reports car state {1}.</value>
-    <comment>A charger reached over HTTP (go-e). {1} is the charger's own car-state number.</comment>
-  </data>
-  <data name="Probe_ChargerApiImplausible" xml:space="preserve">
-    <value>{0} answered (HTTP {1}), but not with the selected charger's API. Is its local HTTP API switched on?</value>
-    <comment>{1} is the HTTP status code.</comment>
-  </data>
   <data name="Probe_NoAnswer" xml:space="preserve">
     <value>{0} did not answer ({1}).</value>
     <comment>{1} is the network error, in the operating system's words.</comment>
@@ -394,9 +380,6 @@
   <data name="Config_PvDriver" xml:space="preserve">
     <value>Pv:Inverter:Driver ('{0}') is not an inverter driver this Gleanvolt knows. Known drivers: {1}. Empty means {2}.</value>
   </data>
-  <data name="Config_PvChargerDriver" xml:space="preserve">
-    <value>{0}:Driver ('{1}') is not a charger driver this Gleanvolt knows. Known drivers: {2}. Empty means {3}.</value>
-  </data>
   <data name="Config_ChargerMinAmps" xml:space="preserve">
     <value>ChargeControl:MinChargingCurrentAmps ({0} A) is below the lowest current the {1} charger charges at ({2} A).</value>
   </data>
@@ -426,18 +409,6 @@
   </data>
   <data name="Config_PvNoInverter" xml:space="preserve">
     <value>No inverter is configured. Set Pv:Inverter:Host.</value>
-  </data>
-  <data name="Config_PvOneCharger" xml:space="preserve">
-    <value>Only {0} EV charger is supported; Pv:Chargers has {1}. The configuration can describe more, so it will not need to change when the control logic supports more — which it does not yet.</value>
-  </data>
-  <data name="Config_PvChargerIdSlug" xml:space="preserve">
-    <value>{0}:Id ('{1}') must be a slug: lower-case letters, digits, '-' and '_'.</value>
-  </data>
-  <data name="Config_PvChargerIdTwice" xml:space="preserve">
-    <value>{0}:Id ('{1}') is used by more than one charger; each id must be unique.</value>
-  </data>
-  <data name="Config_PvHostRequired" xml:space="preserve">
-    <value>{0}:Host is required.</value>
   </data>
   <data name="Config_PvPort" xml:space="preserve">
     <value>{0}:Port ({1}) is not a TCP port.</value>
@@ -858,14 +829,6 @@
   <data name="Config_SetupBadWeatherSource" xml:space="preserve">
     <value>Weather:Source ('{0}') must be NotProvided or External: OpenWeatherMap comes from the OpenWeather plugin, chosen as External.</value>
     <comment>{0} the value given. NotProvided and External are configuration values and stay as they are.</comment>
-  </data>
-  <data name="Probe_ChargerPluginOk" xml:space="preserve">
-    <value>The charger plugin answered: the charger delivers {0} W.</value>
-    <comment>{0} the charger's power in watts.</comment>
-  </data>
-  <data name="Probe_ChargerPluginMissing" xml:space="preserve">
-    <value>No charger plugin answered ({0}). Start it with the provider token from Settings → External providers; Gleanvolt accepts it after the restart.</value>
-    <comment>{0} why, in English.</comment>
   </data>
   <data name="Charger_Empty" xml:space="preserve">
     <value>The reading is empty.</value>

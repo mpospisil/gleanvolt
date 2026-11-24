@@ -87,15 +87,6 @@ public sealed class PvSystemOptions
 
     /// <summary>The inverter this array feeds. Null when the older <c>Solax:Inverter</c> keys still describe it.</summary>
     public PvInverterOptions? Inverter { get; init; }
-
-    /// <summary>
-    /// The EV chargers on this system. A list from the start although <b>exactly one is supported</b> —
-    /// a second entry is a startup failure, not a silently ignored one — so that the day the control
-    /// logic can drive two, the configuration does not have to change shape. An array rather than a
-    /// <c>List</c> or an <c>IReadOnlyList</c> because that is what the configuration binder is certain
-    /// to populate.
-    /// </summary>
-    public PvChargerOptions[] Chargers { get; init; } = [];
 }
 
 /// <summary>
@@ -189,22 +180,4 @@ public sealed class PvInverterOptions : PvDeviceOptions
     /// error rather than a binder exception.</para>
     /// </summary>
     public string UnmeteredGridPhase { get; init; } = string.Empty;
-}
-
-/// <summary>One EV charger on the system.</summary>
-public sealed class PvChargerOptions : PvDeviceOptions
-{
-    /// <summary>
-    /// This charger's identity within the system: the key its Modbus client is registered under, and
-    /// the sub-topic it will publish under once there can be two. Slug-shaped, like
-    /// <see cref="PvSystemOptions.Id"/>, and unique within the list. Defaults to <c>charger</c>.
-    /// </summary>
-    public string Id { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Which charger driver reads and controls this charger: <c>solax</c>, the only one so far. Empty means
-    /// <c>solax</c>, so a configuration from before the field existed needs no change (issue #349).
-    /// Case-insensitive. An id no registered driver has is a configuration problem naming the ones there are.
-    /// </summary>
-    public string Driver { get; init; } = string.Empty;
 }

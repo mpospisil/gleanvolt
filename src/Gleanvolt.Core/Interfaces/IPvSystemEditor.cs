@@ -29,18 +29,6 @@ public interface IPvSystemEditor
     IReadOnlyList<InverterDriverInfo> InverterDrivers { get; }
 
     /// <summary>
-    /// The charger drivers this host can run, which <c>Pv:Chargers:0:Driver</c> may name (issue #349), in
-    /// the order a drop-down shows them.
-    /// </summary>
-    IReadOnlyList<EvChargerDriverInfo> ChargerDrivers { get; }
-
-    /// <summary>
-    /// Whether <c>ExternalCharger:UsePlugin</c> is set (#444): the charger is behind a plugin whatever the charger's brand
-    /// here says, because the deployment runs a charger plugin.
-    /// </summary>
-    bool ChargerPluginForced => false;
-
-    /// <summary>
     /// Stores <paramref name="values"/> (configuration key to value; an empty string clears a value)
     /// in the overrides file, merged with what is there already — if the merged configuration passes
     /// the startup resolver. A value equal to what the key would be without the file is not stored,
@@ -56,19 +44,17 @@ public interface IPvSystemEditor
     SettingsSaveResult Revert(string key);
 
     /// <summary>
-    /// One read against a device address, to catch a swapped inverter and charger before a restart
-    /// makes it look like a frozen battery and zero solar. Never throws for an unreachable device.
+    /// One read against the inverter's address, to catch the charger's address entered by mistake before a
+    /// restart makes it look like a frozen battery and zero solar. Never throws for an unreachable device.
     /// </summary>
     /// <param name="driver">
-    /// The driver whose probe asks, for the inverter or the charger as <paramref name="role"/> says: the one
-    /// the form has selected. Null or empty means that role's default driver.
+    /// The inverter driver whose probe asks: the one the form has selected. Null or empty means the default.
     /// </param>
     /// <param name="inverterTopology">
     /// For the inverter, how it is reached (<c>Pv:Inverter:Topology</c>): behind an EMMA the probe asks the
     /// EMMA too. Null or empty means the driver's default.
     /// </param>
     Task<DeviceProbeResult> ProbeAsync(
-        PvDeviceRole role,
         string host,
         int port,
         byte unitId,

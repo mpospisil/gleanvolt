@@ -28,14 +28,9 @@ public enum DiscoveryFinding
 
     /// <summary>
     /// Answered Modbus with a Huawei model name (issue #324): a SUN2000 inverter, through its SDongle or
-    /// behind an EMMA, or an EMMA itself. Or, with no name, with the phase voltages of an SCharger (#353).
+    /// behind an EMMA, or an EMMA itself.
     /// </summary>
     HuaweiDevice,
-
-    /// <summary>
-    /// A go-e Charger's local HTTP API v2 answered on a web port (#353). Not Modbus: no unit id.
-    /// </summary>
-    GoeCharger,
 }
 
 /// <summary>
@@ -64,7 +59,7 @@ public enum SupportTier
 }
 
 /// <summary>What a serial-number prefix says a SolaX box is.</summary>
-/// <param name="Role">The inverter or the charger.</param>
+/// <param name="Role">The inverter.</param>
 /// <param name="Model">The model as <c>SUPPORTED_PV_SYSTEMS.md</c> names it, e.g. <c>X3-HYB-G4 PRO</c>.</param>
 /// <param name="Family">The upstream family, e.g. <c>GEN6 hybrid</c>.</param>
 /// <param name="Tier">How far Gleanvolt can drive it.</param>
@@ -77,19 +72,19 @@ public sealed record SolaxModel(PvDeviceRole Role, string Model, string Family, 
 /// <param name="Port">The TCP port.</param>
 /// <param name="UnitId">The Modbus unit id that answered, or null where none did (or for a web page).</param>
 /// <param name="Finding">What kind of answer this is.</param>
-/// <param name="Role">The inverter or the charger, when the serial number says which.</param>
+/// <param name="Role">The inverter, when the serial number or the model name says so.</param>
 /// <param name="Model">The model, when the serial number names one.</param>
 /// <param name="Family">The family, when the serial number names one.</param>
 /// <param name="SerialNumber">The serial number as read, when there was one.</param>
 /// <param name="Tier">How far Gleanvolt can drive it, for anything that answered Modbus.</param>
 /// <param name="RoleConfirmed">
-/// Whether the role check (<c>DeviceRoleCheck</c>, the same one <c>/pv-system</c>'s probe uses) agrees
-/// with the serial number; null when it was not run.
+/// Whether the battery register (the one <c>/pv-system</c>'s probe reads) agrees with the serial number; null
+/// when it was not read.
 /// </param>
 /// <param name="Note">One sentence for a human: what was read, or what to do next.</param>
 /// <param name="Driver">
-/// The driver that speaks to it (<c>Pv:Inverter:Driver</c>, or <c>Pv:Chargers:0:Driver</c> for a charger),
-/// when the scan identified a family Gleanvolt has a driver for; null otherwise.
+/// The driver that speaks to it (<c>Pv:Inverter:Driver</c>), when the scan identified a family Gleanvolt has
+/// a driver for and it is not SolaX; null otherwise.
 /// </param>
 /// <param name="Topology">
 /// How that driver reaches it (<c>Pv:Inverter:Topology</c>): <c>emma</c> for a Huawei inverter found
@@ -110,8 +105,8 @@ public sealed record DiscoveredDevice(
     string? Driver = null,
     string? Topology = null)
 {
-    /// <summary>Whether the scan said what the device is: a SolaX serial number, a Huawei model or a go-e's API.</summary>
-    public bool Identified => Finding is DiscoveryFinding.SolaxDevice or DiscoveryFinding.HuaweiDevice or DiscoveryFinding.GoeCharger;
+    /// <summary>Whether the scan said what the device is: a SolaX serial number or a Huawei model.</summary>
+    public bool Identified => Finding is DiscoveryFinding.SolaxDevice or DiscoveryFinding.HuaweiDevice;
 }
 
 /// <summary>Everything one scan found, and what it was told to scan.</summary>

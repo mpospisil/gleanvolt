@@ -266,131 +266,96 @@ Not supported yet. GoodWe is planned.
 ## EV chargers
 
 <!-- include: docs/SUPPORTED_CHARGERS.md -->
-EV chargers Gleanvolt can drive, by manufacturer. Each model links to its manufacturer's page. The tiers
-are explained in
+EV chargers Gleanvolt can drive, by manufacturer. The tiers are explained in
 [Supported PV systems](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_PV_SYSTEMS.md#at-a-glance).
-One charger is supported per installation. A tester's register snapshots
-([issue #354](https://github.com/mpospisil/gleanvolt/issues/354)) move a row up a tier.
+One charger is supported per installation.
 
-Every charger below is also a plugin in [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (#443): driver `external`, with the
-plugin for the brand. **The built-in drivers `solax`, `huawei-7ks`, `huawei-22kt` and `goe` are deprecated in 1.3
-and removed in 1.4** (#444, #445): each start logs which plugin replaces the one in use, and Settings says so beside
-the charger's brand. On Docker, add the plugin to `GLEANVOLT_PLUGINS` and deploy
-([deploy/README.md](https://github.com/mpospisil/gleanvolt/blob/main/deploy/README.md#shipped-plugins)). A plugin's
-page has a recording for testers in place of the register snapshot.
+**Every charger is driven through a plugin** from [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers):
+a small program for one charger family, with its own page for the charger's address and settings. Gleanvolt decides;
+the plugin reads and commands the charger. Gleanvolt never opens a connection to the charger itself. Since 1.4 there
+are no built-in charger drivers (#445). How to run one:
+[Your charger](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md).
 
 ### Chargers at a glance
 
-| Manufacturer | Models | Driver | Tier |
+| Manufacturer | Models | Plugin | Tier |
 |---|---|---|---|
-| [SolaX](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#solax-chargers) | **X1/X3-HAC**; the other HAC variants; X1/X3-EVC | `solax` | **Verified** (X1/X3-HAC); Expected |
-| [Huawei](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#huawei-scharger) | SCharger-7KS-S0, SCharger-22KT-S0 | `huawei-7ks`, `huawei-22kt` | Expected |
-| [go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#go-e-charger) | Gemini, Gemini flex, HOMEfix, HOME+ (hardware V3 or later) | `goe` | Expected |
-| [Shelly](https://github.com/mpospisil/gleanvolt/blob/main/docs/SUPPORTED_CHARGERS.md#shelly-topac-portable-ev-charger) | TopAC Portable EV Charger (EVE01-11R) | `external`, with the Shelly plugin | Expected |
-| Others | — | `external`, with a plugin someone writes | Not supported yet |
+| [SolaX](https://github.com/mpospisil/gleanvolt-chargers/tree/main/solax) | **X1/X3-HAC**; the other HAC variants; X1/X3-EVC | `solax` | **Verified** (X1/X3-HAC); Expected |
+| [Huawei](https://github.com/mpospisil/gleanvolt-chargers/tree/main/huawei) | SCharger-7KS-S0, SCharger-22KT-S0 | `huawei` | Expected |
+| [go-e](https://github.com/mpospisil/gleanvolt-chargers/tree/main/goe) | Gemini, Gemini flex, HOMEfix, HOME+ (hardware V3 or later) | `goe` | Expected |
+| [Shelly](https://github.com/mpospisil/gleanvolt-chargers/tree/main/shelly) | TopAC Portable EV Charger (EVE01-11R) | `shelly` | Expected |
+| Others | — | a plugin someone writes | Not supported yet |
 
-### SolaX chargers
+The plugin's name is its compose profile, its name in `GLEANVOLT_PLUGINS` and its image,
+`ghcr.io/mpospisil/gleanvolt-plugin-<name>`. Each README in gleanvolt-chargers has the models, the setup and the
+hardware's caveats.
 
-Driver `solax`, over Modbus TCP. The HAC models link to SolaX's Smart EV Charger G2 page, the EVC to its
-Smart EV Charger page.
+### SolaX
 
-| Model | Family | Serial prefix | Tier | Notes |
-|---|---|---|---|---|
-| [**X1/X3-HAC**](https://www.solaxpower.com/our-products/smart-ev-charger-g2.html) | GEN2 (HAC) | `5` + model code + power code | **Verified** | The reference installation |
-| [**X1-HAC, X3-HAC, X1-HAC-S, X3-HAC-S, A1-HAC, J1-HAC, C1-HAC, C3-HAC**](https://www.solaxpower.com/our-products/smart-ev-charger-g2.html) — 4.6, 7.2, 11 and 22 kW | GEN2 (HAC) | `5` + model code + power code | Expected | Same four registers as the reference |
-| [**X1-EVC 7 kW, X3-EVC 11 kW, X3-EVC 22 kW**](https://www.solaxpower.com/our-products/smart-ev-charger.html) | GEN1 (EVC) | `C107`, `C311`, `C322` | Expected | Upstream enables all four registers. With firmware 7.0 or later upstream treats the unit as a HAC. Early units were reported with Modbus TCP port 502 closed and reachable only over RS485 at address 70 ([discussion #349](https://github.com/wills106/homeassistant-solax-modbus/discussions/349), 2023) |
+[`solax`](https://github.com/mpospisil/gleanvolt-chargers/tree/main/solax), over Modbus TCP.
 
-Not supported:
+| Model | Tier | Notes |
+|---|---|---|
+| [**X1/X3-HAC**](https://www.solaxpower.com/our-products/smart-ev-charger-g2.html) | **Verified** | The reference installation |
+| [**X1-HAC, X3-HAC, X1-HAC-S, X3-HAC-S, A1-HAC, J1-HAC, C1-HAC, C3-HAC**](https://www.solaxpower.com/our-products/smart-ev-charger-g2.html) — 4.6, 7.2, 11 and 22 kW | Expected | The same registers as the reference |
+| [**X1-EVC 7 kW, X3-EVC 11 kW, X3-EVC 22 kW**](https://www.solaxpower.com/our-products/smart-ev-charger.html) | Expected | Early units were reported with Modbus TCP closed |
 
-- **A charger controlled through a SolaX Datahub.** Charge current is then `0x624`, which Gleanvolt does
-  not write.
-- **Several chargers in parallel mode.** The mode register is then `0x669`.
-- **A charger linked to the inverter for SolaX's own Green/ECO modes** was reported to stop answering
-  Modbus directly (same discussion). Gleanvolt needs the charger on its own Modbus TCP connection.
-
-Caveats:
-
-- **Gleanvolt writes two charger registers**: `0x628` every time the setpoint changes, and `0x60D` when a
-  mode starts or stops. Run `ChargeControl:DryRun` first and compare the logged values with the charger.
-- **Not yet confirmed: EEPROM.** SolaX warns that some holding-register writes are stored in EEPROM, which
-  has a limited number of write cycles. The inverter's `0x7C` command is documented as not stored; for the
-  charger's `0x628` and `0x60D` this project has no answer from SolaX's protocol document yet.
-- **6–32 A, no phase switching.** On three phases the charger's 6 A floor is about 4.2 kW.
-- **One Modbus client.** The charger drops a second Modbus TCP connection on its first request. A charger
-  that evcc or Home Assistant already controls has to be **handed over** to Gleanvolt, not shared. Take
-  snapshots with the button on Settings: it uses Gleanvolt's own connection.
+- **One Modbus client.** The charger drops a second Modbus TCP connection. A charger that evcc or Home Assistant
+  already controls has to be **handed over** to the plugin, not shared.
+- **Not through a SolaX Datahub, not in parallel mode, not linked to the inverter's Green/ECO modes.**
 
 ### Huawei SCharger
 
-Over Modbus TCP, port 502. How to switch its Modbus server on, and what to do behind an EMMA:
-**[Setting up a Huawei SCharger](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md#huawei-scharger)**.
-Huawei's product pages move by region, so the models link to Huawei's solar home page.
+[`huawei`](https://github.com/mpospisil/gleanvolt-chargers/tree/main/huawei), over Modbus TCP. Switching its Modbus
+server on, and what to do behind an EMMA, is in the plugin's README.
 
-| Model | Driver | Tier | Notes |
-|---|---|---|---|
-| [**SCharger-7KS-S0**](https://solar.huawei.com/) (7.4 kW, one phase) | `huawei-7ks` | Expected | Behind an EMMA, keep it in dry-run |
-| [**SCharger-22KT-S0**](https://solar.huawei.com/) (22 kW, three phases) | `huawei-22kt` | Expected | As the 7KS |
+| Model | Tier | Notes |
+|---|---|---|
+| [**SCharger-7KS-S0**](https://solar.huawei.com/) (7.4 kW, one phase) | Expected | Behind an EMMA, keep it in dry run |
+| [**SCharger-22KT-S0**](https://solar.huawei.com/) (22 kW, three phases) | Expected | As the 7KS |
 
 - **No status.** The protocol has none, so no car and a waiting car both read *unknown*, not *available*.
-- **The setpoint is power**, written in 100 W steps and converted from amps.
-- **Port 502 refused** on 2023/2024 firmware is reported by owners in evcc's tracker.
-- **One Modbus client.** The SCharger may drop a second connection, as the SolaX does. A charger an EMMA
-  already manages has to be handed over, not shared.
-- Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
+- Every test recording is synthetic.
 
 ### go-e Charger
 
-Driver `goe`, over the go-e's local HTTP API v2 on port 80. How to switch the API on:
-**[Setting up a go-e](https://github.com/mpospisil/gleanvolt/blob/main/docs/CHARGER_SETUP.md#go-e-charger)**.
+[`goe`](https://github.com/mpospisil/gleanvolt-chargers/tree/main/goe), over the go-e's local HTTP API v2, which is off
+by default.
 
-| Model | Driver | Tier | Notes |
-|---|---|---|---|
-| [**Gemini, Gemini flex, HOMEfix and HOME+**](https://go-e.com/) (hardware V3 or later), 11 and 22 kW | `goe` | Expected | The API is off by default. Phase switching is the go-e's own; Gleanvolt does not command it |
+| Model | Tier | Notes |
+|---|---|---|
+| [**Gemini, Gemini flex, HOMEfix and HOME+**](https://go-e.com/) (hardware V3 or later), 11 and 22 kW | Expected | Phase switching is the go-e's own; Gleanvolt doesn't command it |
 
-- **A pause is the force state *off***, because the go-e refuses a current below 6 A.
-- **The current and the force state are settings the go-e keeps**; Gleanvolt writes them only when they
-  change.
-- Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
-
-### Chargers behind a plugin
-
-Driver `external` (#435). A **plugin**, a program outside Gleanvolt, reads and commands the charger, and
-Gleanvolt drives it through the plugin. Gleanvolt needs no address for the charger; the plugin has it.
-So a new charger needs no new release of Gleanvolt, only a plugin:
-[the charger kind](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md#the-charger-kind).
-
-- **Gleanvolt keeps the safeguards.** The setpoint goes to the plugin only when it moved by
-  `ChargeControl:CurrentChangeThresholdAmps`, never above what the charger says it takes, and in
-  `ChargeControl:DryRun` nothing goes to the plugin at all.
-- **A plugin that is away is a charger Gleanvolt can't read**: the charger shows as *unknown*, and the
-  control loop makes no decision until it answers again.
-- **No register snapshot**: the button on Settings is hidden. A plugin can offer its own.
+- Every test recording is synthetic.
 
 ### Shelly TopAC Portable EV Charger
 
-Driver `external`, with
-the [Shelly plugin](https://github.com/mpospisil/gleanvolt-chargers/blob/main/src/Gleanvolt.Plugin.Shelly/README.md) in
-[gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (#429, #443), over the charger's local Gen2 RPC API.
+[`shelly`](https://github.com/mpospisil/gleanvolt-chargers/tree/main/shelly), over the charger's local Gen2 RPC API.
 
-| Model | Driver | Tier | Notes |
-|---|---|---|---|
-| [**TopAC Portable EV Charger**](https://shelly-api-docs.shelly.cloud/gen2/Devices/ShellyX/XT1/TopACPortableEVCharger) (EVE01-11R), 11 kW, three phases, 6–16 A | `external` | Expected | The plugin has the address, and the password when authentication is on |
+| Model | Tier | Notes |
+|---|---|---|
+| [**TopAC Portable EV Charger**](https://shelly-api-docs.shelly.cloud/gen2/Devices/ShellyX/XT1/TopACPortableEVCharger) (EVE01-11R), 11 kW, three phases, 6–16 A | Expected | The plugin has the address, and the password when authentication is on |
 
-- **A pause is the start/stop switch off**, because the TopAC takes nothing below 6 A. The plugin
-  remembers that it paused, as the go-e driver does.
-- **The power's unit is checked**, not assumed: Shelly documents `total_power` only with zeros, and evcc
-  reads it as kW. The plugin compares it with V × I on the phases once the car draws.
-- **Auto balance** (Shelly EM load management) fights the control loop. The plugin asks the owner to turn
-  it off.
-- **The password**, with authentication on in the Shelly app, is entered on the plugin's page and sent as
-  Shelly's digest.
-- **No search.** The charger isn't found by Gleanvolt's search; enter its address on the plugin's page.
-- **Not shipped.** The plugin is built with Gleanvolt and run by hand, not released as an image or a zip.
-- Start, stop and the setpoint are implemented as documented, and every test recording is synthetic.
+- **6–16 A.** Gleanvolt refuses the plugin while `ChargeControl:MaxChargingCurrentAmps` is above 16 A.
+- **Auto balance** (Shelly EM load management) fights the control loop: turn it off.
+- Every test recording is synthetic.
+
+### What Gleanvolt keeps for every charger
+
+- **The safeguards.** The setpoint goes to the plugin only when it moved by
+  `ChargeControl:CurrentChangeThresholdAmps`, never above what the charger says it takes, and in
+  `ChargeControl:DryRun` nothing goes to the plugin at all.
+- **The limits.** A plugin says what its charger can do when it connects, and Gleanvolt refuses it while
+  `ChargeControl`'s current range or phases are outside that.
+- **Availability.** With no plugin connected, or one that can't read its charger, no mode starts, and a running
+  mode is suspended until the charger is back.
+- **A recording for testers** is on each plugin's page, in place of Gleanvolt's old register snapshot.
 
 ### Other chargers
 
-Not supported yet. A plugin can add one; see [Chargers behind a plugin](#chargers-behind-a-plugin).
+Not supported yet. A plugin can add one, in any repository:
+[the charger kind](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md#the-charger-kind) and the
+[Gleanvolt.Chargers.Hosting README](https://github.com/mpospisil/gleanvolt/blob/main/src/Gleanvolt.Chargers.Hosting/README.md).
 <!-- end include -->
 
 ---
@@ -428,10 +393,8 @@ prefix. Two snapshots are the most useful: one at night with the battery idle an
 one with the battery charging. They become the test fixtures every driver is checked against, so the
 signs and ranges are proven against your device rather than assumed.
 
-For a charger, the same button is under the charger. Three snapshots are the most useful: no car, a car
-plugged in and waiting, and a car charging. It reads over Gleanvolt's own connection, so Gleanvolt keeps
-running; a charger that serves one Modbus client at a time would drop a second one. For a go-e, the file is
-a recording of its API's answers instead of registers.
+For a charger, the recording is on its plugin's page. Three are the most useful: no car, a car plugged in
+and waiting, and a car charging.
 
 ## Sources
 

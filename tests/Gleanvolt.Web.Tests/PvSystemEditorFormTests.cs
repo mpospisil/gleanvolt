@@ -117,13 +117,13 @@ public class PvSystemEditorFormTests : BunitContext
         _editor.ProbeResult = new DeviceProbeResult(false, false, "192.168.2.20:502 did not answer.");
         var form = Render<PvSystemEditorForm>();
 
-        form.Find(Field(PvSystemSettingKeys.ChargerHost)).Input("192.168.2.20");
+        form.Find(Field(PvSystemSettingKeys.InverterHost)).Input("192.168.2.20");
         form.Find("#pv-save").Click();
 
         var probe = Assert.Single(_editor.Probes);
-        Assert.Equal((PvDeviceRole.Charger, "192.168.2.20", 502, (byte)1), probe);
+        Assert.Equal(("192.168.2.20", 502, (byte)1), probe);
         Assert.Contains("did not answer", form.Find("#pv-probes").TextContent);
-        Assert.Equal("192.168.2.20", _editor.Stored[PvSystemSettingKeys.ChargerHost]);
+        Assert.Equal("192.168.2.20", _editor.Stored[PvSystemSettingKeys.InverterHost]);
     }
 
     // -- The inverter's brand (#318).
@@ -149,100 +149,18 @@ public class PvSystemEditorFormTests : BunitContext
         form.Find("#pv-save").Click();
 
         Assert.Equal(new Dictionary<string, string> { [PvSystemSettingKeys.InverterDriver] = "acme" }, Assert.Single(_editor.Saves));
-        var probe = Assert.Single(_editor.Probes);
-        Assert.Equal(PvDeviceRole.Inverter, probe.Role);
+        Assert.Single(_editor.Probes);
         Assert.Equal("acme", Assert.Single(_editor.ProbeDrivers));
     }
 
     [Fact]
-    public void The_charger_brand_is_a_choice_of_the_hosts_charger_drivers()
+    public void Settings_has_no_charger_section_since_the_charger_is_its_plugins()
     {
+        // #445: no built-in charger drivers are left, so there is nothing about the charger to set here.
         var form = Render<PvSystemEditorForm>();
 
-        var select = form.Find(Field(PvSystemSettingKeys.ChargerDriver));
-        Assert.Equal(["SolaX", "Wallco"], select.QuerySelectorAll("option").Select(option => option.TextContent));
-        Assert.Equal("solax", select.GetAttribute("value"));
-    }
-
-    [Fact]
-    public void Choosing_a_charger_brand_follows_its_defaults_and_probes_with_it()
-    {
-        _editor.Running[PvSystemSettingKeys.ChargerHost] = "192.168.2.6";
-        var form = Render<PvSystemEditorForm>();
-
-        form.Find(Field(PvSystemSettingKeys.ChargerDriver)).Change("wallco");
-
-        Assert.Equal("5020", form.Find(Field(PvSystemSettingKeys.ChargerPort)).GetAttribute("placeholder"));
-        Assert.Equal("2", form.Find(Field(PvSystemSettingKeys.ChargerUnitId)).GetAttribute("placeholder"));
-
-        form.Find("#pv-save").Click();
-
-        Assert.Equal(new Dictionary<string, string> { [PvSystemSettingKeys.ChargerDriver] = "wallco" }, Assert.Single(_editor.Saves));
-        var probe = Assert.Single(_editor.Probes);
-        Assert.Equal(PvDeviceRole.Charger, probe.Role);
-        Assert.Equal((5020, (byte)2), (probe.Port, probe.UnitId));
-        Assert.Equal("wallco", Assert.Single(_editor.ProbeDrivers));
-    }
-
-    [Fact]
-    public void A_built_in_charger_driver_says_it_is_deprecated_and_names_the_plugin_that_replaces_it()
-    {
-        // #444: the running charger is SolaX (empty driver, a host): the SolaX plugin takes its place in 1.4.
-        var form = Render<PvSystemEditorForm>();
-
-        var note = form.Find("#pv-charger-deprecated");
-        Assert.Contains("deprecated", note.TextContent);
-        Assert.Contains("GLEANVOLT_PLUGINS", note.TextContent);
-        Assert.Contains("solax", note.TextContent);
-        Assert.Equal("https://github.com/mpospisil/gleanvolt-chargers/tree/main/solax", note.QuerySelector("a")!.GetAttribute("href"));
-    }
-
-    [Fact]
-    public void A_deployment_running_a_charger_plugin_says_so_instead()
-    {
-        _editor.ChargerPluginForced = true;
-        var form = Render<PvSystemEditorForm>();
-
-        Assert.Contains("ExternalCharger:UsePlugin", form.Find("#pv-charger-plugin-forced").TextContent);
-        Assert.Empty(form.FindAll("#pv-charger-deprecated"));
-    }
-
-    [Fact]
-    public void Choosing_a_charger_behind_a_plugin_hides_its_address_and_probes_the_plugin_instead()
-    {
-        // #435: the plugin reaches the charger, so the form asks for no address, and its name is said, not a brand.
-        _editor.ChargerDrivers = [.. _editor.ChargerDrivers, new("external", "External plugin", EvChargerTransport.External, null,
-            new EvChargerCapabilities(6, 32, 0, 3, false, false))];
-        _editor.Running[PvSystemSettingKeys.ChargerHost] = "192.168.2.6";
-        var form = Render<PvSystemEditorForm>();
-
-        Assert.Equal(SettingsText.ChargerDriverExternal, form.Find(Field(PvSystemSettingKeys.ChargerDriver)).QuerySelectorAll("option")[^1].TextContent);
-        Assert.Empty(form.FindAll("#pv-charger-plugin"));
-
-        form.Find(Field(PvSystemSettingKeys.ChargerDriver)).Change("external");
-
-        Assert.Empty(form.FindAll(Field(PvSystemSettingKeys.ChargerHost)));
-        Assert.Empty(form.FindAll(Field(PvSystemSettingKeys.ChargerPort)));
-        Assert.Empty(form.FindAll(Field(PvSystemSettingKeys.ChargerUnitId)));
-        Assert.NotNull(form.Find("#pv-charger-plugin"));
-        Assert.Empty(form.FindAll("#pv-charger-deprecated"));
-
-        form.Find("#pv-save").Click();
-
-        Assert.Equal(new Dictionary<string, string> { [PvSystemSettingKeys.ChargerDriver] = "external" }, Assert.Single(_editor.Saves));
-        Assert.Equal((PvDeviceRole.Charger, string.Empty), (Assert.Single(_editor.Probes).Role, _editor.Probes[0].Host));
-        Assert.Equal("external", Assert.Single(_editor.ProbeDrivers));
-    }
-
-    [Fact]
-    public void Choosing_the_charger_brand_already_in_force_is_not_an_edit()
-    {
-        var form = Render<PvSystemEditorForm>();
-
-        form.Find(Field(PvSystemSettingKeys.ChargerDriver)).Change("wallco");
-        form.Find(Field(PvSystemSettingKeys.ChargerDriver)).Change("solax");
-
-        Assert.True(form.Find("#pv-save").HasAttribute("disabled"));
+        Assert.Empty(form.FindAll("[id^='pv-Pv-Chargers']"));
+        Assert.DoesNotContain(SettingsText.Charger, form.FindAll("h3").Select(heading => heading.TextContent));
     }
 
     [Fact]
@@ -401,7 +319,7 @@ public class PvSystemEditorFormTests : BunitContext
     public void Says_what_is_saved_but_not_running_and_where_the_restart_is()
     {
         _editor.Stored[PvSystemSettingKeys.TiltDegrees] = "30";
-        _editor.Stored[PvSystemSettingKeys.ChargerHost] = "192.168.2.20";
+        _editor.Stored[PvSystemSettingKeys.InverterHost] = "192.168.2.20";
 
         var form = Render<PvSystemEditorForm>();
 
@@ -412,8 +330,8 @@ public class PvSystemEditorFormTests : BunitContext
         // Each field still running something else says so under its box.
         var tilt = form.Find(Field(PvSystemSettingKeys.TiltDegrees)).ParentElement!;
         Assert.Contains("Running: 35", tilt.QuerySelector(".field-pending")!.TextContent);
-        var host = form.Find(Field(PvSystemSettingKeys.ChargerHost)).ParentElement!;
-        Assert.Contains("Running: 192.168.2.6", host.QuerySelector(".field-pending")!.TextContent);
+        var host = form.Find(Field(PvSystemSettingKeys.InverterHost)).ParentElement!;
+        Assert.Contains("Running: 192.168.2.10", host.QuerySelector(".field-pending")!.TextContent);
         Assert.Equal(2, form.FindAll(".field-pending").Count);
     }
 
@@ -512,7 +430,7 @@ public class PvSystemEditorFormTests : BunitContext
 
         // The brands in the drop-down are names, and stay as they are in every language.
         PseudoLocale.AssertTranslated(form.Markup,
-            [.. _editor.InverterDrivers.Select(driver => driver.DisplayName), .. _editor.ChargerDrivers.Select(driver => driver.DisplayName)]);
+            [.. _editor.InverterDrivers.Select(driver => driver.DisplayName)]);
     }
 
     [Fact]

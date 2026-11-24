@@ -1,21 +1,21 @@
 namespace Gleanvolt.Devices;
 
 /// <summary>
-/// One EV charger family, read and controlled over a connection the host owns (issue #348), as
-/// <see cref="IInverterDriver"/> is for inverters. The driver knows the family's registers, encodings and
-/// states; nothing outside it does. What it hands back is in fixed units (watts, amps) and a status from
-/// <see cref="EvChargerStatus"/>, so no code downstream of a driver knows which brand is on the wall.
+/// The charger as the control path reads and commands it (issue #348). Since 1.4 (#445) there is one
+/// implementation, the charger behind a plugin: the plugin knows its charger's registers and states, and nothing
+/// in Gleanvolt does. What it hands back is in fixed units (watts, amps) and a status from
+/// <see cref="EvChargerStatus"/>, so no code downstream knows which brand is on the wall.
 ///
 /// <para><b>Start and stop are one switch.</b> The controller only ever needs to let the charger charge or
-/// stop it (<see cref="SetChargingAllowedAsync"/>); each family maps that onto its own control — a use-mode,
-/// a force state. Anything else a family can be set to is the owner's, read for display and never written.</para>
+/// stop it (<see cref="SetChargingAllowedAsync"/>); each plugin maps that onto its own control — a use-mode,
+/// a force state. Anything else a charger can be set to is the owner's, read for display and never written.</para>
 ///
-/// <para>A driver never opens a socket. The host builds the connection, and in dry-run hands it one that
-/// refuses every write, so a driver cannot write even by mistake.</para>
+/// <para>Gleanvolt never opens a connection to the charger: a charger that serves one Modbus client drops a
+/// second.</para>
 /// </summary>
 public interface IEvChargerDriver
 {
-    /// <summary>What this family can do.</summary>
+    /// <summary>What the charger can do.</summary>
     EvChargerCapabilities Capabilities { get; }
 
     /// <summary>
@@ -48,13 +48,6 @@ public interface IEvChargerDriver
     /// charger does not accept the write. Callers write on a transition, not on every poll.
     /// </summary>
     Task SetChargingAllowedAsync(bool allowed, string reason, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Whether the device on the connection is this family's charger: "Test connection". Connects first,
-    /// reads as little as tells the family apart, and never writes. Throws when nothing answers; a device
-    /// that answers with something this family would not report is a result, not an exception.
-    /// </summary>
-    Task<EvChargerProbeResult> ProbeAsync(CancellationToken cancellationToken = default);
 }
 
 /// <summary>What a charger family supports.</summary>
@@ -63,8 +56,8 @@ public interface IEvChargerDriver
 /// <param name="PauseCurrentAmps">The setpoint that pauses charging without stopping the session.</param>
 /// <param name="Phases">How many phases it supplies.</param>
 /// <param name="CanSwitchPhases">
-/// Whether it can switch between one phase and three while plugged in (go-e, issue #352). Reported, never
-/// commanded: the contract has no phase-switch command yet, so a driver leaves the family's own setting alone.
+/// Whether it can switch between one phase and three while plugged in. Reported, never commanded: the contract
+/// has no phase-switch command yet, so a plugin leaves the charger's own setting alone.
 /// </param>
 /// <param name="HasUseMode">
 /// Whether it has modes of its own beyond charging allowed or not (SolaX's Eco and Green), which readings
@@ -79,8 +72,8 @@ public sealed record EvChargerCapabilities(
     bool HasUseMode)
 {
     /// <summary>
-    /// Whether the family reports what it is doing (issue #351). A family that does not, such as Huawei's
-    /// SCharger, shows only that it is delivering: power above zero reads <see cref="EvChargerStatus.Charging"/>,
+    /// Whether the charger reports what it is doing (issue #351). One that does not shows only that it is
+    /// delivering: power above zero reads <see cref="EvChargerStatus.Charging"/>,
     /// and anything else <see cref="EvChargerStatus.Unknown"/>. No car and a car plugged in and waiting both
     /// read 0 W, and Unknown is the only status that claims neither.
     /// </summary>
@@ -121,7 +114,15 @@ public sealed record EvChargerSettings(bool ChargingAllowed, int ChargeCurrentAm
     public string ModeName => Mode ?? (ChargingAllowed ? "charging allowed" : "charging stopped");
 }
 
-/// <summary>What <see cref="IEvChargerDriver.ProbeAsync"/> found at an address that answered.</summary>
-/// <param name="Recognised">Whether what was read is something this family's charger would report.</param>
-/// <param name="Reading">The raw value read, for a message that says what came back instead.</param>
-public sealed record EvChargerProbeResult(bool Recognised, double Reading);
+/// <summary>What the host tells the charger driver when it creates one.</summary>
+public sealed record EvChargerDriverOptions
+{
+    /// <summary>
+    /// Log the commands the driver would send instead of sending them, and let a value it would have sent stand
+    /// in for the device's when it is read back.
+    /// </summary>
+    public bool DryRun { get; init; }
+
+    /// <summary>How far the current setpoint has to move before it is sent again; at least 1 A.</summary>
+    public int CurrentChangeThresholdAmps { get; init; } = 1;
+}

@@ -59,20 +59,16 @@ public class SetupStatusEvaluatorTests
         Assert.Equal([area], Areas(status));
     }
 
-    [Fact]
-    public void A_charger_with_neither_a_driver_nor_a_host_is_the_plugins_and_blocks_nothing()
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("solax", "")]
+    [InlineData("goe", "192.168.2.6")]
+    public void A_charger_in_the_configuration_blocks_nothing_since_it_is_ignored(string driver, string host)
     {
-        var status = Usable(("Pv:Chargers:0:Host", ""), ("Pv:Chargers:0:Driver", ""));
+        // #445: the charger is always the plugin's; a pre-1.4 charger configuration is ignored, not a setup step.
+        var status = Usable(("Pv:Chargers:0:Host", host), ("Pv:Chargers:0:Driver", driver));
 
         Assert.True(status.Usable);
-    }
-
-    [Fact]
-    public void A_built_in_charger_chosen_without_a_host_is_a_configuration_problem_not_a_setup_step()
-    {
-        var status = Usable(("Pv:Chargers:0:Host", ""), ("Pv:Chargers:0:Driver", "solax"));
-
-        Assert.Equal([SetupArea.Configuration], Areas(status));
     }
 
     [Fact]

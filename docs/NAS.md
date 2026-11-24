@@ -65,14 +65,16 @@ and keeps restarting, so either set the token or delete its service from the fil
 ## The charger plugin
 
 The charger is driven through a plugin from [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers)
-(#444): `solax`, `huawei`, `goe` or `shelly`, each in the compose file under its own profile. The built-in charger
-drivers still work in 1.3 and go in 1.4. To use one:
+(#444): `solax`, `huawei`, `goe` or `shelly`, each in the compose file under its own profile. Since 1.4 it is the only
+way: the controller never opens a connection to the charger (#445). To use one:
 
 1. Make the token as for the weather plugin, and set `GLEANVOLT_PROVIDER_TOKEN`.
-2. Add the charger's profile to `COMPOSE_PROFILES` (`openweather,solax`), set `GLEANVOLT_CHARGER_PLUGIN=true` and
-   keep `EV_CHARGER_HOST`: it is the plugin's address. With the first, the controller drives the charger through the
-   plugin whatever its brand says, so the two never both open it.
+2. Add the charger's profile to `COMPOSE_PROFILES` (`openweather,solax`) and set `EV_CHARGER_HOST`: it is the
+   plugin's address.
 3. The plugin's page appears under **Settings → External providers**.
+
+Upgrading a NAS that ran a built-in charger driver: do step 2 with the plugin that replaced it (`solax` for SolaX,
+`huawei` for an SCharger, `goe` for a go-e), and remove `GLEANVOLT_CHARGER_PLUGIN` if you set it.
 
 At most one: a NAS UI that ignores profiles starts all four, which is harmless but wasteful. Gleanvolt accepts the
 first and refuses the rest, and a refused plugin never talks to its charger. Delete the services you don't use.

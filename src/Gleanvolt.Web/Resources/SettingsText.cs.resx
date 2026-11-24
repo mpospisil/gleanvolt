@@ -352,7 +352,7 @@
     <value>Zahodit změny</value>
   </data>
   <data name="SavedAnyway" xml:space="preserve">
-    <value>Přesto uloženo: vypnutá nabíječka neodpovídá, a přesto to může být správná adresa. Obě zařízení odpovídají na Modbus na portu 502, takže prohozené adresy se po spuštění projeví jako zamrzlá baterie a nulová výroba — před restartem ověřte, která adresa patří kterému zařízení.</value>
+    <value>Přesto uloženo: vypnutý střídač neodpovídá, a přesto to může být správná adresa. Na Modbus na portu 502 odpovídá i nabíječka, takže její adresa zadaná sem se po spuštění projeví jako zamrzlá baterie a nulová výroba — před restartem ji ověřte.</value>
   </data>
   <data name="NotSaved" xml:space="preserve">
     <value>Neuloženo — s tímto nastavením by správce nabíjení nenastartoval:</value>
@@ -408,9 +408,6 @@
   <data name="FieldInverterDriver" xml:space="preserve">
     <value>Značka střídače</value>
   </data>
-  <data name="FieldChargerDriver" xml:space="preserve">
-    <value>Značka nabíječky</value>
-  </data>
   <data name="FieldInverterTopology" xml:space="preserve">
     <value>Připojení přes</value>
   </data>
@@ -428,21 +425,6 @@
   </data>
   <data name="FieldUnmeteredPhase" xml:space="preserve">
     <value>Neměřená fáze sítě</value>
-  </data>
-  <data name="FieldChargerId" xml:space="preserve">
-    <value>ID nabíječky</value>
-  </data>
-  <data name="FieldChargerModel" xml:space="preserve">
-    <value>Model nabíječky</value>
-  </data>
-  <data name="FieldChargerHost" xml:space="preserve">
-    <value>Adresa nabíječky</value>
-  </data>
-  <data name="FieldChargerPort" xml:space="preserve">
-    <value>Port nabíječky</value>
-  </data>
-  <data name="FieldChargerUnitId" xml:space="preserve">
-    <value>Unit ID nabíječky</value>
   </data>
   <data name="HintId" xml:space="preserve">
     <value>a-z, 0-9, - a _</value>
@@ -909,9 +891,6 @@
   <data name="HelpInverterDriver" xml:space="preserve">
     <value>S jakou rodinou střídačů Gleanvolt komunikuje. Určuje, které registry čte a jak drží domácí baterii. Všechny modely jedné značky se stejnými registry Modbus používají stejnou položku.</value>
   </data>
-  <data name="HelpChargerDriver" xml:space="preserve">
-    <value>S jakou rodinou nabíječek Gleanvolt komunikuje. Určuje, které registry čte a zapisuje, aby nabíjení spustil, zastavil a nastavil nabíjecí proud. Všechny modely jedné značky se stejnými registry používají stejnou položku.</value>
-  </data>
   <data name="HelpInverterTopology" xml:space="preserve">
     <value>Jak se Gleanvolt ke střídači připojuje. Přes vlastní dongle střídače čte všechno přímo ze střídače. Za správcem energie, jako je EMMA od Huawei, komunikuje Gleanvolt se správcem energie: síť čte z jeho vlastního senzoru a ke střídači se dostane přes něj, na Unit ID, které správce energie střídači přidělil. To ID zadejte do pole Unit ID střídače.</value>
   </data>
@@ -928,19 +907,10 @@
     <value>Port Modbus TCP, na kterém zařízení odpovídá. Téměř vždy 502; prázdné pole znamená také 502.</value>
   </data>
   <data name="HelpUnitId" xml:space="preserve">
-    <value>Nechte 1. Unit ID rozlišuje zařízení, která sdílejí jednu síťovou adresu, například několik nabíječek za jednou bránou Modbus. Gleanvolt ho začne využívat, až bude podporovat víc střídačů nebo nabíječek. Prázdné pole znamená také 1.</value>
+    <value>Nechte 1. Unit ID rozlišuje zařízení, která sdílejí jednu síťovou adresu, například střídač a baterii za jednou bránou Modbus. Prázdné pole znamená také 1.</value>
   </data>
   <data name="HelpUnmeteredPhase" xml:space="preserve">
     <value>Nechte prázdné, pokud elektroměr měří všechny tři fáze, což je běžné. Pokud jednu neměří, ukazuje na ní 0 W: Gleanvolt pak nevidí přetoky ze slunce ani odběr auta na té fázi, takže solární režimy začnou nabíjet pozdě nebo berou energii ze sítě. Zadejte tu fázi (L1, L2, L3, nebo podle SolaX R, S, T) a Gleanvolt ji místo měření odhadne.</value>
-  </data>
-  <data name="HelpChargerId" xml:space="preserve">
-    <value>Krátké strojové označení nabíječky. Prázdné pole znamená „charger“, což pro jednu nabíječku stačí.</value>
-  </data>
-  <data name="HelpChargerModel" xml:space="preserve">
-    <value>Model nabíječky, například SolaX X3-HAC. Jen pro informaci: nemění, jak Gleanvolt se zařízením komunikuje.</value>
-  </data>
-  <data name="HelpChargerHost" xml:space="preserve">
-    <value>IP adresa nebo název nabíječky v místní síti. Gleanvolt přes ni pomocí Modbus TCP spouští a zastavuje nabíjení a nastavuje nabíjecí proud.</value>
   </data>
   <data name="Reverted" xml:space="preserve">
     <value>Hodnota pole {0} je vrácena; její zdroj je opět: {1}.</value>
@@ -968,18 +938,6 @@
   </data>
   <data name="SnapshotFailed" xml:space="preserve">
     <value>Střídač se nepodařilo přečíst: {0}</value>
-  </data>
-  <data name="SnapshotHelpCharger" xml:space="preserve">
-    <value>Jednou přečte všechny registry, které ovladač nabíječky používá, a uloží je do souboru. Čte přes vlastní spojení Gleanvoltu, takže není třeba nic zastavovat. Sériové číslo se zkrátí na předponu modelu. Soubor přiložte k issue, když testujete nabíječku, kterou Gleanvolt zatím nepodporuje.</value>
-  </data>
-  <data name="SnapshotNoteHintCharger" xml:space="preserve">
-    <value>například: auto připojené, nabíjí 16 A</value>
-  </data>
-  <data name="SnapshotReadingCharger" xml:space="preserve">
-    <value>Čtu nabíječku…</value>
-  </data>
-  <data name="SnapshotFailedCharger" xml:space="preserve">
-    <value>Nabíječku se nepodařilo přečíst: {0}</value>
   </data>
   <!-- External data providers (#386, #401) -->
   <data name="TariffProvider_External" xml:space="preserve">
@@ -1129,12 +1087,6 @@
   <data name="WeatherBuiltInRetired" xml:space="preserve">
     <value>Vestavěné OpenWeather skončilo, a proto je vybrána volba Externí: počasí z OpenWeatherMap teď dodává plugin OpenWeather. Spusťte plugin s tokenem z Externích zdrojů dat a pak na jeho stránce, která se tu objeví po připojení, zadejte svůj klíč OpenWeatherMap. Klíč dřív uložený tady se nezachoval. Do té doby se nabíjení zaznamenává bez počasí.</value>
   </data>
-  <data name="ChargerDriverExternal" xml:space="preserve">
-    <value>Externí plugin</value>
-  </data>
-  <data name="NoteChargerPlugin" xml:space="preserve">
-    <value>Nabíječku obsluhuje plugin, takže Gleanvolt pro ni nepotřebuje adresu. Spusťte plugin s tokenem z Nastavení → Externí zdroje dat; Gleanvolt ho přijme po restartu.</value>
-  </data>
   <data name="ExternalRemembered" xml:space="preserve">
     <value>Zapamatovaný: {0}. Žádný jiný plugin není vpuštěn.</value>
   </data>
@@ -1146,14 +1098,5 @@
   </data>
   <data name="ExternalRefused" xml:space="preserve">
     <value>{0} byl odmítnut {1}: {2}</value>
-  </data>
-  <data name="NoteChargerDeprecated" xml:space="preserve">
-    <value>Zabudovaný ovladač {0} je zastaralý a v Gleanvoltu 1.4 bude odstraněn. Nahrazuje ho plugin {1}: v Dockeru přidejte {2} do GLEANVOLT_PLUGINS v .env a nasaďte znovu; adresa nabíječky se přenese.</value>
-  </data>
-  <data name="NoteChargerDeprecatedLink" xml:space="preserve">
-    <value>Jak plugin spustit</value>
-  </data>
-  <data name="NoteChargerPluginForced" xml:space="preserve">
-    <value>Toto nasazení spouští plugin nabíječky (ExternalCharger:UsePlugin), takže Gleanvolt řídí nabíječku přes něj, ať je zde zvolena jakákoli značka.</value>
   </data>
 </root>

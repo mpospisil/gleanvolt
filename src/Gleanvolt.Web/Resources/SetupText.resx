@@ -62,7 +62,7 @@
     <value>Find the devices</value>
   </data>
   <data name="FindDevicesIntro" xml:space="preserve">
-    <value>Searches this network for inverters and chargers Gleanvolt supports. A /24 takes a minute or two.</value>
+    <value>Searches this network for inverters Gleanvolt supports. A /24 takes a minute or two.</value>
   </data>
   <data name="Subnet" xml:space="preserve">
     <value>Network</value>
@@ -98,20 +98,8 @@
   <data name="LooksLikeInverter" xml:space="preserve">
     <value>an inverter</value>
   </data>
-  <data name="LooksLikeCharger" xml:space="preserve">
-    <value>a charger</value>
-  </data>
   <data name="UseAsInverter" xml:space="preserve">
     <value>Use as inverter</value>
-  </data>
-  <data name="UseAsCharger" xml:space="preserve">
-    <value>Use as charger</value>
-  </data>
-  <data name="RoleMismatchInverter" xml:space="preserve">
-    <value>{0} identified itself as a charger, not an inverter. Check before saving: swapped devices look like a frozen battery and no sun once running.</value>
-  </data>
-  <data name="RoleMismatchCharger" xml:space="preserve">
-    <value>{0} identified itself as an inverter, not a charger. Check before saving: swapped devices look like a frozen battery and no sun once running.</value>
   </data>
   <data name="SetItUp" xml:space="preserve">
     <value>Set it up</value>

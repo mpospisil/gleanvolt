@@ -3,13 +3,12 @@ using Gleanvolt.Core.Models;
 namespace Gleanvolt.Discovery;
 
 /// <summary>
-/// What a SolaX serial number says the box is, from its prefix — the one table in code that
-/// <c>docs/SUPPORTED_INVERTERS.md</c> and <c>docs/SUPPORTED_CHARGERS.md</c> list by hand. They must agree;
-/// a test checks that every prefix here is in one of them.
+/// What a SolaX serial number says the inverter is, from its prefix — the one table in code that
+/// <c>docs/SUPPORTED_INVERTERS.md</c> lists by hand. They must agree; a test checks that every prefix here is
+/// there. Chargers are their plugins' to find (#445).
 ///
 /// <para>The prefixes are the wills106/homeassistant-solax-modbus integration's
-/// (<c>async_determineInverterType</c> in <c>plugin_solax.py</c> and
-/// <c>plugin_solax_ev_charger.py</c>), which detects every model this way. The longest matching prefix
+/// (<c>async_determineInverterType</c> in <c>plugin_solax.py</c>), which detects every model this way. The longest matching prefix
 /// wins, so <c>H3DE</c> and <c>H3E</c> stay apart from <c>H3B</c>.</para>
 /// </summary>
 public static class SolaxModels
@@ -38,63 +37,11 @@ public static class SolaxModels
         (["PRI"], "X1-FIT G3", "FIT", SupportTier.NotSupported),
     ], PvDeviceRole.Inverter);
 
-    private static readonly IReadOnlyList<(string Prefix, SolaxModel Model)> EvcTable = Build(
-    [
-        (["C107"], "X1-EVC 7 kW", "GEN1 (EVC)", SupportTier.Expected),
-        (["C311"], "X3-EVC 11 kW", "GEN1 (EVC)", SupportTier.Expected),
-        (["C322"], "X3-EVC 22 kW", "GEN1 (EVC)", SupportTier.Expected),
-    ], PvDeviceRole.Charger);
-
-    // The HAC's serial is "5" + a two-character model code + a two-character power code. X1/X3-HAC is
-    // the reference installation's model; the rest of the line shares its registers.
-    private static readonly IReadOnlyDictionary<string, (string Name, SupportTier Tier)> HacModels =
-        new Dictionary<string, (string, SupportTier)>(StringComparer.Ordinal)
-        {
-            ["02"] = ("X1-HAC", SupportTier.Verified),
-            ["03"] = ("X3-HAC", SupportTier.Verified),
-            ["04"] = ("A1-HAC", SupportTier.Expected),
-            ["05"] = ("J1-HAC", SupportTier.Expected),
-            ["06"] = ("X1-HAC-S", SupportTier.Expected),
-            ["07"] = ("X3-HAC-S", SupportTier.Expected),
-            ["08"] = ("C1-HAC", SupportTier.Expected),
-            ["09"] = ("C3-HAC", SupportTier.Expected),
-        };
-
-    private static readonly IReadOnlyDictionary<string, string> HacPowers =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["04"] = "4.6 kW",
-            ["07"] = "7.2 kW",
-            ["0B"] = "11 kW",
-            ["0M"] = "22 kW",
-        };
-
     /// <summary>Every inverter prefix, for the test that holds the doc to this table.</summary>
     internal static IEnumerable<string> InverterPrefixes => InverterTable.Select(entry => entry.Prefix);
 
-    /// <summary>Every charger prefix with a fixed spelling (the HAC's is a pattern), for the same test.</summary>
-    internal static IEnumerable<string> ChargerPrefixes => EvcTable.Select(entry => entry.Prefix);
-
     /// <summary>The inverter a serial number read from the inverter's serial registers names, or null.</summary>
     public static SolaxModel? Inverter(string? serialNumber) => Match(InverterTable, serialNumber);
-
-    /// <summary>The charger a serial number read from the charger's serial registers names, or null.</summary>
-    public static SolaxModel? Charger(string? serialNumber)
-    {
-        if (Match(EvcTable, serialNumber) is { } evc)
-        {
-            return evc;
-        }
-
-        if (serialNumber is { Length: >= 5 } && serialNumber[0] == '5'
-            && HacModels.TryGetValue(serialNumber[1..3], out var model)
-            && HacPowers.TryGetValue(serialNumber[3..5], out var power))
-        {
-            return new SolaxModel(PvDeviceRole.Charger, $"{model.Name} {power}", "GEN2 (HAC)", model.Tier);
-        }
-
-        return null;
-    }
 
     /// <summary>
     /// The serial number in <paramref name="registers"/> — ASCII, two characters a register, high byte

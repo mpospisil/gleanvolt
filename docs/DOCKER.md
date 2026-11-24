@@ -68,7 +68,6 @@ the web UI wins over it. See [Configuration](CONFIGURATION.md):
 
 ```bash
   -e Pv__Inverter__Host=192.168.2.10 \
-  -e Pv__Chargers__0__Host=192.168.2.6 \
   -e Pv__Latitude=50.08 -e Pv__Longitude=14.44 \
 ```
 

@@ -23,7 +23,6 @@ public class PvSystemRulesTopologyTests
         var pv = new PvSystemOptions
         {
             Inverter = new PvInverterOptions { Driver = driver, Topology = topology, Host = "192.168.2.10" },
-            Chargers = [new PvChargerOptions { Host = "192.168.2.6" }],
         };
         return (PvSystemRules.Resolve(pv, "Inverter", problems, [Solax, Huawei]), problems);
     }

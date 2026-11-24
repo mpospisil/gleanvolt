@@ -87,8 +87,8 @@ public class CliTests
     public void The_progress_line_names_the_role_model_and_serial()
     {
         Assert.Equal(
-            "  found 192.168.2.6:502 charger, X3-HAC 11 kW, serial SERIAL00000000",
-            ReportWriter.FoundLine(Device(PvDeviceRole.Charger, "192.168.2.6", "X3-HAC 11 kW", SupportTier.Verified)));
+            "  found 192.168.2.10:502 inverter, X3-HYB-G4 PRO, serial SERIAL00000000",
+            ReportWriter.FoundLine(Device(PvDeviceRole.Inverter, "192.168.2.10", "X3-HYB-G4 PRO", SupportTier.Verified)));
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class CliTests
         var lines = DiscoveryConfiguration.EnvironmentLines(
         [
             Device(PvDeviceRole.Inverter, "192.168.2.10", "X3-HYB-G4 PRO", SupportTier.Verified),
-            Device(PvDeviceRole.Charger, "192.168.2.6", "X3-HAC 11 kW", SupportTier.Verified, unitId: 3),
+            Device(PvDeviceRole.Inverter, "192.168.2.11", "X3-Hybrid G4", SupportTier.Expected, unitId: 3),
         ]);
 
         Assert.Equal(
@@ -115,10 +115,6 @@ public class CliTests
             "Pv__Inverter__Host=192.168.2.10",
             "Pv__Inverter__Port=502",
             "Pv__Inverter__UnitId=1",
-            "Pv__Chargers__0__Model=SolaX X3-HAC 11 kW",
-            "Pv__Chargers__0__Host=192.168.2.6",
-            "Pv__Chargers__0__Port=502",
-            "Pv__Chargers__0__UnitId=3",
         ], lines);
     }
 
@@ -139,43 +135,6 @@ public class CliTests
             "Pv__Inverter__Host=192.168.2.20",
             "Pv__Inverter__Port=502",
             "Pv__Inverter__UnitId=1",
-        ], lines);
-    }
-
-    [Fact]
-    public void A_go_e_brings_its_driver_and_no_unit_id_into_the_configuration()
-    {
-        var lines = DiscoveryConfiguration.EnvironmentLines(
-        [
-            new DiscoveredDevice("192.168.2.30", 80, null, DiscoveryFinding.GoeCharger, PvDeviceRole.Charger,
-                "go-e Charger", "local HTTP API v2", null, SupportTier.Expected, true, "note", Driver: "goe"),
-        ]);
-
-        Assert.Equal(
-        [
-            "Pv__Chargers__0__Driver=goe",
-            "Pv__Chargers__0__Model=go-e Charger",
-            "Pv__Chargers__0__Host=192.168.2.30",
-            "Pv__Chargers__0__Port=80",
-        ], lines);
-    }
-
-    [Fact]
-    public void An_sCharger_brings_its_driver_into_the_configuration()
-    {
-        var lines = DiscoveryConfiguration.EnvironmentLines(
-        [
-            new DiscoveredDevice("192.168.2.31", 502, 1, DiscoveryFinding.HuaweiDevice, PvDeviceRole.Charger,
-                "SCharger-22KT-S0", "SCharger EV charger", null, SupportTier.Expected, true, "note", Driver: "huawei-22kt"),
-        ]);
-
-        Assert.Equal(
-        [
-            "Pv__Chargers__0__Driver=huawei-22kt",
-            "Pv__Chargers__0__Model=Huawei SCharger-22KT-S0",
-            "Pv__Chargers__0__Host=192.168.2.31",
-            "Pv__Chargers__0__Port=502",
-            "Pv__Chargers__0__UnitId=1",
         ], lines);
     }
 

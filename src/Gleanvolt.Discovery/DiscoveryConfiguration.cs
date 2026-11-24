@@ -8,7 +8,7 @@ public static class DiscoveryConfiguration
 {
     /// <summary>
     /// <c>Pv__Inverter__Host=…</c> and the rest, with the driver where it is not SolaX, for the first
-    /// inverter and the first charger in <paramref name="devices"/> that Gleanvolt can drive. Empty when there is neither. The variable
+    /// inverter in <paramref name="devices"/> that Gleanvolt can drive. Empty when there is none. The variable
     /// names come from <see cref="PvSystemSettingKeys.EnvironmentVariable"/>, the same as
     /// <c>/pv-system</c> shows.
     /// </summary>
@@ -16,7 +16,7 @@ public static class DiscoveryConfiguration
     {
         var usable = devices
             .Where(device => device is { Identified: true, Role: not null, Tier: not null }
-                && (device.UnitId is not null || device.Finding == DiscoveryFinding.GoeCharger)
+                && device.UnitId is not null
                 && device.Tier is not SupportTier.NotSupported)
             .ToList();
 
@@ -39,34 +39,16 @@ public static class DiscoveryConfiguration
                 PvSystemSettingKeys.InverterPort, PvSystemSettingKeys.InverterUnitId));
         }
 
-        if (usable.FirstOrDefault(device => device.Role == PvDeviceRole.Charger) is { } charger)
-        {
-            if (charger.Driver is { } driver && driver != PvSystemRules.DefaultChargerDriver)
-            {
-                lines.Add($"{PvSystemSettingKeys.EnvironmentVariable(PvSystemSettingKeys.ChargerDriver)}={driver}");
-            }
-
-            lines.AddRange(Lines(charger, PvSystemSettingKeys.ChargerModel, PvSystemSettingKeys.ChargerHost,
-                PvSystemSettingKeys.ChargerPort, PvSystemSettingKeys.ChargerUnitId));
-        }
-
         return lines;
     }
 
     private static IEnumerable<string> Lines(DiscoveredDevice device, string model, string host, string port, string unitId)
     {
-        // go-e's model already says the brand.
-        var brand = device.Finding switch
-        {
-            DiscoveryFinding.HuaweiDevice => "Huawei ",
-            DiscoveryFinding.GoeCharger => string.Empty,
-            _ => "SolaX ",
-        };
+        var brand = device.Finding == DiscoveryFinding.HuaweiDevice ? "Huawei " : "SolaX ";
         yield return $"{PvSystemSettingKeys.EnvironmentVariable(model)}={brand}{device.Model}";
         yield return $"{PvSystemSettingKeys.EnvironmentVariable(host)}={device.Host}";
         yield return $"{PvSystemSettingKeys.EnvironmentVariable(port)}={device.Port}";
 
-        // An HTTP charger has no unit id.
         if (device.UnitId is { } unit)
         {
             yield return $"{PvSystemSettingKeys.EnvironmentVariable(unitId)}={unit}";

@@ -24,11 +24,4 @@ public sealed class ExternalChargerOptions
     /// the held reading stale at once.
     /// </summary>
     public TimeSpan ReadingMaxAge { get; init; } = TimeSpan.FromSeconds(2);
-
-    /// <summary>
-    /// The charger is behind a plugin, whatever <c>Pv:Chargers:0:Driver</c> says (#444). Set by the deploy scripts when a
-    /// charger plugin is in GLEANVOLT_PLUGINS, so switching to the plugin needs no other change and the built-in driver
-    /// never opens the charger beside it. The address in <c>Pv:Chargers</c> is then the plugin's alone.
-    /// </summary>
-    public bool UsePlugin { get; init; }
 }

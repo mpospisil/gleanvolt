@@ -3,8 +3,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Devices;
-using System.Text.Json.Nodes;
-using Gleanvolt.Devices.GoE;
 using Gleanvolt.Devices.Solax;
 using Gleanvolt.Devices.Testing;
 using Gleanvolt.Modbus;
@@ -29,8 +27,6 @@ public sealed class PvSystemEditorTests : IDisposable
     {
         ["Pv:Inverter:Host"] = "192.168.2.10",
         ["Pv:Inverter:Port"] = "502",
-        ["Pv:Chargers:0:Id"] = "charger",
-        ["Pv:Chargers:0:Host"] = "192.168.2.6",
         ["Pv:TiltDegrees"] = "35",
     };
 
@@ -151,14 +147,14 @@ public sealed class PvSystemEditorTests : IDisposable
     [Fact]
     public void Each_value_says_where_it_comes_from()
     {
-        SetEnvironment(PvSystemSettingKeys.ChargerHost, "192.168.2.7");
+        SetEnvironment(PvSystemSettingKeys.Name, "Home");
         WriteFile((PvSystemSettingKeys.TiltDegrees, "30"));
 
         var settings = Editor(Configuration()).Read();
 
         Assert.Equal(SettingSource.WebUi, settings[PvSystemSettingKeys.TiltDegrees].Source);
         Assert.Equal("35", settings[PvSystemSettingKeys.TiltDegrees].Underlying);
-        Assert.Equal(SettingSource.Environment, settings[PvSystemSettingKeys.ChargerHost].Source);
+        Assert.Equal(SettingSource.Environment, settings[PvSystemSettingKeys.Name].Source);
         Assert.Equal(SettingSource.AppSettings, settings[PvSystemSettingKeys.InverterHost].Source);
         Assert.Equal(SettingSource.Default, settings[PvSystemSettingKeys.Latitude].Source);
         Assert.Equal(OverridesPath, settings.OverridesPath);
@@ -205,13 +201,23 @@ public sealed class PvSystemEditorTests : IDisposable
     }
 
     [Fact]
-    public void A_charger_key_round_trips_through_the_file()
+    public void A_charger_saved_before_1_4_leaves_the_file_with_the_next_save()
     {
+        // #445: Settings no longer edits the charger, so a brand or an address saved there would otherwise stay
+        // in the file for good, ignored, with its warning at every start.
+        PvSystemOverrides.Write(OverridesPath, new Dictionary<string, string>
+        {
+            ["Pv:Chargers:0:Driver"] = "goe",
+            ["Pv:Chargers:0:Host"] = "192.168.2.6",
+            [PvSystemSettingKeys.Name] = "Home",
+        });
         var editor = Editor(Configuration());
 
-        editor.Save(new Dictionary<string, string> { [PvSystemSettingKeys.ChargerHost] = "192.168.2.20" });
+        Assert.True(editor.Save(new Dictionary<string, string> { [PvSystemSettingKeys.TiltDegrees] = "30" }).Saved);
 
-        Assert.Equal("192.168.2.20", PvSystemResolver.Resolve(Configuration()).Chargers[0].Connection.Host);
+        Assert.Equal(
+            new Dictionary<string, string> { [PvSystemSettingKeys.Name] = "Home", [PvSystemSettingKeys.TiltDegrees] = "30" },
+            PvSystemOverrides.Read(OverridesPath));
     }
 
     [Fact]
@@ -306,11 +312,9 @@ public sealed class PvSystemEditorTests : IDisposable
     // -- Probing an address.
 
     [Theory]
-    [InlineData(PvDeviceRole.Inverter, (ushort)57, true)]
-    [InlineData(PvDeviceRole.Inverter, (ushort)1234, false)]
-    [InlineData(PvDeviceRole.Charger, (ushort)2, true)]
-    [InlineData(PvDeviceRole.Charger, (ushort)57, false)]
-    public async Task A_probe_says_whether_what_answered_looks_like_the_device(PvDeviceRole role, ushort value, bool plausible)
+    [InlineData((ushort)57, true)]
+    [InlineData((ushort)1234, false)]
+    public async Task A_probe_says_whether_what_answered_looks_like_the_inverter(ushort value, bool plausible)
     {
         DeviceConfig? probed = null;
         var editor = Editor(Configuration(), device =>
@@ -319,7 +323,7 @@ public sealed class PvSystemEditorTests : IDisposable
             return new OneRegisterClient(value);
         });
 
-        var result = await editor.ProbeAsync(role, "192.168.2.20", 502, 1);
+        var result = await editor.ProbeAsync("192.168.2.20", 502, 1);
 
         Assert.True(result.Answered);
         Assert.Equal(plausible, result.Plausible);
@@ -331,7 +335,7 @@ public sealed class PvSystemEditorTests : IDisposable
     {
         var editor = Editor(Configuration(), _ => new OneRegisterClient(null));
 
-        var result = await editor.ProbeAsync(PvDeviceRole.Charger, "192.168.2.20", 502, 1);
+        var result = await editor.ProbeAsync("192.168.2.20", 502, 1);
 
         Assert.False(result.Answered);
         Assert.Contains("did not answer", result.Message);
@@ -346,7 +350,7 @@ public sealed class PvSystemEditorTests : IDisposable
             Configuration(), PvSystemEditor.Snapshot(Configuration()), NullLogger<PvSystemEditor>.Instance,
             _ => client, [new SolaxInverterDriverFactory(), other]);
 
-        var result = await editor.ProbeAsync(PvDeviceRole.Inverter, "192.168.2.20", 502, 1, driver: "ACME");
+        var result = await editor.ProbeAsync("192.168.2.20", 502, 1, driver: "ACME");
 
         Assert.True(result.Plausible);
         Assert.Equal(1, other.Probes);
@@ -357,101 +361,6 @@ public sealed class PvSystemEditorTests : IDisposable
     public void Without_drivers_given_the_editor_offers_the_hosts_catalog()
     {
         Assert.Equal(InverterDrivers.Known, Editor(Configuration()).InverterDrivers);
-        Assert.Equal(ChargerDrivers.Known, Editor(Configuration()).ChargerDrivers);
-    }
-
-    [Fact]
-    public async Task The_charger_probe_is_the_selected_drivers_and_writes_nothing()
-    {
-        var other = new RecordingChargerDriverFactory("wallco");
-        var client = new OneRegisterClient(2);
-        var editor = new PvSystemEditor(
-            Configuration(), PvSystemEditor.Snapshot(Configuration()), NullLogger<PvSystemEditor>.Instance,
-            _ => client, chargerDrivers: [new SolaxChargerDriverFactory(), other]);
-
-        var result = await editor.ProbeAsync(PvDeviceRole.Charger, "192.168.2.6", 502, 1, driver: "WALLCO");
-
-        Assert.True(result.Plausible);
-        Assert.Equal(1, other.Probes);
-        Assert.Equal(["solax", "wallco"], editor.ChargerDrivers.Select(driver => driver.Id));
-    }
-
-    [Theory]
-    [InlineData(true, true)]
-    [InlineData(false, false)]
-    public async Task A_charger_reached_over_http_is_probed_over_http_and_never_written(bool hasApi, bool plausible)
-    {
-        // go-e (#352): the probe is its status request on a read-only HTTP client at the form's host and port;
-        // the Modbus client is never made.
-        HttpClient? made = null;
-        var handler = new ReplayHttpHandler(new HttpDump
-        {
-            Responses = hasApi
-                ? new Dictionary<string, JsonNode?> { [GoeChargerDriver.StatusRequest] = JsonNode.Parse("""{"car":1,"fwv":"59.4"}""") }
-                : new Dictionary<string, JsonNode?>(),
-        });
-        DeviceConfig? probed = null;
-        var editor = new PvSystemEditor(
-            Configuration(), PvSystemEditor.Snapshot(Configuration()), NullLogger<PvSystemEditor>.Instance,
-            _ => throw new InvalidOperationException("No Modbus client for an HTTP charger."),
-            chargerDrivers: [new SolaxChargerDriverFactory(), new GoeChargerDriverFactory()],
-            httpClientFactory: device =>
-            {
-                probed = device;
-                return made = new HttpClient(handler, disposeHandler: false) { BaseAddress = new Uri($"http://{device.Host}:{device.Port}/") };
-            });
-
-        var result = await editor.ProbeAsync(PvDeviceRole.Charger, "192.168.2.30", 80, 0, driver: "goe");
-
-        Assert.NotNull(made);
-        Assert.Equal(("192.168.2.30", 80), (probed!.Host, probed.Port));
-        Assert.True(result.Answered);
-        Assert.Equal(plausible, result.Plausible);
-        Assert.Empty(handler.Writes);
-        Assert.Equal(plausible ? "Probe.ChargerApiOk" : "Probe.ChargerApiImplausible", result.MessagePhrase?.Key);
-    }
-
-    /// <summary>A charger family whose probe always recognises what answered, and counts how often it was asked.</summary>
-    private sealed class RecordingChargerDriverFactory(string id) : IEvChargerDriverFactory
-    {
-        public int Probes { get; private set; }
-
-        public string Id => id;
-
-        public string DisplayName => id;
-
-        public EvChargerTransport Transport => EvChargerTransport.Modbus;
-
-        public ModbusDefaults? Defaults { get; } = new(502, 1, TimeSpan.Zero);
-
-        public EvChargerCapabilities Capabilities { get; } = new(6, 16, 0, 3, false, false);
-
-        public RegisterSnapshotSpec? Snapshot => null;
-
-        public IEvChargerDriver Create(EvChargerConnection connection, EvChargerDriverOptions options) =>
-            new Driver(this, connection.RequireModbus(id));
-
-        private sealed class Driver(RecordingChargerDriverFactory factory, IModbusClient client) : IEvChargerDriver
-        {
-            public EvChargerCapabilities Capabilities => factory.Capabilities;
-
-            public Task<EvChargerReading> ReadAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-            public Task<EvChargerSettings> ReadSettingsAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-            public Task SetCurrentAsync(int activeAmps, int targetAmps, string reason, CancellationToken cancellationToken = default) =>
-                throw new NotSupportedException();
-
-            public Task SetChargingAllowedAsync(bool allowed, string reason, CancellationToken cancellationToken = default) =>
-                throw new NotSupportedException();
-
-            public async Task<EvChargerProbeResult> ProbeAsync(CancellationToken cancellationToken = default)
-            {
-                factory.Probes++;
-                var value = (await client.ReadInputRegistersAsync(0, 1, cancellationToken))[0];
-                return new EvChargerProbeResult(true, value);
-            }
-        }
     }
 
     /// <summary>A driver family whose probe always recognises what answered, and counts how often it was asked.</summary>

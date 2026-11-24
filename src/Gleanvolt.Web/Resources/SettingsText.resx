@@ -361,7 +361,7 @@
     <value>Discard changes</value>
   </data>
   <data name="SavedAnyway" xml:space="preserve">
-    <value>Saved anyway: a charger that is switched off does not answer and can still be the right address. Both devices answer Modbus on port 502, so swapped addresses show up as a frozen battery and zero solar once running — check which is which before restarting.</value>
+    <value>Saved anyway: an inverter that is switched off does not answer and can still be the right address. A charger answers Modbus on port 502 too, so the charger's address here shows up as a frozen battery and zero solar once running — check it before restarting.</value>
   </data>
   <data name="NotSaved" xml:space="preserve">
     <value>Not saved — the controller would refuse to start with this:</value>
@@ -417,9 +417,6 @@
   <data name="FieldInverterDriver" xml:space="preserve">
     <value>Inverter brand</value>
   </data>
-  <data name="FieldChargerDriver" xml:space="preserve">
-    <value>Charger brand</value>
-  </data>
   <data name="FieldInverterTopology" xml:space="preserve">
     <value>Connected through</value>
   </data>
@@ -437,21 +434,6 @@
   </data>
   <data name="FieldUnmeteredPhase" xml:space="preserve">
     <value>Unmetered grid phase</value>
-  </data>
-  <data name="FieldChargerId" xml:space="preserve">
-    <value>Charger id</value>
-  </data>
-  <data name="FieldChargerModel" xml:space="preserve">
-    <value>Charger model</value>
-  </data>
-  <data name="FieldChargerHost" xml:space="preserve">
-    <value>Charger host</value>
-  </data>
-  <data name="FieldChargerPort" xml:space="preserve">
-    <value>Charger port</value>
-  </data>
-  <data name="FieldChargerUnitId" xml:space="preserve">
-    <value>Charger unit id</value>
   </data>
   <data name="HintId" xml:space="preserve">
     <value>a-z, 0-9, - and _</value>
@@ -923,9 +905,6 @@
   <data name="HelpInverterDriver" xml:space="preserve">
     <value>Which family of inverters Gleanvolt is talking to. It decides which registers are read and how the home battery is held. Every model of a brand that shares the same Modbus registers uses the same entry.</value>
   </data>
-  <data name="HelpChargerDriver" xml:space="preserve">
-    <value>Which family of chargers Gleanvolt is talking to. It decides which registers are read and written to start, stop and set the charging current. Every model of a brand that shares the same registers uses the same entry.</value>
-  </data>
   <data name="HelpInverterTopology" xml:space="preserve">
     <value>How Gleanvolt reaches the inverter. With the inverter's own dongle, everything is read from the inverter. Behind an energy manager such as Huawei's EMMA, Gleanvolt talks to the energy manager instead: the grid comes from its own sensor, and the inverter is reached through it, on the unit id the energy manager assigned to the inverter. Enter that id as the inverter unit id.</value>
   </data>
@@ -942,19 +921,10 @@
     <value>The Modbus TCP port the device answers on. Almost always 502, which is also what an empty field means.</value>
   </data>
   <data name="HelpUnitId" xml:space="preserve">
-    <value>Leave it at 1. The unit id tells apart devices that share one network address, for example several chargers behind one Modbus gateway. Gleanvolt will use it once it supports more than one inverter or charger. Empty also means 1.</value>
+    <value>Leave it at 1. The unit id tells apart devices that share one network address, for example an inverter and a battery behind one Modbus gateway. Empty also means 1.</value>
   </data>
   <data name="HelpUnmeteredPhase" xml:space="preserve">
     <value>Leave it empty if your grid meter measures all three phases, which is the normal case. If it misses one, it reads 0 W there: Gleanvolt then misses the sun exported and the car's power on that phase, so the solar modes start late or take grid power. Enter that phase (L1, L2, L3, or SolaX's R, S, T) and Gleanvolt estimates it instead.</value>
-  </data>
-  <data name="HelpChargerId" xml:space="preserve">
-    <value>A short machine name for the charger. Empty means "charger", which is fine for one charger.</value>
-  </data>
-  <data name="HelpChargerModel" xml:space="preserve">
-    <value>The charger's model, for example SolaX X3-HAC. For reference only: it does not change how Gleanvolt talks to the device.</value>
-  </data>
-  <data name="HelpChargerHost" xml:space="preserve">
-    <value>The charger's IP address or host name on your network. Gleanvolt starts and stops charging and sets the charging current through it over Modbus TCP.</value>
   </data>
   <data name="Reverted" xml:space="preserve">
     <value>{0} reverted; it comes from {1} again.</value>
@@ -982,18 +952,6 @@
   </data>
   <data name="SnapshotFailed" xml:space="preserve">
     <value>The inverter could not be read: {0}</value>
-  </data>
-  <data name="SnapshotHelpCharger" xml:space="preserve">
-    <value>Reads every register the charger driver uses, once, and saves them to a file. It reads over Gleanvolt's own connection, so nothing has to be stopped. The serial number is cut to its model prefix. Attach the file to an issue when you test a charger Gleanvolt does not support yet.</value>
-  </data>
-  <data name="SnapshotNoteHintCharger" xml:space="preserve">
-    <value>for example: car plugged in, charging at 16 A</value>
-  </data>
-  <data name="SnapshotReadingCharger" xml:space="preserve">
-    <value>Reading the charger…</value>
-  </data>
-  <data name="SnapshotFailedCharger" xml:space="preserve">
-    <value>The charger could not be read: {0}</value>
   </data>
   <!-- External data providers (#386, #401) -->
   <data name="TariffProvider_External" xml:space="preserve">
@@ -1159,13 +1117,6 @@
     <value>The built-in OpenWeather is gone, so External is chosen for you: OpenWeatherMap's weather now comes from the OpenWeather plugin. Run the plugin with the token from External providers, then enter your OpenWeatherMap key on its page, which appears here once it connects. A key saved here before was not kept. Until then, charges are recorded without the weather.</value>
     <comment>Shown once after the upgrade that removed the built-in OpenWeather (#425), until a weather provider connects. OpenWeather and OpenWeatherMap are names.</comment>
   </data>
-  <data name="ChargerDriverExternal" xml:space="preserve">
-    <value>External plugin</value>
-    <comment>The charger driver for a charger reached through a plugin (#435), in the brand drop-down.</comment>
-  </data>
-  <data name="NoteChargerPlugin" xml:space="preserve">
-    <value>A plugin reaches the charger, so Gleanvolt needs no address for it. Start the plugin with the provider token from Settings → External providers; Gleanvolt accepts it after the restart.</value>
-  </data>
   <data name="ExternalRemembered" xml:space="preserve">
     <value>Remembered: {0}. No other plugin is let in.</value>
   </data>
@@ -1177,14 +1128,5 @@
   </data>
   <data name="ExternalRefused" xml:space="preserve">
     <value>{0} was refused at {1}: {2}</value>
-  </data>
-  <data name="NoteChargerDeprecated" xml:space="preserve">
-    <value>The built-in {0} driver is deprecated and goes in Gleanvolt 1.4. The {1} plugin replaces it: on Docker, add {2} to GLEANVOLT_PLUGINS in .env and deploy again; the charger's address goes with it.</value>
-  </data>
-  <data name="NoteChargerDeprecatedLink" xml:space="preserve">
-    <value>How to run the plugin</value>
-  </data>
-  <data name="NoteChargerPluginForced" xml:space="preserve">
-    <value>This deployment runs a charger plugin (ExternalCharger:UsePlugin), so Gleanvolt controls the charger through it, whatever brand is chosen here.</value>
   </data>
 </root>

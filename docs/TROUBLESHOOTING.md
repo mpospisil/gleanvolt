@@ -27,7 +27,7 @@ computer are in [its own troubleshooting](../deploy/README.md#troubleshooting), 
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Battery SOC frozen, solar and grid at 0, charger *Unknown* | The inverter and charger addresses are swapped. Both answer on port 502, so it connects fine | Swap them on **Settings → Installation**. The wizard warns when a saved address looks swapped |
+| Battery SOC frozen, solar and grid at 0 | The inverter's address is the charger's. Both answer on port 502, so it connects fine | Fix it on **Settings → Installation**; the charger's goes on its plugin's page. The wizard warns when a saved address doesn't look like an inverter |
 | All readings zero, or the log repeats connection errors | Wrong address, or Modbus TCP not enabled on the device | From the machine running Gleanvolt: `nc -vz <address> 502`. See [Finding your devices](DISCOVERY.md) |
 | *Port open, no Modbus reply* | Something else holds the device's only Modbus connection — Home Assistant's SolaX or `huawei_solar` integration, evcc, or a second Gleanvolt | Stop the other client; a device serves one or very few |
 | Numbers look implausible rather than absent | The register map doesn't match your firmware | Keep charging **Off** and compare with the device's own display before enabling anything that writes. See [Supported PV systems](SUPPORTED_PV_SYSTEMS.md) |

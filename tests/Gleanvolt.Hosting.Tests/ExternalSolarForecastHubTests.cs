@@ -277,8 +277,7 @@ public sealed class ExternalSolarForecastHubTests : IAsyncLifetime
         InverterCapacityWatts: null,
         LossFactor: null,
         InstallDate: null,
-        Inverter: new PvDeviceInfo("Inverter", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.1" }),
-        Chargers: []);
+        Inverter: new PvDeviceInfo("Inverter", string.Empty, string.Empty, new DeviceConfig { Host = "127.0.0.1" }));
 
     private SolarForecastData Forecast(double watts = 1000, RequestId? inReplyTo = null)
     {

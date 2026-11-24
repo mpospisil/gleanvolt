@@ -6,10 +6,10 @@
     for the whole process (a second browser sees the first one's progress), and lists every address
     that answered with what it identified as.
 
-    The roles are offered, never taken: each SolaX device has a "use as inverter" and a "use as
-    charger" button, and choosing the role it did not identify as says so. A swapped pair answers
-    Modbus on 502 like the right one does, and only shows itself once running, as a frozen battery and
-    no sun. Nothing here saves: a choice fills the address fields below, and Save there checks it.
+    Offered, never taken: each device that answered Modbus has a "use as inverter" button, primary for
+    one identified as an inverter. A charger answers Modbus on 502 like the inverter does, and only shows
+    itself once running, as a frozen battery and no sun; the charger is its plugin's to find (#445).
+    Nothing here saves: a choice fills the address fields below, and Save there checks it.
 *@
 
 <section class="controls discovery" id="discovery">
@@ -80,9 +80,9 @@
                             <td><code>@device.Host:@device.Port</code>@(device.UnitId is { } unit ? $" · {SetupText.Unit} {unit}" : null)</td>
                             <td>
                                 @(device.Model ?? SetupText.Unidentified)
-                                @if (device.Role is { } role)
+                                @if (device.Role is PvDeviceRole.Inverter)
                                 {
-                                    <span class="hint"> — @(role == PvDeviceRole.Inverter ? SetupText.LooksLikeInverter : SetupText.LooksLikeCharger)</span>
+                                    <span class="hint"> — @SetupText.LooksLikeInverter</span>
                                 }
                                 @if (!device.Supported)
                                 {
@@ -93,18 +93,7 @@
                                 @if (device.UnitId is not null)
                                 {
                                     <button type="button" class="@(device.Role == PvDeviceRole.Inverter ? "primary" : "secondary")"
-                                            @onclick="() => Use(device, PvDeviceRole.Inverter)">@SetupText.UseAsInverter</button>
-                                    @if (!InverterOnly)
-                                    {
-                                        <button type="button" class="@(device.Role == PvDeviceRole.Charger ? "primary" : "secondary")"
-                                                @onclick="() => Use(device, PvDeviceRole.Charger)">@SetupText.UseAsCharger</button>
-                                    }
-                                }
-                                else if (!InverterOnly && device is { Role: PvDeviceRole.Charger, Driver: not null })
-                                {
-                                    @* A charger found over HTTP (go-e, #353): no Modbus, so it can only be the charger. *@
-                                    <button type="button" class="primary"
-                                            @onclick="() => Use(device, PvDeviceRole.Charger)">@SetupText.UseAsCharger</button>
+                                            @onclick="() => Use(device)">@SetupText.UseAsInverter</button>
                                 }
                             </td>
                         </tr>
@@ -118,29 +107,18 @@
             <p class="hint">@warning</p>
         }
     }
-
-    @if (_roleWarning is not null)
-    {
-        <p class="error" id="discovery-role-warning" role="alert">@_roleWarning</p>
-    }
 </section>
 
 @code {
     /// <summary>
-    /// Raised with the address fields a choice fills in: host, port and unit id of the role chosen.
+    /// Raised with the inverter's fields a choice fills in: its driver where the scan knows it, host, port and
+    /// unit id. Only the inverter: the charger is its plugin's to find (#442, #445).
     /// </summary>
     [Parameter] public EventCallback<IReadOnlyDictionary<string, string>> OnChosen { get; set; }
-
-    /// <summary>
-    /// Offer only "use as inverter": the wizard's Inverter step (#442), where the charger isn't Gleanvolt's to set
-    /// up. A found charger is still listed, so a swapped pair can be told apart.
-    /// </summary>
-    [Parameter] public bool InverterOnly { get; set; }
 
     private DiscoverySuggestion _suggestion = new([], []);
     private string _subnet = "";
     private string? _problem;
-    private string? _roleWarning;
 
     private bool Running => Discovery.Current?.Running == true;
 
@@ -157,50 +135,25 @@
 
     private void Start()
     {
-        _roleWarning = null;
         var started = Discovery.Start(_subnet);
         _problem = started.Started ? null : Localized.Say(started.ProblemPhrase, started.Problem ?? "");
     }
 
-    private async Task Use(FoundDevice device, PvDeviceRole role)
+    private async Task Use(FoundDevice device)
     {
-        // Said, not prevented: a device that did not identify itself may well be the right one, and
-        // the owner is the one who knows which box is which.
-        _roleWarning = device.Role is { } identified && identified != role
-            ? Localized.Format(
-                role == PvDeviceRole.Inverter ? SetupText.RoleMismatchInverter : SetupText.RoleMismatchCharger,
-                $"{device.Host}:{device.Port}")
-            : null;
-
-        var keys = role == PvDeviceRole.Inverter
-            ? (Host: PvSystemSettingKeys.InverterHost, Port: PvSystemSettingKeys.InverterPort, Unit: PvSystemSettingKeys.InverterUnitId)
-            : (Host: PvSystemSettingKeys.ChargerHost, Port: PvSystemSettingKeys.ChargerPort, Unit: PvSystemSettingKeys.ChargerUnitId);
-
         var fields = new Dictionary<string, string>();
 
         // An inverter the scan identified brings its driver, and how it is reached (#324): a Huawei behind an
         // EMMA is useless read as a SolaX, or through a dongle it does not have. The driver goes first.
-        if (role == PvDeviceRole.Inverter && device.Driver is { } driver)
+        if (device.Driver is { } driver)
         {
             fields[PvSystemSettingKeys.InverterDriver] = driver;
             fields[PvSystemSettingKeys.InverterTopology] = device.Topology ?? string.Empty;
         }
 
-        // A charger brings its brand the same way (#353). Only when the scan found a charger: a device that
-        // said it is an inverter has no charger driver to bring.
-        if (role == PvDeviceRole.Charger && device.Role == PvDeviceRole.Charger && device.Driver is { } chargerDriver)
-        {
-            fields[PvSystemSettingKeys.ChargerDriver] = chargerDriver;
-        }
-
-        fields[keys.Host] = device.Host;
-        fields[keys.Port] = device.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-        // A charger found over HTTP (go-e) has no unit id: the field is left to its default, unused.
-        if (device.UnitId is not null || device.Driver is null)
-        {
-            fields[keys.Unit] = (device.UnitId ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
-        }
+        fields[PvSystemSettingKeys.InverterHost] = device.Host;
+        fields[PvSystemSettingKeys.InverterPort] = device.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        fields[PvSystemSettingKeys.InverterUnitId] = (device.UnitId ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
 
         await OnChosen.InvokeAsync(fields);
     }

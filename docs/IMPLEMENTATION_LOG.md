@@ -4,6 +4,60 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-24 — Remove the built-in charger drivers (#445)
+
+**What.** The last step of #438. Gleanvolt has no charger code: every charger is driven through a plugin from
+gleanvolt-chargers (or anyone's), and Gleanvolt never opens a connection to the charger. An installation upgraded from
+a release with a built-in SolaX charger runs on the SolaX plugin: the Pi's deploy script starts it from
+`EV_CHARGER_HOST`, and the controller ignores the old `Pv:Chargers` with a warning naming the plugin.
+
+**How.**
+- **Removed projects and files:** `Gleanvolt.Devices.GoE` (and its tests and NuGet package), `HuaweiSChargerDriver` and
+  `SChargerRegisterMap`, the SolaX charger's `SolaxChargerDriver`, `EvChargerRegister(Map)` and `SolaxChargerUseMode`,
+  `IEvChargerDriverFactory` (with `EvChargerConnection`, `EvChargerTransport`, `EvChargerDriverInfo`), `ChargerHttp`,
+  `HttpDump`, `ChargerHttpClients`, `DeviceRoleCheck`, `Hosting.ChargerDrivers`, and the charger conformance kit in
+  `Gleanvolt.Devices.Testing` (charger replays, the HTTP replay). `EvChargerDriverOptions` moved beside
+  `IEvChargerDriver` with only `DryRun` and the threshold; `IEvChargerDriver.ProbeAsync` is gone.
+- **Core:** `PvSystemRules` resolves no chargers; `PvSystemInfo` and `PvSystemOptions` lose `Chargers`;
+  `PvSystemSettingKeys` loses the charger keys; `PvDeviceRole` keeps only `Inverter`; `CheckChargeLimits` takes a name
+  and capabilities. `ChargerPlugins.Replacing(driver, host)` reads a pre-1.4 charger.
+- **Hosting:** the container registers `ExternalChargerDriver` directly and no charger client (Modbus or HTTP, in any
+  mode); `ModbusClientKeys.EvCharger` is gone. The charger hub's kind is always on, and
+  `ChargerAvailabilityMonitor` no longer asks whether the charger is behind a plugin. `ExternalChargerOptions.UsePlugin`
+  is gone. `RemovedChargerSettings` gives the startup warning (logged by `Program.cs`), and `PvSystemEditor` drops
+  `Pv:Chargers:*` from `pv-system.json` on its next write. `DeviceSnapshot` reads only the inverter.
+  `PvSystemEditor.ProbeAsync` probes only the inverter. The CLI's setup asks only for the inverter, without the
+  "identified itself as" note.
+- **Discovery:** no charger serials (`SolaxModels.Charger`), no SCharger phase voltages, no go-e probe
+  (`DiscoveryFinding.GoeCharger`, the HTTP client factory), no charger lines in the pasted configuration. A charger
+  answers as `NotSolax`, with a note pointing to its plugin's search.
+- **API:** `SiteResponse` drops `chargers` and `chargerDriver`; the checked-in OpenAPI contract is regenerated.
+- **Web:** Settings → Installation has no Charger section (brand drop-down, notes, charger probe, charger snapshot);
+  the wizard's search offers only **Use as inverter** and no role warning. Strings removed from Settings, Setup and
+  Service resources, en and cs; the search intro, "Saved anyway" and the unit id help no longer mention chargers.
+- **Deploy:** `appsettings.json` and both compose files carry no `Pv:Chargers` and no `ExternalCharger__UsePlugin`.
+  `_lib.sh` no longer passes `GLEANVOLT_CHARGER_PLUGIN`, and adds the plugin for `PV_CHARGER_DRIVER` when
+  `EV_CHARGER_HOST` is set and `GLEANVOLT_PLUGINS` names no charger plugin. `.env.example` (both) and
+  `packaging/linux/gleanvolt.env` updated.
+- **Docs:** `SUPPORTED_CHARGERS.md` lists the plugins with tiers and links (synced into README and
+  `SUPPORTED_PV_SYSTEMS.md`); `CHARGER_SETUP.md` is now "Your charger" with the 1.3 → 1.4 move; `CONFIGURATION.md`,
+  `DISCOVERY.md`, `HTTP_API.md`, `NAS.md`, `PROVIDERS.md`, `DOCKER.md`, `TROUBLESHOOTING.md`, deploy and packaging
+  READMEs, CONTRIBUTING; the manual's charger, finding-devices, settings, setup-wizard, troubleshooting and
+  preparing-devices pages, en and cs, and twelve screenshots; the release notes' breaking-change paragraph.
+
+**Hardware quirk behind it.** The SolaX charger serves one Modbus client and drops a second on its first request.
+With no charger client left in the container, the built-in driver and the plugin can no longer meet at the charger,
+whatever the deployment sets.
+
+**Tests.** `InverterDriverSelectionTests` (the container has no charger client and the hub is on; a pre-1.4 charger
+configuration starts on the plugin; limits aren't checked at startup), `RemovedChargerSettingsTests`,
+`PvSystemEditorTests` (a 1.3 charger leaves the file with the next save), `PvSystemResolverTests`,
+`SetupStatusEvaluatorTests`, `DeviceScannerTests` (a SolaX charger is not identified), `EnergyStateReaderTests` on a
+fake charger driver, the web form, wizard and snapshot panel tests, and the site endpoint. The full solution passes;
+the compose files pass `docker compose config` and `_lib.sh` `bash -n`.
+
+---
+
 ## 2026-11-24 — A restart's resume waits for a poll that read the charger
 
 **What.** Live on the Pi with the SolaX plugin, a restart resumed FastNoBattery on its first poll, before the plugin

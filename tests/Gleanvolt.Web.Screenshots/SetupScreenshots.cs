@@ -14,7 +14,7 @@ namespace Gleanvolt.Web.Screenshots;
 
 /// <summary>
 /// The manual's "Setting up" pictures (#329): the password page and each step of the setup wizard, Inverter, Site
-/// and Finish (#442), on a fresh install that a search has just found a SolaX inverter and charger for. The site
+/// and Finish (#442), on a fresh install that a search has just found a SolaX inverter for, and the charger beside it. The site
 /// shows what an owner would have typed, so the reader sees a filled form rather than an empty one.
 /// </summary>
 public sealed class SetupScreenshots : ScreenshotTest
@@ -22,7 +22,6 @@ public sealed class SetupScreenshots : ScreenshotTest
     private readonly FakePvSystemEditor _pv = new()
     {
         InverterDrivers = InverterDrivers.Known,
-        ChargerDrivers = ChargerDrivers.Known,
     };
 
     private readonly FoundDevices _discovery = new();
@@ -146,8 +145,9 @@ public sealed class SetupScreenshots : ScreenshotTest
     private static readonly FoundDevice Inverter =
         new("192.168.1.10", 502, 1, PvDeviceRole.Inverter, "X3-HYB-G4 PRO", "H34A10J8123456", true, "", Driver: "solax");
 
+    // The charger answers Modbus too; the search no longer says what it is (#445).
     private static readonly FoundDevice Charger =
-        new("192.168.1.11", 502, 3, PvDeviceRole.Charger, "X3-HAC", "C3110K2654321", true, "", Driver: "solax");
+        new("192.168.1.11", 502, 3, null, null, null, false, "Answers Modbus, but has no SolaX serial number and no Huawei model name: not an inverter Gleanvolt knows. A charger? Its plugin's page has a search of its own.");
 
     // Something else on the network that answered on a port the search tries, as a real search always finds.
     private static readonly FoundDevice Router =

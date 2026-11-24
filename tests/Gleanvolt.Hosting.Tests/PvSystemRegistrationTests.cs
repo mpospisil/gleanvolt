@@ -44,31 +44,6 @@ public class PvSystemRegistrationTests
     }
 
     [Fact]
-    public async Task TheChargerIsRegisteredUnderItsOwnIdAndTheFixedKeyIsTheSameClient()
-    {
-        // Two registrations, one client. Two would be two sockets to the same wallbox, which is the
-        // desynchronised-stream failure a single client exists to prevent -- and [FromKeyedServices]
-        // takes a compile-time constant, so the fixed key cannot simply be dropped.
-        await using var provider = BuildWithPvDevices(("Pv:Chargers:0:Id", "wallbox"));
-
-        var byId = provider.GetRequiredKeyedService<IModbusClient>("wallbox");
-        var byFixedKey = provider.GetRequiredKeyedService<IModbusClient>(ModbusClientKeys.EvCharger);
-
-        Assert.Same(byId, byFixedKey);
-    }
-
-    [Fact]
-    public void NoChargerCanEverClaimTheFixedKey()
-    {
-        // What keeps the alias above an alias rather than a service that resolves itself: charger ids
-        // are slugs, and the fixed key is not one, so the two keyspaces cannot meet.
-        var error = Assert.ThrowsAny<InvalidOperationException>(
-            () => Build(("Pv:Inverter:Host", "127.0.0.1"), ("Pv:Chargers:0:Id", ModbusClientKeys.EvCharger), ("Pv:Chargers:0:Host", "127.0.0.2")));
-
-        Assert.Contains("must be a slug", error.Message);
-    }
-
-    [Fact]
     public void PublishingToABrokerNeedsAnIdToPublishUnder()
     {
         // The id fills a topic segment from here on, so an anonymous system is one that would collide
@@ -95,7 +70,6 @@ public class PvSystemRegistrationTests
         // upgraded without editing .env is told what to change rather than being pointed at a default.
         var error = Assert.ThrowsAny<InvalidOperationException>(() => Build(
             ("Pv:Inverter:Host", "127.0.0.1"),
-            ("Pv:Chargers:0:Host", "127.0.0.2"),
             ("Solax:Inverter:Host", "127.0.0.9")));
 
         Assert.Contains("Solax__Inverter", error.Message);
