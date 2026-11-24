@@ -202,14 +202,15 @@
         _ => status.Name,
     };
 
-    // Where the kind is turned on: a section of this page, or the car's own page (#408).
+    // Where the kind is turned on: a section of the Installation tab, or the car's own page (#408).
+    // Whole paths, since this section is above the Health tab too (#457).
     private static string Section(string kind) => kind switch
     {
-        "tariff" => "#tariff-editor",
-        "solar-forecast" => "#solcast-editor",
+        "tariff" => "/settings#tariff-editor",
+        "solar-forecast" => "/settings#solcast-editor",
         "vehicle" => "/car#car-editor",
-        "weather" => "#weather-editor",
-        "charger" => "#pv-editor",
-        _ => "#external-providers",
+        "weather" => "/settings#weather-editor",
+        "charger" => "/settings#charger-editor",
+        _ => "/settings#external-providers",
     };
 }

@@ -516,7 +516,6 @@ public class CarPageTests : PageTest
 
         Assert.Contains("Vehicle sample", page.Find("#car-ask-external").TextContent);
         Assert.Contains("Vehicle sample", page.Find("#external-vehicle-state").TextContent);
-        Assert.Contains("/providers/vehicle", page.Find("#external-vehicle-hub").TextContent);
 
         page.Find("#car-ask").Click();
 

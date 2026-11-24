@@ -780,7 +780,7 @@
     <value>the weather</value>
   </data>
   <data name="WeatherTip1" xml:space="preserve">
-    <value>Gleanvolt calls no weather service itself: an external provider sends the weather. The OpenWeather plugin, released with Gleanvolt, reads it from a free OpenWeatherMap account, with the key entered on the plugin's own page.</value>
+    <value>Gleanvolt calls no weather service itself: an external provider sends the weather, and its settings are entered on the provider's own page.</value>
   </data>
   <data name="HomeAssistantLink" xml:space="preserve">
     <value>Home Assistant (MQTT)</value>
@@ -959,7 +959,7 @@
     <comment>The tariff provider whose windows another program publishes to Gleanvolt.</comment>
   </data>
   <data name="ExternalProviderIntro" xml:space="preserve">
-    <value>A program outside Gleanvolt supplies this data. It connects to this address with the provider token.</value>
+    <value>A program outside Gleanvolt, a plugin, supplies this data. It connects with the provider token.</value>
   </data>
   <data name="ExternalAddress" xml:space="preserve">
     <value>Gleanvolt address</value>
@@ -1101,10 +1101,11 @@
     <comment>{0} the source now in use.</comment>
   </data>
   <data name="WeatherNotProvided" xml:space="preserve">
-    <value>Sessions are recorded without the weather. Choose External to record it from a provider, such as the OpenWeather plugin.</value>
+    <value>Sessions are recorded without the weather. Choose External to record it from a provider.</value>
   </data>
-  <data name="WeatherExternalIntro" xml:space="preserve">
-    <value>The weather comes from the provider connected here. The OpenWeather plugin, released with Gleanvolt, is the ready-made one: it reads OpenWeatherMap, with the key entered on its page below. Gleanvolt asks the provider when a charging session opens and when it closes; a session it doesn't answer is recorded without the weather.</value>
+  <data name="WeatherTip2" xml:space="preserve">
+    <value>Gleanvolt asks the provider when a charging session opens and when it closes; a session it doesn't answer is recorded without the weather.</value>
+    <comment>Second paragraph of the Weather section's tip (#457).</comment>
   </data>
   <data name="WeatherExternalWizard" xml:space="preserve">
     <value>Connect the provider once setup is finished, on Settings: its address, the token and its own page are there.</value>
@@ -1128,5 +1129,21 @@
   </data>
   <data name="ExternalRefused" xml:space="preserve">
     <value>{0} was refused at {1}: {2}</value>
+  </data>
+  <data name="ExternalProviderTopic" xml:space="preserve">
+    <value>the provider</value>
+    <comment>Accessible name of the (i) beside a provider's session line on Settings: "About the provider" (#457).</comment>
+  </data>
+  <data name="ExternalPageSettingsIntro" xml:space="preserve">
+    <value>{0} has a page of its own, shown here: its settings are entered there. It comes from the provider itself, not from Gleanvolt.</value>
+    <comment>In the tip under a provider's page on Settings (#457). {0} is the provider's name.</comment>
+  </data>
+  <data name="ChargerTopic" xml:space="preserve">
+    <value>the charger</value>
+    <comment>Accessible name of the (i) beside the Charger heading on Settings: "About the charger" (#457).</comment>
+  </data>
+  <data name="ChargerTip1" xml:space="preserve">
+    <value>Gleanvolt drives the charger through a plugin: a program outside Gleanvolt that connects with the provider token. Which charger it is, and its settings, are on the plugin's own page.</value>
+    <comment>The Charger section's tip on Settings (#457).</comment>
   </data>
 </root>

@@ -20,6 +20,7 @@ public class HealthPageTests : PageTest
     private readonly FixedTimeProvider _time = new(new DateTimeOffset(2026, 8, 12, 10, 0, 0, TimeSpan.Zero), Prague);
     private readonly FakeServiceShutdown _shutdown = new();
     private readonly FakeSecretStore _secrets = new();
+    private readonly FakeExternalProviders _providers = new();
 
     public HealthPageTests()
     {
@@ -28,6 +29,24 @@ public class HealthPageTests : PageTest
         Services.AddSingleton<TimeProvider>(_time);
         Services.AddSingleton<IServiceShutdown>(_shutdown);
         Services.AddSingleton<ISecretStore>(_secrets);
+
+        // External providers sits above the tabs (#457), so the Health tab renders it too.
+        Services.AddSingleton<IExternalProviders>(_providers);
+        Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(new WebOptions()));
+        Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(null));
+    }
+
+    [Fact]
+    public void External_providers_sit_above_the_tabs_here_too()
+    {
+        // #457: the section is above both tabs, and its links lead back to the Installation tab.
+        _providers.Set(new ExternalProviderStatus("weather", "Weather", "/providers/weather", HasToken: false, ExternalProviderState.Waiting));
+
+        var page = Render<Health>();
+
+        Assert.True(page.Markup.IndexOf("id=\"external-providers\"", StringComparison.Ordinal)
+            < page.Markup.IndexOf("settings-tabs", StringComparison.Ordinal));
+        Assert.Equal("/settings#weather-editor", page.Find("#external-providers-weather a").GetAttribute("href"));
     }
 
     /// <summary>

@@ -146,6 +146,45 @@ public sealed class SettingsScreenshots : ScreenshotTest
             frames: new Dictionary<string, string> { ["/external/weather/page"] = ProviderPageScreenshot.OpenWeather(Now) });
     }
 
+    /// <summary>
+    /// The charger's section (#457): its plugin connected, with the plugin's own page in the frame, where the
+    /// charger's address is entered. The page is a stand-in: the plugins live in their own repository.
+    /// </summary>
+    [Fact]
+    public void The_charger()
+    {
+        _providers.Set(new ExternalProviderStatus(
+            "charger", "Charger", "/providers/charger", HasToken: true, ExternalProviderState.Connected,
+            ProviderId: "solax-charger", ProviderName: "SolaX charger", ProviderVersion: "1.0.0",
+            Since: Now.AddHours(-3), LastDataAt: Now.AddSeconds(-5), Healthy: true, PageUrl: new Uri("http://192.168.2.7:8097/"),
+            RememberedProviderId: "solax-charger"));
+        _providers.Token = "gvp_8nR3yW6kM1qT9vB4xC7zD2fG5hJ0sL3eP6iU9oA1wE4";
+
+        Capture(RenderPage<PvSystem>("/settings"), "settings-charger", selector: "#charger-editor",
+            frames: new Dictionary<string, string> { ["/external/charger/page"] = ChargerPage });
+    }
+
+    // A plugin's page as the charger plugins draw one: the charger's address and a Save button.
+    private const string ChargerPage = """
+        <!DOCTYPE html>
+        <html lang="en"><head><meta charset="utf-8"><title>SolaX charger</title>
+        <style>
+          body { font: 15px system-ui, sans-serif; margin: 16px; color: #1f2933; }
+          h1 { font-size: 18px; margin: 0 0 12px; }
+          label { display: block; margin: 8px 0 4px; }
+          input { font: inherit; padding: 6px 8px; width: 16rem; }
+          button { font: inherit; margin-top: 12px; padding: 6px 14px; }
+          p { color: #52606d; }
+        </style></head>
+        <body>
+          <h1>SolaX charger</h1>
+          <p>Connected to the charger. Last read 5 s ago.</p>
+          <label for="host">Charger address</label><input id="host" value="192.168.1.6">
+          <label for="port">Modbus port</label><input id="port" value="502">
+          <div><button>Save</button></div>
+        </body></html>
+        """;
+
     [Fact]
     public void The_tariff_table() =>
         Capture(RenderPage<PvSystem>("/settings"), "settings-tariff", selector: "#tariff-editor");

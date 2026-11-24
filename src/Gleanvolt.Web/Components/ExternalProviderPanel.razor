@@ -1,42 +1,37 @@
 @implements IDisposable
 @inject IExternalProviders Providers
-@inject NavigationManager Navigation
 @inject TimeProvider Time
 
 @*
-    One kind of external data provider (#386): where a provider connects and its session, live. Any
+    One kind of external data provider (#386): the provider connected and its session, live. Any
     kind's Settings section hosts it; the kind decides elsewhere what turns it on (for the tariff,
     choosing External and saving).
 
-    The token is one for every kind (#406) and lives in ExternalProvidersForm; this panel only points
-    there, as a warning while there is none.
+    Where providers connect, each kind's hub and the one token (#406) are in ExternalProvidersForm at
+    the top of Settings (#457); this panel only points there, as a warning while there is no token.
 *@
 
 @if (Providers.Find(Kind) is { } status)
 {
     <div class="external-provider" id="external-@status.Kind">
-        <p class="muted">@SettingsText.ExternalProviderIntro</p>
+        @* The provider and its session first (#457); where it connects and the token are in the External
+           providers section at the top of Settings, so here they are one tap away in the tip. *@
+        <div class="tip-head external-provider-head">
+            <p id="external-@(status.Kind)-state" class="@(status.State == ExternalProviderState.Connected ? null : "warning")">
+                @State(status)
+            </p>
+            <InfoTip Topic="@SettingsText.ExternalProviderTopic" Group="settings-info" End="true">
+                <p>@SettingsText.ExternalProviderIntro</p>
+                <p>@Localized.Rich(SettingsText.ExternalTokenShared, @<a href="/settings#external-providers">@SettingsText.ExternalProviders</a>)</p>
+            </InfoTip>
+        </div>
 
-        <dl class="external-provider-address">
-            <dt>@SettingsText.ExternalAddress</dt>
-            <dd><code id="external-@(status.Kind)-address">@BaseAddress</code></dd>
-            <dt>@SettingsText.ExternalHub</dt>
-            <dd><code id="external-@(status.Kind)-hub">@status.HubPath</code></dd>
-        </dl>
-
-        <h3>@SettingsText.ExternalToken</h3>
-
-        @* One token for every kind (#406): made and shown in the External providers section. *@
-        <p class="@(status.HasToken ? "muted" : "warning")" id="external-@(status.Kind)-token-state">
-            @Localized.Rich(status.HasToken ? SettingsText.ExternalTokenShared : SettingsText.ExternalTokenSharedMissing,
-                @<a href="/settings#external-providers">@SettingsText.ExternalProviders</a>)
-        </p>
-
-        <h3>@SettingsText.ExternalStatus</h3>
-
-        <p id="external-@(status.Kind)-state" class="@(status.State == ExternalProviderState.Connected ? "muted" : "warning")">
-            @State(status)
-        </p>
+        @if (!status.HasToken)
+        {
+            <p class="warning" id="external-@(status.Kind)-token-state">
+                @Localized.Rich(SettingsText.ExternalTokenSharedMissing, @<a href="/settings#external-providers">@SettingsText.ExternalProviders</a>)
+            </p>
+        }
 
         <p class="muted" id="external-@(status.Kind)-data">
             @(status.LastDataAt is { } at ? Localized.Format(SettingsText.ExternalLastData, When(at)) : SettingsText.ExternalNoDataYet)
@@ -74,9 +69,6 @@
 
     /// <summary>True when the page has no login. Kept for the hosts that pass it; nothing here changes anything.</summary>
     [Parameter] public bool ReadOnly { get; set; }
-
-    // What a provider is configured with: the SDK adds the hub path itself.
-    private string BaseAddress => Navigation.BaseUri.TrimEnd('/');
 
     protected override void OnInitialized() => Providers.Changed += Refresh;
 

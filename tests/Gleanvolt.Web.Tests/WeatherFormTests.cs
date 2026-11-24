@@ -33,7 +33,7 @@ public class WeatherFormTests : BunitContext
 
     [Theory]
     [InlineData(WeatherSource.NotProvided, "#weather-not-provided")]
-    [InlineData(WeatherSource.External, "#weather-external-intro")]
+    [InlineData(WeatherSource.External, "#external-weather-state")]
     public void TheSectionBelowTheChoiceFollowsTheSourceInUse(WeatherSource selected, string shown)
     {
         WithSources(selected);
@@ -48,14 +48,32 @@ public class WeatherFormTests : BunitContext
         Assert.Equal(selected == WeatherSource.External, form.FindAll("#external-weather").Count == 1);
     }
 
-    [Fact]
-    public void ExternalNamesTheOpenWeatherPluginAsTheReadyMadeProvider()
+    [Theory]
+    [InlineData(WeatherSource.NotProvided)]
+    [InlineData(WeatherSource.External)]
+    public void TheGeneralTextNamesNoParticularProvider(WeatherSource selected)
     {
-        WithSources(WeatherSource.External);
+        // #457: the section is about a provider, not the OpenWeather plugin in particular.
+        WithSources(selected);
 
         var form = Render<WeatherForm>();
 
-        Assert.Contains("OpenWeather plugin", form.Find("#weather-external-intro").TextContent);
+        Assert.DoesNotContain("OpenWeather", form.Markup);
+    }
+
+    [Fact]
+    public void ExternalShowsTheProviderFirstAndItsPageBelow()
+    {
+        var (_, providers) = WithSources(WeatherSource.External);
+        providers.Set(new ExternalProviderStatus("weather", "Weather", "/providers/weather", HasToken: true,
+            ExternalProviderState.Connected, "openweather", "OpenWeather", "1.0", PageUrl: new Uri("http://localhost:8096/")));
+
+        var form = Render<WeatherForm>();
+
+        var markup = form.Markup;
+        Assert.True(markup.IndexOf("external-weather-state", StringComparison.Ordinal) < markup.IndexOf("external-weather-frame", StringComparison.Ordinal));
+        Assert.Equal("/external/weather/page", form.Find("#external-weather-page-link").GetAttribute("href"));
+        Assert.Equal("_blank", form.Find("#external-weather-page-link").GetAttribute("target"));
     }
 
     [Fact]

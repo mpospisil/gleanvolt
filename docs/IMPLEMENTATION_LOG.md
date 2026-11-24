@@ -4,6 +4,50 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-24 — Settings: External providers at the top, a Charger section, less text (#457)
+
+**What.** Settings now opens with the plugins. The External providers section (the one token, Gleanvolt's
+address, and each kind's hub and session) sits under the **Settings** heading, above the Installation and Health
+tabs, so it appears on both. Every section that takes data from a plugin shows the same thing in the same order:
+first the connected provider and its session, then the provider's own page in a frame, with the
+**Open in a new tab** link under it. A new **Charger** section on the Installation tab gives the charger a home
+again. Since #456 removed the charger fields from the installation form, Settings had said nothing about it.
+
+**How.**
+- `ExternalProvidersForm` moved from the middle of `PvSystem.razor` to above `SettingsTabs` in both `PvSystem.razor`
+  and `Health.razor`. Its kind links are whole paths now (`/settings#tariff-editor`, ...), so they work from the
+  Health tab too. The charger's link leads to the new `#charger-editor` instead of the form that no longer has
+  charger fields.
+- `ExternalProviderPanel` keeps only the session line (provider name, version and since when, from
+  `ExternalProviderStateText`), the last data, and the warnings. The address, hub and token pointer, and the intro,
+  were the same in every kind's panel and are said once at the top. The intro and the token pointer are now in an (i)
+  beside the session line. The token warning stays in sight while there is no token.
+- `ExternalProviderPage` puts the frame first. Its intro and the "blank page?" hint went into an (i) beside the
+  new-tab link, which is unchanged.
+- Hosts list the panel before the page: Weather, Car, and now Solar forecast and the External tariff, which also host
+  the page (it renders only when the provider has one).
+- `ChargerProviderForm` (new) is the Charger section. It has no source choice, because the charger is always a
+  plugin's (#445). It shows the panel and the page. Remembering and forgetting the plugin (#440) stay in the External
+  providers table.
+- Weather: no OpenWeather or OpenWeatherMap in the general text (`WeatherTip1`, `WeatherNotProvided`). The External
+  intro paragraph became the tip's second paragraph (`WeatherExternalIntro` renamed to `WeatherTip2`). The #425 upgrade
+  notice still names the plugin, because that is what it is about.
+- New strings, in en and cs: `ExternalProviderTopic`, `ExternalPageSettingsIntro`, `ChargerTopic`, `ChargerTip1`.
+- CSS: the session line and the new-tab link sit on one line with their (i), with a section's gap between External
+  providers and the tabs.
+
+**Decided against.** A "Not provided" choice for the charger was drafted into the issue and dropped. Since #445 the
+controller always expects a charger plugin, and there is no use case yet for running without one.
+
+**Files.** `Components/ChargerProviderForm.razor` (new), `ExternalProviderPanel.razor`, `ExternalProviderPage.razor`,
+`ExternalProvidersForm.razor`, `ExternalTariffPanel.razor`, `SolcastAccountForm.razor`, `WeatherForm.razor`,
+`Pages/PvSystem.razor`, `Pages/Health.razor`, `Pages/Car.razor`, `SettingsText(.cs).resx`, `site.css`. Tests:
+`PvSystemPageTests`, `HealthPageTests`, `ExternalProviderPanelTests`, `ExternalProvidersFormTests`, `WeatherFormTests`,
+`CarPageTests`. Manual: `setting-up/settings.mdx` and `setting-up/charger.mdx` (en and cs), a new `settings-charger.png`,
+and the Settings screenshots regenerated.
+
+---
+
 ## 2026-11-24 — Remove the built-in charger drivers (#445)
 
 **What.** The last step of #438. Gleanvolt has no charger code: every charger is driven through a plugin from

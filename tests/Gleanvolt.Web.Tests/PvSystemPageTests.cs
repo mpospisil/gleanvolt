@@ -117,7 +117,8 @@ public class PvSystemPageTests : BunitContext
         PvSystemInfo? site = null,
         EvInfo? car = null,
         MqttDisplayOptions? mqtt = null,
-        ApiDisplayOptions? api = null)
+        ApiDisplayOptions? api = null,
+        IExternalProviders? providers = null)
     {
         context.Services.AddSingleton(site ?? Site());
 
@@ -147,7 +148,7 @@ public class PvSystemPageTests : BunitContext
 
         // The Solcast account's, with none configured.
         context.Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());
-        context.Services.AddSingleton<IExternalProviders>(new FakeExternalProviders());
+        context.Services.AddSingleton(providers ?? new FakeExternalProviders());
         context.Services.AddSingleton<IIntegrationsEditor>(new FakeIntegrationsEditor());
 
         // The tariff form's, with no tariff set up.
@@ -165,6 +166,29 @@ public class PvSystemPageTests : BunitContext
         MqttDisplayOptions? mqtt = null,
         ApiDisplayOptions? api = null) =>
         RenderIn(this, site, car, mqtt, api);
+
+    [Fact]
+    public void External_providers_come_first_above_the_tabs_and_the_charger_has_its_own_section()
+    {
+        // #457: the plugins lead the page, and the charger, a plugin's since #445, is shown again.
+        var providers = new FakeExternalProviders();
+        providers.Set(new ExternalProviderStatus("charger", "Charger", "/providers/charger", HasToken: true, ExternalProviderState.Connected,
+            ProviderId: "shelly-topac", ProviderName: "Shelly TopAC", ProviderVersion: "1.0",
+            Since: new DateTimeOffset(2026, 10, 21, 8, 0, 0, TimeSpan.Zero), PageUrl: new Uri("http://localhost:8097/")));
+
+        var page = RenderIn(this, providers: providers);
+
+        var markup = page.Markup;
+        Assert.True(markup.IndexOf("id=\"external-providers\"", StringComparison.Ordinal)
+            < markup.IndexOf("settings-tabs", StringComparison.Ordinal));
+        Assert.Equal("/settings#charger-editor", page.Find("#external-providers-charger a").GetAttribute("href"));
+
+        var charger = page.Find("#charger-editor");
+        Assert.Contains("Shelly TopAC", charger.QuerySelector("#external-charger-state")!.TextContent);
+        Assert.Equal("/external/charger/page", charger.QuerySelector("#external-charger-frame")!.GetAttribute("src"));
+        Assert.Equal("/external/charger/page", charger.QuerySelector("#external-charger-page-link")!.GetAttribute("href"));
+        Assert.Empty(page.FindAll("#charger-source-choice"));
+    }
 
     [Fact]
     public void Points_to_the_car_page_for_the_cars_settings_and_limits()

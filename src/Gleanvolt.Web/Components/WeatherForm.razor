@@ -6,7 +6,7 @@
 
 @*
     Where the weather each charging session ran in comes from (#424, #425): nowhere, or an external
-    provider that publishes over its hub, such as the OpenWeather plugin. Gleanvolt calls no weather
+    provider that publishes over its hub. Gleanvolt calls no weather
     service itself since #425. Choosing one and saving applies at once, and the section below follows the
     choice. In the wizard no provider can connect yet, so External only records the choice there.
 
@@ -19,6 +19,7 @@
         <h2>@SettingsText.Weather</h2>
         <InfoTip Topic="@SettingsText.WeatherTopic" Group="settings-info" Wide="true">
             <p>@SettingsText.WeatherTip1</p>
+            <p>@SettingsText.WeatherTip2</p>
         </InfoTip>
     </div>
 
@@ -65,10 +66,9 @@
             }
             else
             {
-                <p class="muted" id="weather-external-intro">@SettingsText.WeatherExternalIntro</p>
-
-                <ExternalProviderPage Kind="weather" Intro="@SettingsText.WeatherExternalPageIntro" />
+                @* The provider first, its own page below (#457); what External does is in the section's tip. *@
                 <ExternalProviderPanel Kind="weather" ReadOnly="ReadOnly" />
+                <ExternalProviderPage Kind="weather" Intro="@SettingsText.WeatherExternalPageIntro" />
             }
         }
         else
