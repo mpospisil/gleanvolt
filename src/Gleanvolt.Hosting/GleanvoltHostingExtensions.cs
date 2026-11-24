@@ -307,6 +307,13 @@ public static class GleanvoltHostingExtensions
             var controlledConnection = site.Chargers[0].Connection;
             services.AddKeyedSingleton(ModbusClientKeys.EvCharger, (provider, _) =>
             {
+                // A charger behind a plugin has no address here: the plugin reaches it. The device snapshot
+                // still asks for this client, so it gets one that refuses every request instead of a crash.
+                if (string.IsNullOrWhiteSpace(controlledConnection.Host))
+                {
+                    return ChargerHttpClients.NotConfigured();
+                }
+
                 var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
                 return ChargerHttpClients.Create(
                     controlledConnection, !chargeControl.DryRun, provider.GetRequiredService<ILogger<ReadOnlyHttpHandler>>());

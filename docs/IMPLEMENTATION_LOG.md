@@ -4,6 +4,25 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-24 — A charger behind a plugin no longer crashes a web page
+
+**What.** On the Pi, 1.3.2 with the SolaX plugin, opening a web page threw `UriFormatException: Invalid URI: The
+hostname could not be parsed` three times in a minute. `DeviceSnapshot` injects the charger's keyed `HttpClient`,
+and its registration built `http://<host>:<port>/` from the controlled charger's connection. A charger behind a
+plugin has no address (`Host` is empty; the plugin reaches the charger), so building the client threw while the
+page's components were being created. Present since a charger could be `external` (#435); the Pi is the first
+installation that runs one with the web UI on.
+
+**How.** With no host, the registration returns `ChargerHttpClients.NotConfigured()`, a client that refuses every
+request. Nothing uses it for a plugin charger: the `external` driver has no snapshot spec, so a snapshot of it
+fails with its own message before any request.
+
+**Files.** `src/Gleanvolt.Hosting/GleanvoltHostingExtensions.cs`,
+`tests/Gleanvolt.Hosting.Tests/InverterDriverSelectionTests.cs` (the container test for a plugin charger now
+resolves `IDeviceSnapshot` and the charger's HTTP client; it failed with the Pi's exception before the fix).
+
+---
+
 ## 2026-11-24 — A charger plugin not connected yet is one log line, not a stack trace
 
 **What.** At start-up the first poll runs before the charger plugin has attached, so the energy reader logged
