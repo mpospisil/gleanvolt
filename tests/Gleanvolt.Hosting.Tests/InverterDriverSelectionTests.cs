@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Devices;
 using Gleanvolt.Devices.GoE;
@@ -153,6 +154,12 @@ public class InverterDriverSelectionTests
 
         var registry = provider.GetRequiredService<Gleanvolt.Providers.Server.ExternalProviderRegistry>();
         Assert.True(registry.IsEnabled(ChargerHub.Kind));
+
+        // The Settings page's device snapshot asks for the charger's HTTP client: with no address it must still
+        // resolve (it crashed the page on 1.3.2), and refuse to be used.
+        Assert.NotNull(provider.GetRequiredService<IDeviceSnapshot>());
+        var http = provider.GetRequiredKeyedService<HttpClient>(ModbusClientKeys.EvCharger);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => http.GetAsync("/"));
     }
 
     [Fact]
