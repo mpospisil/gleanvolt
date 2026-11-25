@@ -10,7 +10,7 @@ namespace Gleanvolt.Chargers;
 public sealed record FoundCharger(DeviceAddress Address, string Description);
 
 /// <summary>
-/// The plugin's own search for its charger: every address of a private network (this machine's own /24s, or one
+/// A helper for a plugin's own search for its charger, for one found by its port: every address of a private network (this machine's own /24s, or one
 /// the owner types, no larger than a /22) tried on the charger's port, and each one that accepts a connection asked
 /// by the plugin's probe whether it is this charger. Reads only: a probe never writes.
 /// </summary>

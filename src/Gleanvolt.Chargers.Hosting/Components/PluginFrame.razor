@@ -6,8 +6,9 @@
 
 @*
     Every plugin's page: the status, what Gleanvolt asks and what the charger can do, the plugin's own view of the
-    charger (ChildContent), then the address with the search, and the recording for testers. Opening the page
-    writes nothing to the charger.
+    charger (ChildContent), the plugin's own settings, and the recording for testers. The charger's address and port,
+    and finding the charger, are the plugin's: they go in Settings (#459, #461). Opening the page writes nothing to
+    the charger.
 *@
 
 <PageTitle>@Plugin.Name</PageTitle>
@@ -69,24 +70,17 @@
 
 @Settings
 
-<AddressSection Check="Check" UnitId="UnitId" />
-
-<SearchSection />
-
 <RecordingSection />
 
 @code {
     /// <summary>The plugin's own view of the charger, under the reading.</summary>
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
-    /// <summary>The plugin's own settings (the model, a password), as sections of their own, before the address.</summary>
+    /// <summary>
+    /// The plugin's own settings as sections of their own, before the recording: the charger's address and port, the
+    /// search for it when the plugin has one, and anything else (the model, a password).
+    /// </summary>
     [Parameter] public RenderFragment? Settings { get; set; }
-
-    /// <summary>Reads the charger at an address before it is saved; returns what it says it is, throws when it does not answer as one.</summary>
-    [Parameter, EditorRequired] public Func<DeviceAddress, byte?, Task<string>> Check { get; set; } = default!;
-
-    /// <summary>Whether the address has a Modbus unit id.</summary>
-    [Parameter] public bool UnitId { get; set; }
 
     protected override void OnInitialized()
     {

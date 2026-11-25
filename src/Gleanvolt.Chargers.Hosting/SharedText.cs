@@ -35,9 +35,11 @@ public static class SharedText
     public static readonly Words No = new("no", "ne");
     public static readonly Words NoReadingYet = new("No reading yet.", "Zatím žádné čtení.");
 
-    // The address.
+    // The address and the search, for the plugin's own sections (#459, #461).
     public static readonly Words AddressHeading = new("The charger's address", "Adresa nabíječky");
     public static readonly Words Address = new("Address", "Adresa");
+    public static readonly Words Port = new("Port", "Port");
+    public static readonly Words NotAPort = new("The port is a number from 1 to 65535.", "Port je číslo od 1 do 65535.");
     public static readonly Words AddressNotSet = new("not set", "nenastavena");
     public static readonly Words SourcePage = new("Saved on this page.", "Uloženo na této stránce.");
     public static readonly Words SourceConfiguration = new("From the plugin's configuration.", "Z konfigurace pluginu.");
@@ -46,8 +48,8 @@ public static class SharedText
     public static readonly Words Checking = new("Checking…", "Ověřuje se…");
     public static readonly Words Remove = new("Remove", "Odebrat");
     public static readonly Words NotAnAddress = new(
-        "That is not an address: a host name or an IP address, with a port if it is not the usual one.",
-        "To není adresa: název nebo IP adresa, s portem, pokud není obvyklý.");
+        "That is not an address: a host name or an IP address.",
+        "To není adresa: název nebo IP adresa.");
     public static readonly Words AddressAccepted = new("Saved. The charger answers: {0}", "Uloženo. Nabíječka odpovídá: {0}");
     public static readonly Words AddressNotChecked = new(
         "Saved, but the charger did not answer: {0}",

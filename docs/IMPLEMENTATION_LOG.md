@@ -4,6 +4,32 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-25 — Charger plugins own the address, the port and the search (#459, #461)
+
+**What.** `PluginFrame` (`Gleanvolt.Chargers.Hosting`) no longer renders the address and search sections. Its
+`Check` and `UnitId` parameters are gone, and so are `AddressSection.razor`, `SearchSection.razor` and
+`IChargerSearch`. `Settings` now holds all of the plugin's own sections, before the recording. `SharedText` gains
+`Port` and `NotAPort`, and `NotAnAddress` no longer speaks of a port. `LanScan` stays, as a helper.
+
+**Why.** The single address box never said which TCP port was used (#459): 502 for SolaX and Huawei, 80 for go-e and
+Shelly, and none shown when the configuration's address had none. The decision went further: the address and the
+port are the charger's, and finding the charger is the plugin's (#461). See DECISIONS.md.
+
+**In gleanvolt-chargers** (its own PR, on the next SDK). Each plugin has `Pages/AddressSection.razor`: the host and
+the port as two fields, showing what is in use (the port included when the configuration names none), the unit id on
+Modbus, and a line saying what the port is on that charger. Saved as `host:port`. SolaX, Huawei and go-e have
+`Pages/SearchSection.razor` and a `FindAsync` on their search class. Shelly has no search, as before.
+
+**Verified.** The SDK was packed into gleanvolt-chargers' local feed (`1.3.99-local`). All four plugins build on it
+and their tests pass (51). The SolaX and go-e pages were rendered against TEST-NET addresses (never the real charger,
+which serves one Modbus client), in Czech and English: Address and Port fields, the port shown as 502 and 80.
+
+**Files.** `src/Gleanvolt.Chargers.Hosting/Components/PluginFrame.razor`, `.../AddressSection.razor` and
+`.../SearchSection.razor` (removed), `PluginHost.cs`, `LanScan.cs`, `SharedText.cs`, `README.md`; `docs/PROVIDERS.md`,
+`docs/DECISIONS.md`.
+
+---
+
 ## 2026-11-24 — Settings: External providers at the top, a Charger section, less text (#457)
 
 **What.** Settings now opens with the plugins. The External providers section (the one token, Gleanvolt's
