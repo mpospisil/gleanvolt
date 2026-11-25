@@ -65,16 +65,6 @@ public sealed class PluginSettings
     }
 }
 
-/// <summary>How a plugin finds its charger on the LAN: the port, and a read that says whether an address is it.</summary>
-public interface IChargerSearch
-{
-    /// <summary>The charger's port: 502, or 80.</summary>
-    int Port { get; }
-
-    /// <summary>What the device at <paramref name="address"/> is, if it is this charger; null if it is not. Reads only.</summary>
-    Task<string?> ProbeAsync(DeviceAddress address, CancellationToken cancellationToken);
-}
-
 /// <summary>
 /// The host every plugin runs in: its configuration (user secrets, the environment, the command line), the page
 /// that Gleanvolt frames and admits only with its ticket, the data directory (owner-only, the settings and the page's

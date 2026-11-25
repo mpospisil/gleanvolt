@@ -85,9 +85,10 @@ and SolaX, Huawei and go-e, ported from the drivers built into Gleanvolt. Each i
 with its own solution and tests, laid out as a plugin in its own repository would be.
 
 **A charger plugin in your own repository** (#443) references **`Gleanvolt.Chargers.Hosting`** (MIT, on
-nuget.org with the SDK): the host, the page Gleanvolt frames and guards, the address and your own settings, a LAN
-search, and the recording for testers. The plugin implements a `PluginCharger` (its capabilities, a read, the two
-commands), a page in the shared `PluginFrame`, and a `Program.cs` that names it. Its README has a plugin in four
+nuget.org with the SDK): the host, the page Gleanvolt frames and guards, saved settings, helpers for an address and
+a LAN search, and the recording for testers. The plugin implements a `PluginCharger` (its capabilities, a read, the
+two commands), a page in the shared `PluginFrame` with the charger's address and port and its own search on it
+(#459, #461), and a `Program.cs` that names it. Its README has a plugin in four
 files. `Gleanvolt.Providers.Testing` adds `PluginHarness` and a `FakeModbusServer` to test one without Gleanvolt.
 
 [`plugins/Gleanvolt.Plugin.OpenWeather`](../plugins/Gleanvolt.Plugin.OpenWeather) is another (#424):

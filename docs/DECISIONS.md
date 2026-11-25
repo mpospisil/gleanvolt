@@ -4,6 +4,24 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-25 — The charger's address, port and search belong to the plugin, not the SDK (#459, #461)
+
+**Found.** The SDK's `PluginFrame` gave every charger plugin the same address section: one box, with the port only
+as an unexplained `host:port`, so the owner was never told which port was used. It also gave every plugin the same
+search: a scan of the LAN on one port, with the plugin only answering whether each address was its charger. All four
+plugins had the port gap. The search fitted only chargers found by an open port, and Shelly had none.
+
+**Decided.** The address and the port are the charger's, and only the plugin knows how its charger is found. The
+frame renders neither section any more. `AddressSection`, `SearchSection` and `IChargerSearch` left the SDK. Each
+plugin puts its own address section (Address and Port fields, the unit id on Modbus) and its own search in the
+frame's `Settings`. `PluginSettings`, `DeviceAddress`, `LanScan` and the shared texts stay as helpers. The saved
+setting keeps its `host:port` form, so saved addresses and `<Section>:Host` go on working.
+
+**Accepted.** It is a breaking change to the SDK's API: a plugin built on 1.3.2 that passes `Check` to the frame or
+registers an `IChargerSearch` does not build on the next SDK. The four plugins in gleanvolt-chargers move with it.
+Their address and search sections are near-identical copies, one per plugin, so they can differ where a charger
+needs it (no search on Shelly; mDNS later).
+
 ## 2026-11-24 — The built-in charger drivers are removed; the charger is always a plugin's (#445)
 
 **Found.** After #444 every built-in charger driver had a plugin in gleanvolt-chargers, and the Pi already ran its
