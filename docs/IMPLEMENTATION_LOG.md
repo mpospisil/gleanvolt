@@ -4,6 +4,26 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-25 — Charger plugin page: the address names its TCP port (#459)
+
+**What.** The address section that every charger plugin's page shares (`Gleanvolt.Chargers.Hosting`,
+`AddressSection.razor`) said nothing about the port. A line under the **Address** box now names the port the plugin
+uses when the address has none (`PluginInfo.DefaultDevicePort`: 502 for SolaX and Huawei, 80 for go-e and Shelly)
+and how to give another (`host:port`). The placeholder shows the address in use with its port: one from the
+configuration written as `192.168.1.6` now reads `192.168.1.6:502`, as the plugin reads it.
+
+**Why in the SDK.** All four plugins in gleanvolt-chargers were checked. None says anything about the port on its own
+page, and each one's address comes from the shared section, so one fix covers all four. They pick it up when
+gleanvolt-chargers moves to the next SDK release (`GleanvoltSdkVersion`).
+
+**Verified.** The SolaX plugin was built on this SDK, packed into gleanvolt-chargers' local feed, and run against a
+TEST-NET address (never the real charger, which serves one Modbus client). The page renders the hint in English and Czech, and
+`192.0.2.1` from the configuration shows as `192.0.2.1:502`. There are no page-rendering tests for the SDK's components.
+
+**Files.** `src/Gleanvolt.Chargers.Hosting/Components/AddressSection.razor`, `src/Gleanvolt.Chargers.Hosting/SharedText.cs`.
+
+---
+
 ## 2026-11-24 — Settings: External providers at the top, a Charger section, less text (#457)
 
 **What.** Settings now opens with the plugins. The External providers section (the one token, Gleanvolt's

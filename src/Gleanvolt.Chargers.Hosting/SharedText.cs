@@ -39,6 +39,9 @@ public static class SharedText
     public static readonly Words AddressHeading = new("The charger's address", "Adresa nabíječky");
     public static readonly Words Address = new("Address", "Adresa");
     public static readonly Words AddressNotSet = new("not set", "nenastavena");
+    public static readonly Words AddressHint = new(
+        "A host name or an IP address. The plugin uses port {0}; for another, add it after a colon: 192.168.1.6:{1}.",
+        "Název nebo IP adresa. Plugin použije port {0}; jiný připište za dvojtečku: 192.168.1.6:{1}.");
     public static readonly Words SourcePage = new("Saved on this page.", "Uloženo na této stránce.");
     public static readonly Words SourceConfiguration = new("From the plugin's configuration.", "Z konfigurace pluginu.");
     public static readonly Words SourceNone = new("No address yet.", "Zatím žádná adresa.");

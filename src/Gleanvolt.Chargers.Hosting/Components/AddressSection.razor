@@ -14,7 +14,8 @@
 
     <label for="address">@SharedText.Address</label>
     <input id="address" type="text" autocomplete="off" spellcheck="false" @bind="_address" @bind:event="oninput"
-           placeholder="@(Settings.Address.Current ?? SharedText.AddressNotSet.ToString())" disabled="@_busy" />
+           placeholder="@InUse" disabled="@_busy" />
+    <p class="muted" id="address-hint">@SharedText.AddressHint.Format(Plugin.DefaultDevicePort, OtherPortExample)</p>
 
     @if (UnitId)
     {
@@ -63,6 +64,14 @@
     public void Dispose() => Settings.Address.Changed -= Refresh;
 
     private void Refresh() => _ = InvokeAsync(StateHasChanged);
+
+    // The address in use with its port, as the plugin reads it: one from the configuration may name none (#459).
+    private string InUse => Settings.Address.Current is { } current
+        ? DeviceAddress.Parse(current, Plugin.DefaultDevicePort)?.ToString() ?? current
+        : SharedText.AddressNotSet.ToString();
+
+    // A port that is plainly not the default, for the hint's example.
+    private int OtherPortExample => Plugin.DefaultDevicePort == 8080 ? 8081 : 8080;
 
     private async Task SaveAsync()
     {
