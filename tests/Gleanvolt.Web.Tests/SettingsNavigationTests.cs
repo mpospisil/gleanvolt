@@ -23,6 +23,12 @@ public class SettingsNavigationTests : PageTest
     }
 
     [Fact]
+    public void External_providers_are_a_settings_tab()
+    {
+        Assert.Equal(["/settings/providers"], Routes<ExternalProvidersSettings>());
+    }
+
+    [Fact]
     public void Health_is_a_settings_tab_and_keeps_its_old_address()
     {
         Assert.Equal(["/settings/health", "/health"], Routes<Health>());
@@ -30,8 +36,9 @@ public class SettingsNavigationTests : PageTest
 
     [Theory]
     [InlineData(SettingsTab.Installation, "/settings")]
+    [InlineData(SettingsTab.ExternalProviders, "/settings/providers")]
     [InlineData(SettingsTab.Health, "/settings/health")]
-    public void Marks_the_open_half(SettingsTab current, string href)
+    public void Marks_the_open_tab(SettingsTab current, string href)
     {
         var tabs = Render<SettingsTabs>(parameters => parameters.Add(p => p.Current, current));
 
@@ -39,5 +46,14 @@ public class SettingsNavigationTests : PageTest
         Assert.Equal(href, active.GetAttribute("href"));
         Assert.Equal("page", active.GetAttribute("aria-current"));
         Assert.Single(tabs.FindAll("a.tab.active"));
+    }
+
+    [Fact]
+    public void External_providers_sit_between_installation_and_health()
+    {
+        var tabs = Render<SettingsTabs>(parameters => parameters.Add(p => p.Current, SettingsTab.Health));
+
+        Assert.Equal(["/settings", "/settings/providers", "/settings/health"],
+            tabs.FindAll("a.tab").Select(tab => tab.GetAttribute("href")));
     }
 }

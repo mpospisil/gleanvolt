@@ -189,6 +189,9 @@
   <data name="SettingsInstallation" xml:space="preserve">
     <value>Instalace</value>
   </data>
+  <data name="SettingsExternalProviders" xml:space="preserve">
+    <value>Externí zdroje dat</value>
+  </data>
   <data name="SettingsHealth" xml:space="preserve">
     <value>Stav</value>
   </data>

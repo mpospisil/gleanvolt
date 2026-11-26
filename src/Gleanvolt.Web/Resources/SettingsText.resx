@@ -28,6 +28,9 @@
   <data name="HealthPageTitle" xml:space="preserve">
     <value>Health</value>
   </data>
+  <data name="ExternalProvidersPageTitle" xml:space="preserve">
+    <value>External providers</value>
+  </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Settings</value>
   </data>

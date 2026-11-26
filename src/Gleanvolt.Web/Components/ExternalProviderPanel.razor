@@ -22,14 +22,14 @@
             </p>
             <InfoTip Topic="@SettingsText.ExternalProviderTopic" Group="settings-info" End="true">
                 <p>@SettingsText.ExternalProviderIntro</p>
-                <p>@Localized.Rich(SettingsText.ExternalTokenShared, @<a href="/settings#external-providers">@SettingsText.ExternalProviders</a>)</p>
+                <p>@Localized.Rich(SettingsText.ExternalTokenShared, @<a href="/settings/providers">@SettingsText.ExternalProviders</a>)</p>
             </InfoTip>
         </div>
 
         @if (!status.HasToken)
         {
             <p class="warning" id="external-@(status.Kind)-token-state">
-                @Localized.Rich(SettingsText.ExternalTokenSharedMissing, @<a href="/settings#external-providers">@SettingsText.ExternalProviders</a>)
+                @Localized.Rich(SettingsText.ExternalTokenSharedMissing, @<a href="/settings/providers">@SettingsText.ExternalProviders</a>)
             </p>
         }
 

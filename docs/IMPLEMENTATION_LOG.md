@@ -4,6 +4,28 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-26 — External providers get their own Settings tab
+
+**What.** Settings has three tabs: Installation (`/settings`), External providers (`/settings/providers`, new page
+`ExternalProvidersSettings.razor`) and Health (`/settings/health`). `ExternalProvidersForm` is no longer rendered above
+the tabs on the Installation and Health pages; it is the whole of the new tab. `SettingsTab` gains `ExternalProviders`,
+`SharedText` gains `SettingsExternalProviders` and `SettingsText` gains `ExternalProvidersPageTitle` (en + cs).
+
+**Why.** With the section above both tabs (#457), the top of Settings read as the page itself and pushed the
+Installation forms and the tab strip down; the owner found the page more confusing than before.
+
+**Links.** The token pointers in `ExternalProviderPanel` and the form's fallback link went to
+`/settings#external-providers`; they now go to `/settings/providers`. The kinds' links in the section were already
+whole paths to the Installation tab's sections, so they keep working from the new tab.
+
+**Files.** `src/Gleanvolt.Web/Components/Pages/ExternalProvidersSettings.razor` (new), `PvSystem.razor`, `Health.razor`,
+`SettingsTab.cs`, `SettingsTabs.razor`, `ExternalProviderPanel.razor`, `ExternalProvidersForm.razor`, the
+`SharedText`/`SettingsText` resources; tests (`ExternalProvidersSettingsPageTests` new, navigation, Health, PvSystem,
+panel); the screenshot fixture and regenerated Settings screenshots; the manual's settings, tariff, solar forecast and
+car pages (en + cs).
+
+---
+
 ## 2026-11-25 — Charger plugins own the address, the port and the search (#459, #461)
 
 **What.** `PluginFrame` (`Gleanvolt.Chargers.Hosting`) no longer renders the address and search sections. Its

@@ -31,7 +31,7 @@ public class ExternalProviderPanelTests : BunitContext
     [Fact]
     public void LeavesTheAddressAndHubToTheExternalProvidersSection()
     {
-        // #457: where providers connect is said once, at the top of Settings.
+        // #457: where providers connect is said once, on Settings' External providers tab.
         var panel = RenderPanel();
 
         Assert.Empty(panel.FindAll("#external-tariff-address"));
@@ -46,7 +46,7 @@ public class ExternalProviderPanelTests : BunitContext
         Assert.Contains("Make the provider token first", panel.Find("#external-tariff-state").TextContent);
         var pointer = panel.Find("#external-tariff-token-state");
         Assert.Contains("warning", pointer.ClassList);
-        Assert.Equal("/settings#external-providers", pointer.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Equal("/settings/providers", pointer.QuerySelector("a")!.GetAttribute("href"));
         Assert.Empty(panel.FindAll("#external-tariff-token"));
     }
 
