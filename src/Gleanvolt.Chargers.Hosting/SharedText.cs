@@ -22,6 +22,21 @@ public static class SharedText
         "Gleanvolt je ve zkušebním režimu (dry-run): nabíječku čte a neposílá žádné příkazy.");
     public static readonly Words ChargerCan = new("This charger", "Tato nabíječka");
     public static readonly Words CanDo = new("{0}–{1} A, {2} phase(s)", "{0}–{1} A, fáze: {2}");
+    public static readonly Words TokenFromConfiguration = new(
+        "Connected with the token from the configuration.",
+        "Připojeno tokenem z konfigurace.");
+    public static readonly Words TokenFromPairing = new("Connected with the token from pairing.", "Připojeno tokenem ze spárování.");
+
+    // The waiting view, until the owner accepts the plugin in Gleanvolt (#459).
+    public static readonly Words PairingSearching = new("Looking for Gleanvolt on this network.", "Hledá se Gleanvolt v této síti.");
+    public static readonly Words PairingWaiting = new(
+        "Waiting for the owner to accept this plugin in Gleanvolt: Settings → External providers.",
+        "Čeká se, až vlastník tento plugin přijme v Gleanvoltu: Nastavení → Externí poskytovatelé.");
+    public static readonly Words PairingRejected = new(
+        "Gleanvolt rejected this plugin. It asks again in an hour, or when restarted.",
+        "Gleanvolt tento plugin odmítl. Znovu se zeptá za hodinu nebo po restartu.");
+    public static readonly Words PairingCode = new("Pairing code", "Kód pro spárování");
+    public static readonly Words PairingAddresses = new("This plugin's addresses", "Adresy tohoto pluginu");
 
     // The reading.
     public static readonly Words Charger = new("The charger", "Nabíječka");
