@@ -107,12 +107,22 @@ public static class ExternalProviderExtensions
 
             // One plugin reaches us as ::ffff:a.b.c.d or a.b.c.d depending on the listener; it must be one
             // address, or it is a duplicate of itself and its rate-limit bucket is split.
-            var source = context.Connection.RemoteIpAddress ?? IPAddress.Loopback;
+            // An unknown address (a unix socket, some proxies) is not this machine: None is not loopback, so the
+            // owner is still shown the code to check.
+            var source = context.Connection.RemoteIpAddress ?? IPAddress.None;
             source = source.IsIPv4MappedToIPv6 ? source.MapToIPv4() : source;
 
-            return registry.Requests.Knock(kind, knock, source) is { } entry
-                ? Results.Json(new PairingTicket(entry.Id), PairingJson)
-                : Results.StatusCode(StatusCodes.Status429TooManyRequests);
+            try
+            {
+                return registry.Requests.Knock(kind, knock, source) is { } entry
+                    ? Results.Json(new PairingTicket(entry.Id), PairingJson)
+                    : Results.StatusCode(StatusCodes.Status429TooManyRequests);
+            }
+            catch (FormatException)
+            {
+                // A hash the pattern let through that does not decode: still the sender's mistake, not ours.
+                return Results.BadRequest();
+            }
         }).AllowAnonymous();
 
         endpoints.MapPost("/providers/pairing/{id}/collect", async (string id, HttpContext context, ExternalProviderRegistry registry) =>
@@ -142,11 +152,11 @@ public static class ExternalProviderExtensions
     };
 
     private static readonly System.Text.RegularExpressions.Regex ProviderIdPattern =
-        new("^[a-z0-9-]{1,64}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        new(@"^[a-z0-9-]{1,64}\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     // The base64url of a SHA-256: what PairingSecret.Code can read, and the only thing a plugin can send.
     private static readonly System.Text.RegularExpressions.Regex SecretHashPattern =
-        new("^[A-Za-z0-9_-]{43}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        new(@"^[A-Za-z0-9_-]{43}\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     private static bool IsValid(PairingKnock knock) =>
         knock.HubPath is { Length: > 0 and <= 200 } hubPath && hubPath[0] == '/'

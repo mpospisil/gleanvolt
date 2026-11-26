@@ -141,6 +141,28 @@ public sealed class PairingEndpointTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task AProviderIdWithATrailingNewlineIsRefused()
+    {
+        await _host.StartAsync();
+
+        var response = await _host.PostAsync(PairingPaths.Knock, Knock(providerId: "echo-one\n"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AnUnknownSourceAddressIsNotThisMachine()
+    {
+        await _host.StartAsync();
+        using var client = _host.Server.CreateClient();
+
+        var response = await client.PostAsJsonAsync(PairingPaths.Knock, Knock());
+
+        response.EnsureSuccessStatusCode();
+        Assert.False(Assert.Single(_host.Registry.Pairing).OnThisMachine);
+    }
+
+    [Fact]
     public async Task ALongNameIsRefused()
     {
         await _host.StartAsync();
@@ -155,6 +177,7 @@ public sealed class PairingEndpointTests : IAsyncDisposable
     [InlineData("short")]
     [InlineData("not base64 url, but 43 characters long......")]
     [InlineData("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")]
+    [InlineData("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n")]
     public async Task AMalformedSecretHashIsRefused(string hash)
     {
         await _host.StartAsync();
