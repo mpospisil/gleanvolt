@@ -185,6 +185,7 @@ public static class VehicleProviderServiceCollectionExtensions
         services.AddSingleton<IVehicleSource, TSource>();
         services.AddSingleton<VehicleProviderConnection>();
         services.AddHostedService(provider => provider.GetRequiredService<VehicleProviderConnection>());
+        services.AddGleanvoltPairing(provider => provider.GetRequiredService<VehicleProviderConnection>().HubPath);
         return services;
     }
 }

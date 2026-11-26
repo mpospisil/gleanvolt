@@ -37,6 +37,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Gleanvolt.Providers.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Gleanvolt.Providers.Contracts\Gleanvolt.Providers.Contracts.csproj" />
   </ItemGroup>
 

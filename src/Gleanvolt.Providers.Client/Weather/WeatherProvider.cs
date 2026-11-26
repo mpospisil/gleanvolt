@@ -125,6 +125,7 @@ public static class WeatherProviderServiceCollectionExtensions
         services.AddSingleton<IWeatherSource, TSource>();
         services.AddSingleton<WeatherProviderConnection>();
         services.AddHostedService(provider => provider.GetRequiredService<WeatherProviderConnection>());
+        services.AddGleanvoltPairing(provider => provider.GetRequiredService<WeatherProviderConnection>().HubPath);
         return services;
     }
 }

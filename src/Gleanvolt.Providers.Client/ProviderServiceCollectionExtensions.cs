@@ -17,6 +17,7 @@ public static class ProviderServiceCollectionExtensions
         services.TryAddSingleton<ProviderCredentials>();
         services.AddSingleton<TConnection>();
         services.AddHostedService(provider => provider.GetRequiredService<TConnection>());
+        services.AddGleanvoltPairing(provider => provider.GetRequiredService<TConnection>().HubPath);
         return services;
     }
 }

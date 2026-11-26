@@ -206,6 +206,7 @@ public static class ChargerProviderServiceCollectionExtensions
         services.AddSingleton<IChargerSource, TSource>();
         services.AddSingleton<ChargerProviderConnection>();
         services.AddHostedService(provider => provider.GetRequiredService<ChargerProviderConnection>());
+        services.AddGleanvoltPairing(provider => provider.GetRequiredService<ChargerProviderConnection>().HubPath);
         return services;
     }
 }

@@ -28,6 +28,8 @@
     <ProjectReference Include="..\..\src\Gleanvolt.Providers.Server\Gleanvolt.Providers.Server.csproj" />
     <ProjectReference Include="..\..\src\Gleanvolt.Providers.Client\Gleanvolt.Providers.Client.csproj" />
     <ProjectReference Include="..\..\src\Gleanvolt.Providers.Testing\Gleanvolt.Providers.Testing.csproj" />
+    <!-- Only to encode the DNS answers Gleanvolt sends, for the SDK's own mDNS parser to read. -->
+    <ProjectReference Include="..\..\src\Gleanvolt.Infrastructure\Gleanvolt.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

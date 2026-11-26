@@ -118,6 +118,7 @@ public static class SolarForecastProviderServiceCollectionExtensions
         services.AddSingleton<ISolarForecastSource, TSource>();
         services.AddSingleton<SolarForecastProviderConnection>();
         services.AddHostedService(provider => provider.GetRequiredService<SolarForecastProviderConnection>());
+        services.AddGleanvoltPairing(provider => provider.GetRequiredService<SolarForecastProviderConnection>().HubPath);
         return services;
     }
 }

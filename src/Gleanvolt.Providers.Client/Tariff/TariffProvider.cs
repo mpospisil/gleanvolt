@@ -101,6 +101,7 @@ public static class TariffProviderServiceCollectionExtensions
         services.AddSingleton<ITariffSource, TSource>();
         services.AddSingleton<TariffProviderConnection>();
         services.AddHostedService(provider => provider.GetRequiredService<TariffProviderConnection>());
+        services.AddGleanvoltPairing(provider => provider.GetRequiredService<TariffProviderConnection>().HubPath);
         return services;
     }
 }
