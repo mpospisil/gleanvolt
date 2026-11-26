@@ -1,3 +1,4 @@
+using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Charger;
 
 namespace Gleanvolt.Providers.Testing;
@@ -16,6 +17,13 @@ public sealed class ChargerTestHubOptions
 
     /// <summary>The token the plugin must connect with. A new random one when null.</summary>
     public string? Token { get; set; }
+
+    /// <summary>
+    /// Whether the hub answers Gleanvolt's two pairing endpoints (<see cref="PairingPaths"/>) and accepts every knock
+    /// with its own <see cref="ChargerTestHub.Token"/>, for a plugin that starts without a token. True by default;
+    /// false answers 404, as a Gleanvolt that predates pairing does.
+    /// </summary>
+    public bool AcceptPairing { get; set; } = true;
 
     /// <summary>How long a read, a command or a wait for the plugin may take: 10 seconds.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(10);

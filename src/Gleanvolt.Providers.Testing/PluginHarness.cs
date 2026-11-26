@@ -54,6 +54,12 @@ public sealed class PluginHarness : IAsyncDisposable
     /// <summary>The hub, once connected.</summary>
     public ChargerTestHub? Hub { get; private set; }
 
+    /// <summary>The plugin's token and address, once connected: where a paired token lands.</summary>
+    public ProviderCredentials? Credentials { get; private set; }
+
+    /// <summary>The plugin's pairing, once connected with <c>paired: true</c>.</summary>
+    public ProviderPairing? Pairing { get; private set; }
+
     /// <summary>The plugin's connection, once connected.</summary>
     public ChargerProviderConnection? Connection { get; private set; }
 
@@ -66,20 +72,37 @@ public sealed class PluginHarness : IAsyncDisposable
         return device;
     }
 
-    /// <summary>Connects <paramref name="charger"/> to a test hub whose charge control asks <paramref name="limits"/>, and waits for it to be attached.</summary>
-    public async Task<ChargerTestHub> ConnectAsync(PluginCharger charger, ChargerLimits limits, bool attaches = true)
+    /// <summary>
+    /// Connects <paramref name="charger"/> to a test hub whose charge control asks <paramref name="limits"/>, and waits for it to be attached.
+    /// With <paramref name="paired"/> the plugin starts with no token, as a plugin installed before Gleanvolt does, finds the
+    /// hub and is paired by it (#459); the poll that waits for the owner runs a hundred times faster than the SDK's 3 s.
+    /// </summary>
+    public async Task<ChargerTestHub> ConnectAsync(PluginCharger charger, ChargerLimits limits, bool attaches = true, bool paired = false)
     {
         Hub = await ChargerTestHub.StartAsync(new ChargerTestHubOptions { Limits = limits, Timeout = TimeSpan.FromSeconds(5) }).ConfigureAwait(false);
         var options = new ProviderOptions();
-        Hub.Configure(options);
+        // Paired, neither the token nor the address is set: it is the pairing that must bring them.
+        if (!paired)
+        {
+            Hub.Configure(options);
+        }
+
         options.ProviderId = Plugin.ProviderId;
         options.Name = Plugin.Name;
         options.InitialRetryDelay = TimeSpan.FromMilliseconds(100);
         options.RefusedRetryDelay = TimeSpan.FromMilliseconds(100);
 
-        Connection = new ChargerProviderConnection(Options.Create(options), charger, NullLogger<ChargerProviderConnection>.Instance);
+        Credentials = new ProviderCredentials(Options.Create(options), Files);
+        Connection = new ChargerProviderConnection(Options.Create(options), charger, NullLogger<ChargerProviderConnection>.Instance, Credentials);
         _ = new StatusReporter(Connection, charger, Session, NullLogger<StatusReporter>.Instance);
         await Connection.StartAsync(CancellationToken.None).ConfigureAwait(false);
+
+        if (paired)
+        {
+            Pairing = new ProviderPairing(options, Credentials, new HubFinder(Hub.Endpoint), Files, null, new QuickTime(),
+                NullLogger<ProviderPairing>.Instance, ChargerContract.HubPath);
+            await Pairing.StartAsync(CancellationToken.None).ConfigureAwait(false);
+        }
 
         if (attaches)
         {
@@ -109,6 +132,12 @@ public sealed class PluginHarness : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Pairing is not null)
+        {
+            await Pairing.StopAsync(CancellationToken.None);
+            Pairing.Dispose();
+        }
+
         if (Connection is not null)
         {
             await Connection.StopAsync(CancellationToken.None);
@@ -137,4 +166,29 @@ internal sealed class RecordedClients(HttpMessageHandler handler, DeviceRecorder
 {
     public HttpClient CreateClient(string name) =>
         new(new RecordingHandler(recorder) { InnerHandler = handler }, disposeHandler: false);
+}
+
+/// <summary>Yields the test hub's address, as Gleanvolt's finder yields Gleanvolt's.</summary>
+internal sealed class HubFinder(Uri hub) : IGleanvoltFinder
+{
+    public async IAsyncEnumerable<Uri> CandidatesAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await Task.CompletedTask.ConfigureAwait(false);
+        yield return hub;
+    }
+}
+
+/// <summary>
+/// The system clock with every timer a hundred times shorter, so the pairing's 3 s poll takes 30 ms and a test
+/// does not sleep for it.
+/// </summary>
+internal sealed class QuickTime : TimeProvider
+{
+    private const int Speedup = 100;
+
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period) =>
+        base.CreateTimer(callback, state, Shorter(dueTime), Shorter(period));
+
+    // Infinite stays infinite: -1 ms is how a timer says "never" or "once".
+    private static TimeSpan Shorter(TimeSpan time) => time < TimeSpan.Zero ? time : time / Speedup;
 }

@@ -40,6 +40,8 @@ public sealed class ChargerTestHub : IAsyncDisposable
     private readonly List<ChargerReading> _readings = [];
     private readonly List<RefusedReading> _refusals = [];
     private readonly List<ProviderStatus> _statuses = [];
+    private readonly List<PairingKnock> _knocks = [];
+    private readonly Dictionary<string, string> _knockHashes = new(StringComparer.Ordinal);
     private TaskCompletionSource<ProviderHello> _hello = NewHello();
     private string? _connectionId;
     private ProviderHello? _attached;
@@ -132,6 +134,9 @@ public sealed class ChargerTestHub : IAsyncDisposable
     /// <summary>Every status the plugin reported, oldest first.</summary>
     public IReadOnlyList<ProviderStatus> Statuses => Snapshot(_statuses);
 
+    /// <summary>Every pairing knock the hub accepted, oldest first.</summary>
+    public IReadOnlyList<PairingKnock> PairingKnocks => Snapshot(_knocks);
+
     /// <summary>Every reading the hub accepted, asked for or not, oldest first.</summary>
     public IReadOnlyList<ChargerReading> Readings => Snapshot(_readings);
 
@@ -156,10 +161,14 @@ public sealed class ChargerTestHub : IAsyncDisposable
         builder.Services.AddSingleton(holder);
 
         var app = builder.Build();
-        app.Use((context, next) => Authorised(context.Request, token)
+        app.Use((context, next) => Authorised(context.Request, token) || (options.AcceptPairing && IsPairing(context.Request))
             ? next(context)
             : Refuse(context.Response));
         app.MapHub<TestChargerHub>(ChargerContract.HubPath);
+        if (options.AcceptPairing)
+        {
+            MapPairing(app, holder);
+        }
 
         await app.StartAsync(cancellationToken).ConfigureAwait(false);
 
@@ -367,6 +376,77 @@ public sealed class ChargerTestHub : IAsyncDisposable
             waiting.TrySetResult(result);
         }
     }
+
+    // ---- Pairing ----
+
+    // Gleanvolt's two endpoints, without its waiting list: every knock is accepted at once. The secret is still
+    // checked against the hash the plugin knocked with, so a plugin that collects with the wrong one is found out.
+    private static void MapPairing(WebApplication app, Holder holder)
+    {
+        app.MapPost(PairingPaths.Knock, async (HttpContext context) =>
+        {
+            if (await ReadAsync<PairingKnock>(context.Request).ConfigureAwait(false) is not { } knock)
+            {
+                return Results.BadRequest();
+            }
+
+            return Results.Json(holder.Hub!.Knocked(knock), PairingJson);
+        });
+
+        app.MapPost("/providers/pairing/{id}/collect", async (string id, HttpContext context) =>
+        {
+            if (await ReadAsync<PairingCollect>(context.Request).ConfigureAwait(false) is not { } collect)
+            {
+                return Results.BadRequest();
+            }
+
+            return Results.Json(holder.Hub!.Collected(id, collect.Secret), PairingJson);
+        });
+    }
+
+    private static async Task<T?> ReadAsync<T>(HttpRequest request)
+        where T : class
+    {
+        try
+        {
+            return await request.ReadFromJsonAsync<T>(PairingJson).ConfigureAwait(false);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private PairingTicket Knocked(PairingKnock knock)
+    {
+        var id = Guid.NewGuid().ToString("N");
+        lock (_gate)
+        {
+            _knocks.Add(knock);
+            _knockHashes[id] = knock.SecretHash;
+        }
+
+        return new PairingTicket(id);
+    }
+
+    private PairingAnswer Collected(string id, string? secret)
+    {
+        lock (_gate)
+        {
+            // As Gleanvolt: a collect that does not prove the secret learns nothing, not even that the request exists.
+            return secret is not null && _knockHashes.TryGetValue(id, out var hash) && hash == PairingSecret.Hash(secret)
+                ? new PairingAnswer(PairingState.Accepted, Token)
+                : new PairingAnswer(PairingState.Unknown);
+        }
+    }
+
+    private static bool IsPairing(HttpRequest request) =>
+        request.Path.StartsWithSegments("/providers/pairing", StringComparison.Ordinal);
+
+    private static readonly JsonSerializerOptions PairingJson = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
+    };
 
     // ---- Inside ----
 
