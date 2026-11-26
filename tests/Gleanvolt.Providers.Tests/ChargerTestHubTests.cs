@@ -223,6 +223,18 @@ public sealed class ChargerTestHubTests : IAsyncLifetime
         Assert.Contains("\"accepted\"", await right.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task A_hub_without_pairing_answers_a_knock_with_404_as_an_older_gleanvolt_does()
+    {
+        await using var hub = await ChargerTestHub.StartAsync(new ChargerTestHubOptions { AcceptPairing = false });
+        using var http = new HttpClient { BaseAddress = hub.Endpoint };
+        var knock = new PairingKnock(ChargerContract.HubPath, "someone", "Someone", "1", null, PairingSecret.Hash("s"));
+
+        var response = await http.PostAsJsonAsync(PairingPaths.Knock, knock);
+
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private async Task<FakeCharger> StartPluginAsync(string? token = null, ChargerCapabilities? capabilities = null, string id = "fake-charger")
     {
         var builder = Host.CreateApplicationBuilder();

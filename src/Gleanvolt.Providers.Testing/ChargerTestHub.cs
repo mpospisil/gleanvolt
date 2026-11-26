@@ -161,7 +161,9 @@ public sealed class ChargerTestHub : IAsyncDisposable
         builder.Services.AddSingleton(holder);
 
         var app = builder.Build();
-        app.Use((context, next) => Authorised(context.Request, token) || (options.AcceptPairing && IsPairing(context.Request))
+        // The pairing paths pass the token check whether or not they are mapped: unmapped, they answer 404 as an older
+        // Gleanvolt does, not 401.
+        app.Use((context, next) => Authorised(context.Request, token) || IsPairing(context.Request)
             ? next(context)
             : Refuse(context.Response));
         app.MapHub<TestChargerHub>(ChargerContract.HubPath);
