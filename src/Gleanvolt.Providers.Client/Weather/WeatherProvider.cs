@@ -2,6 +2,7 @@ using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Weather;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -32,8 +33,9 @@ public sealed class WeatherProviderConnection : ProviderConnection<WeatherWelcom
     private WeatherSite? _site;
 
     public WeatherProviderConnection(
-        IOptions<ProviderOptions> options, IWeatherSource source, ILogger<WeatherProviderConnection> logger)
-        : base(options.Value, WeatherContract.HubPath, WeatherContract.Major, WeatherContract.Minor, logger)
+        IOptions<ProviderOptions> options, IWeatherSource source, ILogger<WeatherProviderConnection> logger,
+        ProviderCredentials? credentials = null)
+        : base(options.Value, WeatherContract.HubPath, WeatherContract.Major, WeatherContract.Minor, logger, credentials)
     {
         _source = source;
         Welcomed += welcome => _site = welcome.Site;
@@ -119,6 +121,7 @@ public static class WeatherProviderServiceCollectionExtensions
         where TSource : class, IWeatherSource
     {
         services.Configure(configure);
+        services.TryAddSingleton<ProviderCredentials>();
         services.AddSingleton<IWeatherSource, TSource>();
         services.AddSingleton<WeatherProviderConnection>();
         services.AddHostedService(provider => provider.GetRequiredService<WeatherProviderConnection>());

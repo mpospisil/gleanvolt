@@ -38,8 +38,8 @@ public sealed class EchoHub(ExternalProviderRegistry registry, ProviderHostInfo 
 }
 
 /// <summary>The SDK's connection for the echo kind: answers every ping when <see cref="Answer"/> is on.</summary>
-public sealed class EchoConnection(ProviderOptions options, ILogger? logger = null)
-    : ProviderConnection<Welcome>(options, EchoHub.Path, 1, 0, logger ?? NullLogger.Instance)
+public sealed class EchoConnection(ProviderOptions options, ILogger? logger = null, ProviderCredentials? credentials = null)
+    : ProviderConnection<Welcome>(options, EchoHub.Path, 1, 0, logger ?? NullLogger.Instance, credentials)
 {
     public bool Answer { get; set; } = true;
 

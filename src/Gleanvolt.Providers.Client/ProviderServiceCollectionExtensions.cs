@@ -1,5 +1,6 @@
 using Gleanvolt.Providers.Contracts;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace Gleanvolt.Providers.Client;
@@ -13,6 +14,7 @@ public static class ProviderServiceCollectionExtensions
         where TWelcome : Welcome
     {
         services.Configure(configure);
+        services.TryAddSingleton<ProviderCredentials>();
         services.AddSingleton<TConnection>();
         services.AddHostedService(provider => provider.GetRequiredService<TConnection>());
         return services;

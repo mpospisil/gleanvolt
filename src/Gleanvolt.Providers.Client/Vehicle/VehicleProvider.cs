@@ -2,6 +2,7 @@ using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Vehicle;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -35,8 +36,9 @@ public sealed class VehicleProviderConnection : ProviderConnection<VehicleWelcom
     private volatile ChargingSessionInfo? _session;
 
     public VehicleProviderConnection(
-        IOptions<ProviderOptions> options, IVehicleSource source, ILogger<VehicleProviderConnection> logger)
-        : base(options.Value, VehicleContract.HubPath, VehicleContract.Major, VehicleContract.Minor, logger)
+        IOptions<ProviderOptions> options, IVehicleSource source, ILogger<VehicleProviderConnection> logger,
+        ProviderCredentials? credentials = null)
+        : base(options.Value, VehicleContract.HubPath, VehicleContract.Major, VehicleContract.Minor, logger, credentials)
     {
         _source = source;
         Welcomed += welcome =>
@@ -179,6 +181,7 @@ public static class VehicleProviderServiceCollectionExtensions
         where TSource : class, IVehicleSource
     {
         services.Configure(configure);
+        services.TryAddSingleton<ProviderCredentials>();
         services.AddSingleton<IVehicleSource, TSource>();
         services.AddSingleton<VehicleProviderConnection>();
         services.AddHostedService(provider => provider.GetRequiredService<VehicleProviderConnection>());

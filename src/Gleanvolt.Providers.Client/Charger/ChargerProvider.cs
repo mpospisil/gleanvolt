@@ -2,6 +2,7 @@ using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Charger;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -53,8 +54,9 @@ public sealed class ChargerProviderConnection : ProviderConnection<ChargerWelcom
     private readonly SemaphoreSlim _device = new(1, 1);
 
     public ChargerProviderConnection(
-        IOptions<ProviderOptions> options, IChargerSource source, ILogger<ChargerProviderConnection> logger)
-        : base(options.Value, ChargerContract.HubPath, ChargerContract.Major, ChargerContract.Minor, logger)
+        IOptions<ProviderOptions> options, IChargerSource source, ILogger<ChargerProviderConnection> logger,
+        ProviderCredentials? credentials = null)
+        : base(options.Value, ChargerContract.HubPath, ChargerContract.Major, ChargerContract.Minor, logger, credentials)
     {
         _source = source;
     }
@@ -200,6 +202,7 @@ public static class ChargerProviderServiceCollectionExtensions
         where TSource : class, IChargerSource
     {
         services.Configure(configure);
+        services.TryAddSingleton<ProviderCredentials>();
         services.AddSingleton<IChargerSource, TSource>();
         services.AddSingleton<ChargerProviderConnection>();
         services.AddHostedService(provider => provider.GetRequiredService<ChargerProviderConnection>());
