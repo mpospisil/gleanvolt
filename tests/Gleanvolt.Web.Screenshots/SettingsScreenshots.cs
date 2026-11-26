@@ -216,7 +216,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
         _providers.Set(new ExternalProviderStatus("vehicle", "Car", "/providers/vehicle", HasToken: true, ExternalProviderState.Off));
         _providers.Token = "gvp_5mQ2xV9tL4pR8wK1nB7yC3dF6hJ0sA2eG5iU8oZ4qW1";
 
-        Capture(RenderPage<PvSystem>("/settings"), "settings-external-providers", selector: "#external-providers");
+        Capture(RenderPage<ExternalProvidersSettings>("/settings/providers"), "settings-external-providers", selector: "#external-providers");
     }
 
     /// <summary>The API switched on, with the key the Home Assistant integration uses (#393).</summary>

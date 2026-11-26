@@ -168,9 +168,10 @@ public class PvSystemPageTests : BunitContext
         RenderIn(this, site, car, mqtt, api);
 
     [Fact]
-    public void External_providers_come_first_above_the_tabs_and_the_charger_has_its_own_section()
+    public void External_providers_are_a_tab_of_their_own_and_the_charger_has_its_own_section()
     {
-        // #457: the plugins lead the page, and the charger, a plugin's since #445, is shown again.
+        // The plugins moved from the top of the page to their own tab; the charger, a plugin's since
+        // #445, keeps its section here.
         var providers = new FakeExternalProviders();
         providers.Set(new ExternalProviderStatus("charger", "Charger", "/providers/charger", HasToken: true, ExternalProviderState.Connected,
             ProviderId: "shelly-topac", ProviderName: "Shelly TopAC", ProviderVersion: "1.0",
@@ -178,10 +179,7 @@ public class PvSystemPageTests : BunitContext
 
         var page = RenderIn(this, providers: providers);
 
-        var markup = page.Markup;
-        Assert.True(markup.IndexOf("id=\"external-providers\"", StringComparison.Ordinal)
-            < markup.IndexOf("settings-tabs", StringComparison.Ordinal));
-        Assert.Equal("/settings#charger-editor", page.Find("#external-providers-charger a").GetAttribute("href"));
+        Assert.Empty(page.FindAll("#external-providers"));
 
         var charger = page.Find("#charger-editor");
         Assert.Contains("Shelly TopAC", charger.QuerySelector("#external-charger-state")!.TextContent);

@@ -203,7 +203,7 @@
     };
 
     // Where the kind is turned on: a section of the Installation tab, or the car's own page (#408).
-    // Whole paths, since this section is above the Health tab too (#457).
+    // Whole paths, since this section is a tab of its own.
     private static string Section(string kind) => kind switch
     {
         "tariff" => "/settings#tariff-editor",
@@ -211,6 +211,6 @@
         "vehicle" => "/car#car-editor",
         "weather" => "/settings#weather-editor",
         "charger" => "/settings#charger-editor",
-        _ => "/settings#external-providers",
+        _ => "/settings/providers",
     };
 }

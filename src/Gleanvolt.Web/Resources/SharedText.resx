@@ -210,6 +210,9 @@
   <data name="SettingsInstallation" xml:space="preserve">
     <value>Installation</value>
   </data>
+  <data name="SettingsExternalProviders" xml:space="preserve">
+    <value>External providers</value>
+  </data>
   <data name="SettingsHealth" xml:space="preserve">
     <value>Health</value>
   </data>

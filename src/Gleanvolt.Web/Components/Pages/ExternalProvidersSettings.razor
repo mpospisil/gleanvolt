@@ -1,0 +1,19 @@
+@page "/settings/providers"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@*
+    Settings: the external providers -- the one token every plugin connects with, and each kind's hub
+    and session. It sat above both other tabs (#457), which made both pages longer and the top of
+    Settings confusing; a tab of its own keeps it one click away.
+*@
+
+<SiteTitle Page="@SettingsText.ExternalProvidersPageTitle" />
+
+<h1>@SettingsText.SettingsTitle</h1>
+
+<SettingsTabs Current="SettingsTab.ExternalProviders" />
+
+<SetupModeBanner />
+
+<ExternalProvidersForm />

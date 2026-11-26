@@ -27,6 +27,9 @@
   <data name="HealthPageTitle" xml:space="preserve">
     <value>Stav</value>
   </data>
+  <data name="ExternalProvidersPageTitle" xml:space="preserve">
+    <value>Externí zdroje dat</value>
+  </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Nastavení</value>
   </data>
