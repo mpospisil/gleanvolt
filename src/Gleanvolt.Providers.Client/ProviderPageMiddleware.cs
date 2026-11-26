@@ -23,6 +23,14 @@ public sealed class ProviderPageOptions
     /// </summary>
     public Func<HttpContext, bool> IsPublic { get; set; } = DefaultIsPublic;
 
+    /// <summary>
+    /// Answers <c>GET /</c> while the provider has no token (#459), when the page is open to the whole network
+    /// and nothing may be shown but that the provider waits to be paired. Null writes a plain text with the
+    /// provider's name, the phase and the code the owner compares in Gleanvolt. Every other path that is not
+    /// public is refused as usual, so there is nothing to press.
+    /// </summary>
+    public RequestDelegate? Unpaired { get; set; }
+
     /// <summary>The default for <see cref="IsPublic"/>.</summary>
     public static bool DefaultIsPublic(HttpContext context)
     {
@@ -39,12 +47,15 @@ public sealed class ProviderPageOptions
 /// Admits only a browser Gleanvolt sent (#410): a request with a valid ticket
 /// (<see cref="ProviderPage.TicketParameter"/>) is let through and given the provider's own cookie; a
 /// request with that cookie is let through; anything else is answered 403. The page needs no login of
-/// its own, and nobody on the network can press its buttons without the owner's Gleanvolt.
+/// its own, and nobody on the network can press its buttons without the owner's Gleanvolt. Until the provider
+/// has a token (#459) there is nothing to sign with, so nobody is admitted and <c>GET /</c> shows only
+/// <see cref="ProviderPageOptions.Unpaired"/>.
 /// </summary>
 internal sealed class ProviderPageMiddleware(
     RequestDelegate next,
     IOptions<ProviderOptions> provider,
     IOptions<ProviderPageOptions> page,
+    ProviderCredentials credentials,
     ILogger<ProviderPageMiddleware> logger,
     TimeProvider? time = null)
 {
@@ -63,14 +74,22 @@ internal sealed class ProviderPageMiddleware(
         }
 
         var options = provider.Value;
+
+        // Read per request: the token arrives or goes while the provider runs. Without one nothing may be
+        // signed or verified, an empty key would admit anyone who signs with it.
+        if (credentials.Token is not { } token)
+        {
+            return IsRoot(context.Request) ? (page.Value.Unpaired ?? WriteWaitingView)(context) : Refuse(context);
+        }
+
         var now = _time.GetUtcNow();
         var cookieName = CookieName(options.ProviderId);
 
         if (context.Request.Query[ProviderPage.TicketParameter].ToString() is { Length: > 0 } ticket
-            && ProviderPage.VerifyTicket(ticket, options.Token, options.ProviderId, now))
+            && ProviderPage.VerifyTicket(ticket, token, options.ProviderId, now))
         {
             var expires = now + page.Value.CookieLifetime;
-            context.Response.Cookies.Append(cookieName, ProviderPage.Sign(CookiePurpose, options.Token, options.ProviderId, expires), new CookieOptions
+            context.Response.Cookies.Append(cookieName, ProviderPage.Sign(CookiePurpose, token, options.ProviderId, expires), new CookieOptions
             {
                 HttpOnly = true,
                 Path = "/",
@@ -86,15 +105,39 @@ internal sealed class ProviderPageMiddleware(
             return next(context);
         }
 
-        if (ProviderPage.Verify(CookiePurpose, context.Request.Cookies[cookieName], options.Token, options.ProviderId, now))
+        if (ProviderPage.Verify(CookiePurpose, context.Request.Cookies[cookieName], token, options.ProviderId, now))
         {
             return next(context);
         }
 
+        return Refuse(context);
+    }
+
+    private static bool IsRoot(HttpRequest request) =>
+        HttpMethods.IsGet(request.Method) && (request.Path.Value is null or "" or "/");
+
+    private Task Refuse(HttpContext context)
+    {
         logger.LogInformation("Refused {Path}: no valid ticket from Gleanvolt. Open the page from Gleanvolt.", context.Request.Path);
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         context.Response.ContentType = "text/plain; charset=utf-8";
         return context.Response.WriteAsync("Open this page from Gleanvolt: the Car page, or Settings → External providers.");
+    }
+
+    // The default waiting view. The pairing is optional: a host without it only learns that it is waiting.
+    private Task WriteWaitingView(HttpContext context)
+    {
+        var name = provider.Value.Name is { Length: > 0 } n ? n : provider.Value.ProviderId;
+        var text = $"{name} is not paired with Gleanvolt yet.";
+
+        if (context.RequestServices.GetService<ProviderPairing>()?.Status is { } status)
+        {
+            text += $"{Environment.NewLine}Phase: {status.Phase}{Environment.NewLine}Code: {status.Code}"
+                + $"{Environment.NewLine}Accept this provider in Gleanvolt, under Settings → External providers, if the code matches.";
+        }
+
+        context.Response.ContentType = "text/plain; charset=utf-8";
+        return context.Response.WriteAsync(text);
     }
 }
 
@@ -103,8 +146,8 @@ public static class ProviderPageExtensions
 {
     /// <summary>
     /// Guards everything after it with the ticket Gleanvolt adds (#410). Put it before the page's
-    /// endpoints. Uses the <see cref="ProviderOptions"/> the provider registered with, for the token and
-    /// the provider id.
+    /// endpoints. Uses the <see cref="ProviderOptions"/> the provider registered with for the provider id, and
+    /// <see cref="ProviderCredentials"/> for the token, which can arrive while the provider runs.
     /// </summary>
     public static IApplicationBuilder UseGleanvoltProviderPage(this IApplicationBuilder app, Action<ProviderPageOptions>? configure = null)
     {

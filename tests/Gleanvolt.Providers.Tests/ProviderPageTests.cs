@@ -8,6 +8,8 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 
 namespace Gleanvolt.Providers.Tests;
@@ -245,8 +247,80 @@ public sealed class ProviderPageTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync("/sign-in.json", null)).StatusCode);
     }
 
+    [Fact]
+    public async Task UnpairedTheRootShowsTheWaitingView()
+    {
+        await using var plugin = await PluginAsync(token: "");
+
+        var response = await plugin.GetTestClient().GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains(plugin.Services.GetRequiredService<ProviderPairing>().Status.Code, body, StringComparison.Ordinal);
+        Assert.DoesNotContain("the page", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UnpairedEverythingElseIsRefused()
+    {
+        await using var plugin = await PluginAsync(token: "");
+        var client = plugin.GetTestClient();
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync("/", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/recording")).StatusCode);
+    }
+
+    [Fact]
+    public async Task UnpairedTheFrameworkIsStillServed()
+    {
+        await using var plugin = await PluginAsync(token: "");
+
+        var response = await plugin.GetTestClient().GetAsync("/_framework/blazor.web.js");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("the page", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task AStaleCookieWhileUnpairedSeesTheWaitingView()
+    {
+        await using var plugin = await PluginAsync(token: "");
+        var credentials = plugin.Services.GetRequiredService<ProviderCredentials>();
+        credentials.Save(new Uri("http://gleanvolt.test"), Token);
+        var client = plugin.GetTestClient();
+        var ticket = ProviderPage.CreateTicket(Token, "plugin", Now.AddMinutes(2));
+        var opened = await client.GetAsync($"/?{ProviderPage.TicketParameter}={Uri.EscapeDataString(ticket)}");
+        var cookie = Assert.Single(opened.Headers.GetValues("Set-Cookie")).Split(';')[0];
+
+        credentials.ForgetPaired();
+
+        using var reload = new HttpRequestMessage(HttpMethod.Get, "/");
+        reload.Headers.Add("Cookie", cookie);
+        var response = await client.SendAsync(reload);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.DoesNotContain("the page", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        using var elsewhere = new HttpRequestMessage(HttpMethod.Get, "/recording");
+        elsewhere.Headers.Add("Cookie", cookie);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.SendAsync(elsewhere)).StatusCode);
+    }
+
+    [Fact]
+    public async Task OncePairedATicketSignedWithTheNewTokenOpensThePage()
+    {
+        await using var plugin = await PluginAsync(token: "");
+        var client = plugin.GetTestClient();
+        var ticket = ProviderPage.CreateTicket(Token, "plugin", Now.AddMinutes(2));
+        var url = $"/?{ProviderPage.TicketParameter}={Uri.EscapeDataString(ticket)}";
+        Assert.DoesNotContain("the page", await (await client.GetAsync(url)).Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+        plugin.Services.GetRequiredService<ProviderCredentials>().Save(new Uri("http://gleanvolt.test"), Token);
+
+        Assert.Equal("the page", await (await client.GetAsync(url)).Content.ReadAsStringAsync());
+    }
+
     // A plugin's web host with the SDK's guard in front of an endpoint that answers every path.
-    private static async Task<WebApplication> PluginAsync()
+    private static async Task<WebApplication> PluginAsync(string token = Token)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
@@ -254,10 +328,18 @@ public sealed class ProviderPageTests : IAsyncLifetime
         builder.Services.AddSingleton<TimeProvider>(new FakeTimeProvider(Now));
         builder.Services.Configure<ProviderOptions>(options =>
         {
-            options.Token = Token;
+            options.Token = token;
             options.ProviderId = "plugin";
+            options.Name = "Plugin";
         });
         builder.Services.AddOptions<ProviderPageOptions>();
+        builder.Services.AddSingleton<ProviderCredentials>();
+        builder.Services.AddSingleton(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<ProviderOptions>>();
+            return new ProviderPairing(options.Value, provider.GetRequiredService<ProviderCredentials>(),
+                new GleanvoltFinder(options), null, null, TimeProvider.System, NullLogger<ProviderPairing>.Instance, "/hub");
+        });
 
         var app = builder.Build();
         app.UseGleanvoltProviderPage();
