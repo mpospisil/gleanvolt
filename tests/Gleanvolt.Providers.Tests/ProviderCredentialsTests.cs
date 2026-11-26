@@ -66,6 +66,57 @@ public sealed class ProviderCredentialsTests : IDisposable
         Assert.Equal(1, changed);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("not an address")]
+    public void ASavedTokenWithoutAUsableEndpointLoadsAsNone(string? endpoint)
+    {
+        var store = new ProviderSecretStore(_directory);
+        store.Write("gleanvolt-token", "t");
+        if (endpoint is not null)
+        {
+            store.Write("gleanvolt-endpoint", endpoint);
+        }
+
+        var credentials = Credentials();
+
+        Assert.Equal(CredentialSource.None, credentials.Source);
+        Assert.Null(credentials.Token);
+        Assert.False(File.Exists(Path.Combine(_directory, "gleanvolt-token")));
+    }
+
+    [Fact]
+    public void AFailingChangedHandlerStopsNeitherSaveNorForget()
+    {
+        var credentials = Credentials();
+        var heard = 0;
+        credentials.Changed += () => throw new InvalidOperationException("boom");
+        credentials.Changed += () => heard++;
+
+        Assert.True(credentials.Save(Paired, "t"));
+        credentials.ForgetPaired();
+
+        Assert.Equal(2, heard);
+        Assert.Equal(CredentialSource.None, credentials.Source);
+    }
+
+    [Fact]
+    public async Task AFailingChangedHandlerDoesNotStopTheConnectionLoop()
+    {
+        await using var host = new TestHost();
+        await host.StartAsync();
+        var (connection, credentials) = Connect(host, token: "");
+        credentials.Changed += () => throw new InvalidOperationException("boom");
+        await connection.StartAsync(CancellationToken.None);
+
+        credentials.Save(host.Server.BaseAddress, "wrong");
+        await Eventually.True(() => credentials.Source == CredentialSource.None, "the refusal was handled despite the handler");
+
+        credentials.Save(host.Server.BaseAddress, host.Token);
+        await Eventually.True(() => connection.IsAttached, "the loop is still running");
+        await connection.StopAsync(CancellationToken.None);
+    }
+
     [Fact]
     public void ForgettingClearsTokenAndEndpoint()
     {

@@ -42,11 +42,19 @@ public sealed class ProviderCredentials
         _store = store;
         _configuredToken = Clean(_options.Token);
 
-        _pairedToken = Clean(store?.Read(TokenFile));
-        if (_pairedToken is not null
-            && Uri.TryCreate(Clean(store?.Read(EndpointFile)), UriKind.Absolute, out var endpoint))
+        // A token is only worth having with the address it was accepted at: without it the provider would
+        // knock on the default address for ever, and a connection error never forgets a token. So a token
+        // whose endpoint is missing or garbled is dropped, files and all.
+        var token = Clean(store?.Read(TokenFile));
+        if (token is not null && Uri.TryCreate(Clean(store?.Read(EndpointFile)), UriKind.Absolute, out var endpoint))
         {
+            _pairedToken = token;
             _pairedEndpoint = endpoint;
+        }
+        else if (store is not null && (token is not null || store.Read(EndpointFile) is not null))
+        {
+            store.Delete(TokenFile);
+            store.Delete(EndpointFile);
         }
 
         if (Token is not null)
@@ -112,13 +120,21 @@ public sealed class ProviderCredentials
         {
             _pairedToken = token.Trim();
             _pairedEndpoint = endpoint;
-            written = _store is not null
-                && _store.Write(TokenFile, _pairedToken)
-                && _store.Write(EndpointFile, endpoint.AbsoluteUri);
+            // The endpoint first, the token last: a crash or a failed write between them leaves an endpoint
+            // alone, which loads as nothing, never a token without its address.
+            written = _store is not null && _store.Write(EndpointFile, endpoint.AbsoluteUri);
+            if (written)
+            {
+                written = _store!.Write(TokenFile, _pairedToken);
+            }
+            else
+            {
+                _store?.Delete(TokenFile);
+            }
             _arrived.TrySetResult();
         }
 
-        Changed?.Invoke();
+        RaiseChanged();
         return written;
     }
 
@@ -146,7 +162,7 @@ public sealed class ProviderCredentials
             }
         }
 
-        Changed?.Invoke();
+        RaiseChanged();
     }
 
     /// <summary>Completes when there is a token: at once when there already is one.</summary>
@@ -155,6 +171,23 @@ public sealed class ProviderCredentials
         lock (_gate)
         {
             return _arrived.Task.WaitAsync(cancellationToken);
+        }
+    }
+
+    // A subscriber is somebody else's code, and this runs inside the connection loop: one that throws must not
+    // stop the provider's host, nor keep the others from hearing.
+    private void RaiseChanged()
+    {
+        foreach (var handler in Changed?.GetInvocationList() ?? [])
+        {
+            try
+            {
+                ((Action)handler)();
+            }
+            catch (Exception)
+            {
+                // Nothing to tell: the credentials changed whether or not it was handled.
+            }
         }
     }
 
