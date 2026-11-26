@@ -168,4 +168,7 @@
   <data name="ChargerManual" xml:space="preserve">
     <value>Jak přidat nabíječku</value>
   </data>
+  <data name="ChargerByHand" xml:space="preserve">
+    <value>Připojit plugin ručně</value>
+  </data>
 </root>

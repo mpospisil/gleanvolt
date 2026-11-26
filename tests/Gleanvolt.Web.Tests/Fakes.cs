@@ -1453,13 +1453,31 @@ internal sealed class FakeExternalProviders : IExternalProviders
 
     public string? ReadToken() => Token;
 
-    public IReadOnlyList<PairingRequestView> Pairing => [];
+    /// <summary>The pairing requests waiting; set it, then call <see cref="RaiseChanged"/> as the registry would.</summary>
+    public List<PairingRequestView> Waiting { get; } = [];
 
-    public Task<bool> AcceptPairingAsync(string id) => Task.FromResult(false);
+    /// <summary>The ids accepted, in order.</summary>
+    public List<string> Accepted { get; } = [];
+
+    /// <summary>The ids rejected, in order.</summary>
+    public List<string> Rejected { get; } = [];
+
+    public IReadOnlyList<PairingRequestView> Pairing => Waiting.ToList();
+
+    public Task<bool> AcceptPairingAsync(string id)
+    {
+        Accepted.Add(id);
+        return Task.FromResult(true);
+    }
 
     public void RejectPairing(string id)
     {
+        Rejected.Add(id);
+        Waiting.RemoveAll(request => request.Id == id);
     }
+
+    /// <summary>Raises <see cref="Changed"/>.</summary>
+    public void RaiseChanged() => Changed?.Invoke();
 
     /// <summary>The kinds whose remembered provider was forgotten, in order.</summary>
     public List<string> Forgotten { get; } = [];

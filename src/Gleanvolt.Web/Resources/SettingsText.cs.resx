@@ -1114,4 +1114,34 @@
   <data name="ChargerTip1" xml:space="preserve">
     <value>Gleanvolt řídí nabíječku přes plugin: program mimo Gleanvolt, který se připojuje s tokenem pro zdroje dat. Která nabíječka to je a její nastavení najdete na vlastní stránce pluginu.</value>
   </data>
+  <data name="PairingTitle" xml:space="preserve">
+    <value>Pluginy žádající o připojení</value>
+  </data>
+  <data name="PairingIntro" xml:space="preserve">
+    <value>Plugin tu čeká, dokud ho nepřijmete. Přijetím dostane token zdroje.</value>
+  </data>
+  <data name="PairingThisMachine" xml:space="preserve">
+    <value>Tento počítač</value>
+  </data>
+  <data name="PairingCode" xml:space="preserve">
+    <value>Kód:</value>
+  </data>
+  <data name="PairingCheckCode" xml:space="preserve">
+    <value>Otevřete stránku pluginu na jeho vlastní adrese nebo jeho log a ověřte, že kód souhlasí.</value>
+  </data>
+  <data name="PairingAccept" xml:space="preserve">
+    <value>Přijmout</value>
+  </data>
+  <data name="PairingReject" xml:space="preserve">
+    <value>Odmítnout</value>
+  </data>
+  <data name="PairingBlockDuplicate" xml:space="preserve">
+    <value>Dva pluginy žádají pod tímto názvem. Odmítněte ten, který neznáte.</value>
+  </data>
+  <data name="PairingBlockKindOff" xml:space="preserve">
+    <value>Tento druh zdroje je vypnutý.</value>
+  </data>
+  <data name="PairingBlockAnotherProvider" xml:space="preserve">
+    <value>Gleanvolt už používá jiný plugin nabíječky. Nejdřív ho zapomeňte.</value>
+  </data>
 </root>

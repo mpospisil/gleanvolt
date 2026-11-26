@@ -170,4 +170,7 @@
   <data name="ChargerManual" xml:space="preserve">
     <value>How to add a charger</value>
   </data>
+  <data name="ChargerByHand" xml:space="preserve">
+    <value>Connect a plugin by hand</value>
+  </data>
 </root>

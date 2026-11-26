@@ -93,18 +93,23 @@
                 <h3>@SetupText.ChargerTitle</h3>
                 <p>@SetupText.ChargerPlugin</p>
 
-                @if (Providers.ReadToken() is { } token)
-                {
-                    <p class="muted">@SetupText.ChargerToken</p>
-                    <div id="wizard-charger-token"><Secret Value="@token" /></div>
-                }
-                else if (Providers.All.Count > 0)
-                {
-                    <p class="muted">@SetupText.ChargerNoToken</p>
-                    <button type="button" class="secondary" id="wizard-charger-make-token" disabled="@_busy" @onclick="MakeTokenAsync">
-                        @SetupText.ChargerMakeToken
-                    </button>
-                }
+                <PairingRequestsList />
+
+                <details id="wizard-charger-by-hand">
+                    <summary>@SetupText.ChargerByHand</summary>
+                    @if (Providers.ReadToken() is { } token)
+                    {
+                        <p class="muted">@SetupText.ChargerToken</p>
+                        <div id="wizard-charger-token"><Secret Value="@token" /></div>
+                    }
+                    else if (Providers.All.Count > 0)
+                    {
+                        <p class="muted">@SetupText.ChargerNoToken</p>
+                        <button type="button" class="secondary" id="wizard-charger-make-token" disabled="@_busy" @onclick="MakeTokenAsync">
+                            @SetupText.ChargerMakeToken
+                        </button>
+                    }
+                </details>
 
                 <p class="muted">
                     @SetupText.ChargerLater
