@@ -1453,6 +1453,14 @@ internal sealed class FakeExternalProviders : IExternalProviders
 
     public string? ReadToken() => Token;
 
+    public IReadOnlyList<PairingRequestView> Pairing => [];
+
+    public Task<bool> AcceptPairingAsync(string id) => Task.FromResult(false);
+
+    public void RejectPairing(string id)
+    {
+    }
+
     /// <summary>The kinds whose remembered provider was forgotten, in order.</summary>
     public List<string> Forgotten { get; } = [];
 

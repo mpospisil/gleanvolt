@@ -47,6 +47,7 @@ internal sealed class TestHost : IAsyncDisposable
         _app.UseAuthorization();
         _app.MapExternalProviders();
         _app.MapExternalProviderPages();
+        _app.MapProviderPairing();
         await _app.StartAsync();
 
         Token = await Registry.CreateTokenAsync();
@@ -69,6 +70,21 @@ internal sealed class TestHost : IAsyncDisposable
             .Build();
         await connection.StartAsync();
         return connection;
+    }
+
+    /// <summary>Posts JSON to <paramref name="path"/> as a client at <paramref name="from"/> (127.0.0.1 when not said).</summary>
+    public Task<HttpResponseMessage> PostAsync(string path, object body, IPAddress? from = null) =>
+        PostRawAsync(path, System.Text.Json.JsonSerializer.Serialize(body, System.Text.Json.JsonSerializerOptions.Web), from);
+
+    /// <summary>Posts <paramref name="json"/> as it is, for a body that is not what the contract sends.</summary>
+    public async Task<HttpResponseMessage> PostRawAsync(string path, string json, IPAddress? from = null)
+    {
+        using var client = new HttpClient(Server.CreateHandler(context => context.Connection.RemoteIpAddress = from ?? IPAddress.Loopback))
+        {
+            BaseAddress = Server.BaseAddress,
+        };
+        using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        return await client.PostAsync(path, content);
     }
 
     public static ProviderHello Hello(string id = "echo-one", int major = 1) => new(id, "Echo " + id, "0.1", major, 0);

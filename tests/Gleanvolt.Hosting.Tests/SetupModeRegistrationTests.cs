@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using Gleanvolt.Api;
 using Gleanvolt.Core.Configuration;
 using Gleanvolt.Core.Interfaces;
@@ -118,6 +119,61 @@ public class SetupModeRegistrationTests
         Assert.Contains("not configured", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
 
         await app.StopAsync();
+    }
+
+    [Fact]
+    public async Task PairingIsAnsweredInSetupMode()
+    {
+        // The Wizard runs in setup mode and is where the owner accepts a plugin, so a knock must reach the registry then.
+        var root = Directory.CreateTempSubdirectory("gleanvolt-setup-pairing-").FullName;
+        try
+        {
+            var builder = WebApplication.CreateSlimBuilder();
+            builder.WebHost.UseTestServer();
+            builder.Logging.ClearProviders();
+            builder.Configuration.AddInMemoryCollection([new("Secrets:Directory", root)]);
+            builder.Services.AddGleanvolt(builder.Configuration, Prague);
+
+            await using var app = builder.Build();
+            Assert.True(app.Services.GetRequiredService<ISetupState>().SetupMode);
+
+            // UseGleanvolt maps the UI's static assets from a manifest a test host has none of: an empty one will do.
+            var manifest = Path.Combine(
+                AppContext.BaseDirectory,
+                $"{System.Reflection.Assembly.GetEntryAssembly()!.GetName().Name}.staticwebassets.endpoints.json");
+            var manifestExisted = File.Exists(manifest);
+            if (!manifestExisted)
+            {
+                File.WriteAllText(manifest, """{"Version":1,"ManifestType":"Publish","Endpoints":[]}""");
+            }
+
+            try
+            {
+                app.UseGleanvolt();
+            }
+            finally
+            {
+                if (!manifestExisted)
+                {
+                    File.Delete(manifest);
+                }
+            }
+
+            await app.StartAsync();
+
+            var kind = app.Services.GetRequiredService<IExternalProviders>().All[0];
+            var knock = new Gleanvolt.Providers.Contracts.PairingKnock(
+                kind.HubPath, "a-plugin", "A plugin", "1.0", null, Gleanvolt.Providers.Contracts.PairingSecret.Hash("a-secret"));
+            var response = await app.GetTestClient().PostAsJsonAsync(Gleanvolt.Providers.Contracts.PairingPaths.Knock, knock);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Single(app.Services.GetRequiredService<IExternalProviders>().Pairing);
+            await app.StopAsync();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]

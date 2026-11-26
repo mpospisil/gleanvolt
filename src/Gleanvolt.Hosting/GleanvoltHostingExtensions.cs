@@ -1194,21 +1194,29 @@ public static class GleanvoltHostingExtensions
         // The external data providers' hubs (#386), on the same port, behind their own tokens. Wherever
         // the port is open, since a provider is a program like an API client and needs no web UI; not in
         // setup mode, where nothing would act on what they send. Without the UI, nothing has put the
-        // authentication middleware in the pipeline yet.
-        if ((web.Enabled || api.Enabled) && !app.Services.GetRequiredService<ISetupState>().SetupMode)
+        // authentication middleware in the pipeline yet. Pairing is mapped in setup mode too: the Wizard
+        // is where the owner accepts a plugin, and the registry exists then.
+        if (web.Enabled || api.Enabled)
         {
+            var setupMode = app.Services.GetRequiredService<ISetupState>().SetupMode;
+
             if (!web.Enabled)
             {
                 app.UseAuthentication();
                 app.UseAuthorization();
             }
 
-            app.MapExternalProviders();
+            app.MapProviderPairing();
 
-            // A provider's own page (#410): only through the web UI's login, which is what the ticket vouches for.
-            if (web.Enabled)
+            if (!setupMode)
             {
-                app.MapExternalProviderPages().RequireAuthorization();
+                app.MapExternalProviders();
+
+                // A provider's own page (#410): only through the web UI's login, which is what the ticket vouches for.
+                if (web.Enabled)
+                {
+                    app.MapExternalProviderPages().RequireAuthorization();
+                }
             }
         }
 

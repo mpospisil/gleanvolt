@@ -14,6 +14,14 @@ internal sealed class NoExternalProviders : IExternalProviders
 
     public string? ReadToken() => null;
 
+    public IReadOnlyList<PairingRequestView> Pairing => [];
+
+    public Task<bool> AcceptPairingAsync(string id) => Task.FromResult(false);
+
+    public void RejectPairing(string id)
+    {
+    }
+
     public event Action? Changed
     {
         add { }
