@@ -163,7 +163,7 @@ public sealed record ExternalProviderStatus(
     /// for <see cref="StatusCode"/>, then the detail in the viewer's language. The English is for the log,
     /// the API and Home Assistant. Null with nothing to say.
     /// </summary>
-    public (Phrase? Phrase, string English)? StatusSaid => ProviderStatusText.Of(StatusCode, StatusMessages, StatusMessage);
+    public (Phrase? Phrase, string English)? StatusSaid => ProviderStatusText.Of(StatusCode, StatusMessages, StatusMessage, Kind);
 
     /// <summary>
     /// Where the web UI opens the provider's page (#410): a Gleanvolt address behind the web login that

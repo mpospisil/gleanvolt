@@ -14,10 +14,12 @@ public static class ProviderStatusText
     /// <paramref name="messages"/> alone: <paramref name="message"/> is then the provider's whole sentence
     /// for an older Gleanvolt and would say the code again. Without one, the detail is
     /// <paramref name="messages"/> or <paramref name="message"/>. Null when there is nothing to say.
+    /// <paramref name="kind"/>, the provider's kind id, words a code for what that kind lacks: a charger
+    /// plugin that isn't set up has no account, it has no charger.
     /// </summary>
-    public static (Phrase? Phrase, string English)? Of(string? code, IReadOnlyDictionary<string, string>? messages, string? message)
+    public static (Phrase? Phrase, string English)? Of(string? code, IReadOnlyDictionary<string, string>? messages, string? message, string? kind = null)
     {
-        var coded = Coded(code);
+        var coded = Coded(code, kind);
         var english = messages?.FirstOrDefault(text => string.Equals(text.Key, "en", StringComparison.OrdinalIgnoreCase)).Value;
 
         if (coded is null && string.IsNullOrEmpty(english))
@@ -44,8 +46,10 @@ public static class ProviderStatusText
     }
 
     // Literal keys, so the check that every phrase key has its resources finds them.
-    private static (Phrase Phrase, string English)? Coded(string? code) => code switch
+    private static (Phrase Phrase, string English)? Coded(string? code, string? kind) => code switch
     {
+        "not-set-up" when string.Equals(kind, "charger", StringComparison.OrdinalIgnoreCase) =>
+            (Phrase.Of("ProviderStatus.NotSetUpCharger"), "the charger isn't set up yet; set it up on the plugin's page"),
         "not-set-up" => (Phrase.Of("ProviderStatus.NotSetUp"), "the account isn't entered yet; enter it on the provider's page"),
         "needs-sign-in" => (Phrase.Of("ProviderStatus.NeedsSignIn"), "sign in on the provider's page"),
         "needs-code" => (Phrase.Of("ProviderStatus.NeedsCode"), "enter the code you were sent, on the provider's page"),

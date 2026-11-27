@@ -19,6 +19,23 @@ public class ProviderStatusTextTests
     }
 
     [Fact]
+    public void Not_set_up_on_a_charger_is_about_the_charger_not_an_account()
+    {
+        // A charger plugin has no account: what it lacks is the charger's address, entered on its page.
+        var said = ProviderStatusText.Of("not-set-up", null, null, kind: "charger")!.Value;
+
+        Assert.Equal(Phrase.Of("ProviderStatus.NotSetUpCharger"), said.Phrase);
+        Assert.Equal("the charger isn't set up yet; set it up on the plugin's page", said.English);
+    }
+
+    [Fact]
+    public void Not_set_up_on_another_kind_is_still_the_account()
+    {
+        Assert.Equal(Phrase.Of("ProviderStatus.NotSetUp"), ProviderStatusText.Of("not-set-up", null, null, kind: "tariff")!.Value.Phrase);
+        Assert.Equal(Phrase.Of("ProviderStatus.NotSetUp"), ProviderStatusText.Of("not-set-up", null, null)!.Value.Phrase);
+    }
+
+    [Fact]
     public void A_code_with_detail_says_both_and_leaves_out_the_old_hosts_sentence()
     {
         var said = ProviderStatusText.Of("needs-sign-in", Both, "The account changed. Sign in again on the plugin's page.")!.Value;

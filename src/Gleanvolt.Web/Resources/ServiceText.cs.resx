@@ -682,6 +682,9 @@
   <data name="ProviderStatus_NotSetUp" xml:space="preserve">
     <value>účet ještě není zadaný; zadejte ho na stránce poskytovatele</value>
   </data>
+  <data name="ProviderStatus_NotSetUpCharger" xml:space="preserve">
+    <value>nabíječka ještě není nastavená; nastavte ji na stránce pluginu</value>
+  </data>
   <data name="ProviderStatus_NeedsSignIn" xml:space="preserve">
     <value>přihlaste se na stránce poskytovatele</value>
   </data>
