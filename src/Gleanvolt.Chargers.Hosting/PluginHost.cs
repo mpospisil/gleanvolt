@@ -150,11 +150,7 @@ public static class PluginHost
             return next(context);
         });
 
-        app.UseRequestLocalization(options =>
-        {
-            options.SetDefaultCulture("en").AddSupportedCultures("en", "cs").AddSupportedUICultures("en", "cs");
-            options.RequestCultureProviders = [new QueryStringRequestCultureProvider(), new CookieRequestCultureProvider()];
-        });
+        app.UsePluginCulture();
 
         // Everything after it answers only a browser Gleanvolt sent, with a ticket: the page changes what charger is driven.
         var pairing = app.Services.GetRequiredService<ProviderPairing>();
