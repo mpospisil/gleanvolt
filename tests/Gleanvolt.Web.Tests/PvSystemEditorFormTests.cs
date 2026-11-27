@@ -80,6 +80,18 @@ public class PvSystemEditorFormTests : BunitContext
     }
 
     [Fact]
+    public void Once_open_the_fold_stays_open_while_the_owner_works_in_it()
+    {
+        // Reverting the pending field that opened it must not snap it shut under the cursor.
+        _editor.Stored[PvSystemSettingKeys.LossFactor] = "0.85";
+        var form = Render<PvSystemEditorForm>();
+
+        form.Find("#pv-advanced .revert").Click();
+
+        Assert.True(form.Find("#pv-advanced").HasAttribute("open"));
+    }
+
+    [Fact]
     public void A_refused_save_opens_the_fold()
     {
         _editor.Refuse = ["The loss factor must be between 0 and 1."];

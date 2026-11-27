@@ -120,7 +120,8 @@ public class PvSystemPageTests : BunitContext
         ApiDisplayOptions? api = null,
         IExternalProviders? providers = null,
         FakeIntegrationsEditor? integrations = null,
-        bool signedIn = false)
+        bool signedIn = false,
+        string? at = null)
         where TPage : Microsoft.AspNetCore.Components.IComponent
     {
         context.Services.AddSingleton(site ?? Site());
@@ -159,6 +160,11 @@ public class PvSystemPageTests : BunitContext
         context.Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));
         context.Services.AddSingleton<TimeProvider>(
             new FixedTimeProvider(new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero), TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")));
+
+        if (at is not null)
+        {
+            context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(at);
+        }
 
         return context.Render<TPage>();
     }
@@ -226,6 +232,57 @@ public class PvSystemPageTests : BunitContext
         page.Find("#api-enabled").Change(true);
 
         Assert.Contains("3", page.Find("#integrations-pending").TextContent);
+    }
+
+    [Fact]
+    public void Removing_the_broker_password_shows_in_the_banner_at_once()
+    {
+        // The fake counts a set password as waiting for a restart, so removing it takes the banner's one
+        // change away -- and the banner has to notice without a reload.
+        var editor = new FakeIntegrationsEditor { Password = "s3cret" };
+        var page = RenderIn<Integrations>(this, integrations: editor, signedIn: true);
+        Assert.Contains("1", page.Find("#integrations-pending").TextContent);
+
+        page.Find("#mqtt-password-remove").Click();
+
+        Assert.Empty(page.FindAll("#integrations-pending"));
+    }
+
+    [Theory]
+    [InlineData("solcast-editor", "/settings/forecast-prices#solcast-editor")]
+    [InlineData("weather-editor", "/settings/forecast-prices#weather-editor")]
+    [InlineData("tariff-editor", "/settings/forecast-prices#tariff-editor")]
+    [InlineData("mqtt-editor", "/settings/integrations#mqtt-editor")]
+    [InlineData("api-editor", "/settings/integrations#api-editor")]
+    [InlineData("password", "/settings/system#password")]
+    public void An_old_bookmark_to_a_moved_section_goes_to_its_tab(string fragment, string where)
+    {
+        RenderIn<PvSystem>(this, at: "/settings#" + fragment);
+
+        Assert.Equal("http://localhost" + where, Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().Uri);
+    }
+
+    [Fact]
+    public void A_bookmark_to_a_section_still_here_stays()
+    {
+        RenderIn<PvSystem>(this, at: "/settings#charger-editor");
+
+        Assert.Equal("http://localhost/settings#charger-editor", Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().Uri);
+    }
+
+    [Fact]
+    public void The_example_call_uses_a_key_the_running_api_accepts()
+    {
+        var editor = new FakeIntegrationsEditor();
+        editor.Keys.Add(new ApiKeyEntry("new", "not-yet-running", SettingSource.SecretStore, IsPending: true));
+        editor.Keys.Add(new ApiKeyEntry("client", "a-real-key", SettingSource.SecretStore, IsPending: false));
+        var page = RenderIn<Integrations>(this, api: Api(), integrations: editor, signedIn: true);
+
+        page.Find("#api-example").QuerySelectorAll("button").First(button => button.TextContent == "Reveal").Click();
+
+        var example = page.Find("#api-example").TextContent;
+        Assert.Contains("a-real-key", example);
+        Assert.DoesNotContain("not-yet-running", example);
     }
 
     [Fact]

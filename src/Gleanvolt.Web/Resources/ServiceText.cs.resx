@@ -520,7 +520,7 @@
     <value>Port brokeru ('{0}') musí být číslo od 1 do 65535.</value>
   </data>
   <data name="Config_MqttNeedsPvId" xml:space="preserve">
-    <value>Home Assistant potřebuje ID instalace (Instalace → ID): je to část témat, pod kterými tento systém publikuje, aby se dvě instalace na jednom brokeru navzájem nepřepisovaly.</value>
+    <value>Home Assistant potřebuje ID instalace (Instalace → Pokročilé → ID): je to část témat, pod kterými tento systém publikuje, aby se dvě instalace na jednom brokeru navzájem nepřepisovaly.</value>
   </data>
   <data name="Config_NotABoolean" xml:space="preserve">
     <value>'{0}' není true ani false.</value>

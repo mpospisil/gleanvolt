@@ -356,7 +356,7 @@ with it and only a shell on the host (`docker compose start gleanvolt-controller
 Overview, no history, no controls until a password exists.
 
 One shared password gates the whole UI (hashed with ASP.NET Core's `PasswordHasher`); there are no
-per-user accounts. The setup page can only set a *first* password. Change it on **Settings → Installation**,
+per-user accounts. The setup page can only set a *first* password. Change it on **Settings → System**,
 which asks for the current one; resetting a forgotten one is [below](#forgot-your-password).
 
 **Optionally**, set it ahead of time, so no setup page is ever shown, by supplying the hash as a secret

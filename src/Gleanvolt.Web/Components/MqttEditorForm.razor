@@ -302,7 +302,7 @@
         }
     }
 
-    private void RemovePassword()
+    private async Task RemovePassword()
     {
         Touch();
         var result = Editor.Save(new Dictionary<string, string>(), string.Empty);
@@ -315,6 +315,7 @@
 
         Reload();
         _message = SettingsText.PasswordRemoved;
+        await OnSaved.InvokeAsync();
     }
 
     private async Task TestAsync()

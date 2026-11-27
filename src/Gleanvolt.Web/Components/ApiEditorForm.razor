@@ -142,15 +142,15 @@
         </div>
     }
 
-    @* A line to paste into a terminal, folded until wanted. The key is the first one listed, masked inside the
-       line while Copy hands over the whole command; signed out it is a placeholder. *@
+    @* A line to paste into a terminal, folded until wanted. The key is the first one the running API accepts (not one
+       waiting for a restart), masked inside the line while Copy hands over the whole command; signed out it is a placeholder. *@
     @if (Api.Enabled)
     {
         <details id="api-example">
             <summary>@SettingsText.CallingIt</summary>
             <p class="muted">@SettingsText.CallingTip</p>
             <p class="code-line">
-                @if (!ReadOnly && _settings.ApiKeys.FirstOrDefault() is { } example)
+                @if (!ReadOnly && _settings.ApiKeys.FirstOrDefault(key => !key.IsPending) is { } example)
                 {
                     <Secret Value="@example.Key" Before="@CurlPrefix" After="@CurlSuffix" />
                 }

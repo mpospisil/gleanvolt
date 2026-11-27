@@ -2,6 +2,7 @@
 @page "/pv-system"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inject NavigationManager Nav
 
 @*
     Settings: the installation (issue #111) -- the PV system, its battery and inverter, and the charger. The
@@ -26,3 +27,28 @@
 <ChargerProviderForm />
 
 <p class="muted car-link">@Localized.Rich(SettingsText.CarLink, @<a href="/car">@SettingsText.CarLink_0</a>)</p>
+
+@code {
+    // The sections that moved to a tab of their own on 2026-11-27, by the anchor an old bookmark or a link in
+    // the manual of an older version carries. The browser never sends the fragment, so this is decided here,
+    // in the circuit, and the page replaces its own address rather than adding one to the history.
+    private static readonly Dictionary<string, string> Moved = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["solcast-editor"] = "/settings/forecast-prices",
+        ["weather-editor"] = "/settings/forecast-prices",
+        ["tariff-editor"] = "/settings/forecast-prices",
+        ["mqtt-editor"] = "/settings/integrations",
+        ["api-editor"] = "/settings/integrations",
+        ["password"] = "/settings/system",
+    };
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender
+            && new Uri(Nav.Uri).Fragment.TrimStart('#') is { Length: > 0 } fragment
+            && Moved.TryGetValue(fragment, out var tab))
+        {
+            Nav.NavigateTo($"{tab}#{fragment}", replace: true);
+        }
+    }
+}

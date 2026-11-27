@@ -694,7 +694,7 @@ back to the car's own charge state with an older Gleanvolt. In the .NET SDK,
 **Read-only.** The kind carries no commands to the car: no start or stop, no target SOC, no wake-up.
 
 **What Gleanvolt does with it.** The reading goes where every feed's goes: the Overview's vehicle card
-("via" the provider's name), *Ask the car*, the Health page, the Home Assistant vehicle entities and
+("via" the provider's name), *Ask the car*, **Settings → System**, the Home Assistant vehicle entities and
 **Car feed**, `GET /api/v1/vehicle`, and the conversion of a percentage target. `vehicleSource` in
 `GET /api/v1/status` says `external` and the provider's name. The reading stays advisory: nothing that
 writes to the charger or the inverter reads it, and `Vehicle:MaxAge` and the stale refusal for

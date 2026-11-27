@@ -281,7 +281,6 @@
     // Huawei's EMMA (#322), the one topology the page has something to say about: it takes one client.
     private const string EmmaTopology = "emma";
 
-    // A field the selected driver has no use for is not shown: the topology, for a driver reached one way.
     // One field: label and (i), its input, and what it says about being pending or edited. Shared by the
     // groups and the Advanced fold.
     private RenderFragment Field(string key) => __builder =>
@@ -373,8 +372,14 @@
         PvSystemSettingKeys.HomeBatteryChargeEfficiency, PvSystemSettingKeys.InverterUnmeteredGridPhase,
     ];
 
-    private bool AdvancedOpen => _problems.Count > 0 || AdvancedKeys.Any(key => _settings[key].IsPending);
+    // Latched: once something in the fold needed attention it stays open for the life of the page, so a Revert
+    // or the next save does not snap it shut under the owner's cursor.
+    private bool _advancedOpened;
 
+    private bool AdvancedOpen =>
+        _advancedOpened |= _problems.Count > 0 || AdvancedKeys.Any(key => _settings[key].IsPending);
+
+    // A field the selected driver has no use for is not shown: the topology, for a driver reached one way.
     private bool Shown(string key) =>
         key != PvSystemSettingKeys.InverterTopology || SelectedDriver is { Topologies.Count: > 0 };
 
