@@ -4,6 +4,40 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-27 — Shutdown work runs on its own deadline; the host's shutdown token is not a budget
+
+**Found.** The host hands every hosted service's `StopAsync` one shared token, cancelled `ShutdownTimeout` (30 s)
+after the stop began. That makes it a deadline for the whole shutdown, not for one step: anything that holds the stop
+up before a step is reached spends it. In a field test a web UI restart held Kestrel's drain for the full 30 s (an
+open WebSocket nothing closed), so the charger pause, the energy interval write and the charging session close were
+each handed a token that had already run out, and none of them ran. The charger pause was linked to that token on
+purpose, on the reasoning that "the host's own deadline still wins if it is the shorter". After a stall that reasoning
+left a charging car under a setpoint nobody was driving any more.
+
+Separately, `IHostApplicationLifetime.StopApplication()` looks like a non-blocking signal but runs every
+ApplicationStopping callback on the calling thread, and SignalR's waits up to 5 s for its connections to close.
+
+**Decided.**
+- **Each shutdown step bounds itself.** A `StopAsync` step that must happen (pause the charger, write the part-finished
+  interval, close the open session) uses a `CancellationTokenSource` of its own, sized to that step, and does not take
+  or link the host's token. The sum of those bounds, not the host's token, is what keeps a stop inside the container's
+  `stop_grace_period` and the unit's `TimeoutStopSec` (60 s). Today: pause 10 s, energy write 5 s, session close 20 s.
+- **Nothing new gets in once stopping.** `UseGleanvoltShutdownGate()` is the first middleware and answers every request
+  503 once ApplicationStopping has fired, so a reconnecting client cannot open a connection Kestrel then waits out. It
+  answers 503, never 401: a provider plugin forgets its pairing on 401.
+- **The stop is requested off the caller's thread.** `HostShutdown` calls `StopApplication()` on the thread pool,
+  because its callers (a Blazor circuit, the MQTT client's callback) are often what the stopping callbacks wait for.
+
+**Consequences accepted.**
+- A new shutdown step has to choose its own bound and keep the total inside 60 s. Adding up the bounds is now a review
+  question, where before the host's token appeared to answer it.
+- After a stall, a step still runs although the host's 30 s are gone. That is the point of the decision, but a slow
+  step now lengthens the stop instead of being skipped.
+- During the drain every page, API call and provider gets a bare 503 with no body. A browser shows Blazor's reconnect
+  prompt or the restart page's "Restarting…" line, as before.
+
+---
+
 ## 2026-11-25 — The charger's address, port and search belong to the plugin, not the SDK (#459, #461)
 
 **Found.** The SDK's `PluginFrame` gave every charger plugin the same address section: one box, with the port only

@@ -45,11 +45,11 @@ public sealed class LifecycleTests : IAsyncDisposable
         Assert.False(plugin.IsAttached);
         Assert.Equal(0, welcomes.Count);
 
-        await StartGleanvoltAsync();
+        await StartGleanvoltAsync(Instance(0));
 
-        await Eventually.True(() => plugin.IsAttached, "the plugin should attach once Gleanvolt answers");
-        Assert.Equal(ExternalProviderState.Connected, Registry.Find(EchoHub.Kind)!.State);
-        Assert.Equal(1, welcomes.Count);
+        await AttachedToAsync(Instance(0), welcomes, "Gleanvolt once it answers");
+        Assert.True(plugin.IsAttached);
+        Assert.Single(welcomes);
 
         await plugin.StopAsync(CancellationToken.None);
     }
@@ -57,22 +57,21 @@ public sealed class LifecycleTests : IAsyncDisposable
     [Fact]
     public async Task APluginAttachesAgainAfterGleanvoltRestarts()
     {
-        await StartGleanvoltAsync();
+        await StartGleanvoltAsync(Instance(0));
         using var plugin = Plugin(out var welcomes);
         await plugin.StartAsync(CancellationToken.None);
-        await Eventually.True(() => plugin.IsAttached, "the plugin should attach");
+        await AttachedToAsync(Instance(0), welcomes, "the first Gleanvolt");
 
         await StopGleanvoltAsync();
         await Eventually.True(() => !plugin.IsAttached, "the plugin should notice that Gleanvolt is gone");
 
         // Down for longer than a few retries, as an image pull or a reboot is.
         await Task.Delay(TimeSpan.FromSeconds(1));
-        await StartGleanvoltAsync();
+        await StartGleanvoltAsync(Instance(1));
 
-        await Eventually.True(() => plugin.IsAttached, "the plugin should attach to the restarted Gleanvolt");
-        Assert.Equal(ExternalProviderState.Connected, Registry.Find(EchoHub.Kind)!.State);
+        await AttachedToAsync(Instance(1), welcomes, "the restarted Gleanvolt");
+        Assert.True(plugin.IsAttached);
         Assert.Equal("echo-life", Registry.Find(EchoHub.Kind)!.ProviderId);
-        Assert.Equal(2, welcomes.Count);
 
         await plugin.StopAsync(CancellationToken.None);
     }
@@ -80,25 +79,46 @@ public sealed class LifecycleTests : IAsyncDisposable
     [Fact]
     public async Task APluginAttachesAgainAfterSeveralRestarts()
     {
-        await StartGleanvoltAsync();
+        await StartGleanvoltAsync(Instance(0));
         using var plugin = Plugin(out var welcomes);
         await plugin.StartAsync(CancellationToken.None);
 
-        // Each instance's own registry is the proof of attachment: the plugin's IsAttached can still be true
-        // from the instance just stopped, and a retry can land on an instance that is shutting down and be
-        // welcomed by it too, so the number of welcomes is a lower bound, not an exact count.
-        await Eventually.True(() => ConnectedToThisGleanvolt(), "the plugin should attach to the first Gleanvolt");
+        // Each instance answers with a version of its own, so a welcome says which instance sent it (see
+        // AttachedToAsync). The registry alone is not enough: it shows the plugin Connected before the
+        // welcome has reached the plugin, and an instance stopped in between never delivers it. Waiting for the instance's own
+        // welcome also tells it apart from one sent by the instance just stopped, which a retry can still
+        // reach while it shuts down.
+        await AttachedToAsync(Instance(0), welcomes, "the first Gleanvolt");
 
         for (var restart = 1; restart <= 3; restart++)
         {
             await StopGleanvoltAsync();
-            await StartGleanvoltAsync();
-            await Eventually.True(() => ConnectedToThisGleanvolt(), $"the plugin should attach again after restart {restart}");
+            await StartGleanvoltAsync(Instance(restart));
+            await AttachedToAsync(Instance(restart), welcomes, $"the Gleanvolt after restart {restart}");
         }
 
-        Assert.True(welcomes.Count >= 4, $"expected a welcome from each of the 4 instances, got {welcomes.Count}");
-
         await plugin.StopAsync(CancellationToken.None);
+    }
+
+    private static string Instance(int number) => $"1.2.3-test.{number}";
+
+    // Both halves of an attachment, each seen from its own side: the instance's registry shows the plugin
+    // Connected, and the plugin has had that instance's welcome. Neither implies the other at the same
+    // instant -- the registry is updated before the welcome is sent, and the plugin reports IsAttached a
+    // moment before it raises Welcomed -- so a test that read one and then counted the other was a race
+    // (it failed on CI with 2 and 3 welcomes of 4).
+    private async Task AttachedToAsync(string instance, List<Welcome> welcomes, string which)
+    {
+        await Eventually.True(() => ConnectedToThisGleanvolt(), $"the plugin should attach to {which}");
+        await Eventually.True(
+            () =>
+            {
+                lock (welcomes)
+                {
+                    return welcomes.Any(welcome => welcome.HostVersion == instance);
+                }
+            },
+            $"the plugin should be welcomed by {which}");
     }
 
     public async ValueTask DisposeAsync() => await StopGleanvoltAsync();
@@ -133,13 +153,13 @@ public sealed class LifecycleTests : IAsyncDisposable
         return plugin;
     }
 
-    private async Task StartGleanvoltAsync()
+    private async Task StartGleanvoltAsync(string version = "1.2.3-test")
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseKestrel().UseUrls($"http://127.0.0.1:{_port}");
         builder.Logging.ClearProviders();
         builder.Services.AddSingleton<ISecretStore>(_secrets);
-        builder.Services.AddSingleton(new ProviderHostInfo("1.2.3-test"));
+        builder.Services.AddSingleton(new ProviderHostInfo(version));
         builder.Services.AddExternalProvider<EchoHub>(new ProviderKind(EchoHub.Kind, "Echo", 1, 0, EchoHub.Path, _ => true));
 
         _gleanvolt = builder.Build();

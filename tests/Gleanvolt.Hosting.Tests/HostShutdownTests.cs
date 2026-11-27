@@ -45,7 +45,7 @@ public class HostShutdownTests
 
         shutdown.RequestStop("Home Assistant");
 
-        Assert.Equal(1, _lifetime.StopCalls);
+        _lifetime.WaitForStopCalls(1);
     }
 
     [Fact]
@@ -57,11 +57,39 @@ public class HostShutdownTests
         shutdown.RequestStop("Home Assistant");
 
         Assert.Equal(0, shutdown.ExitCode);
-        Assert.Equal(2, _lifetime.StopCalls);
+        _lifetime.WaitForStopCalls(2);
     }
 
     // Restart (#204): the same graceful stop, with a code of its own that is non-zero -- so the restart
     // policy brings it back -- and is neither 0 nor the SIGTERM code, so `docker inspect` can tell it apart.
+
+    /// <summary>
+    /// <see cref="IHostApplicationLifetime.StopApplication"/> runs every ApplicationStopping callback on
+    /// the thread that calls it, and SignalR's waits up to 5 s for its connections to close. A restart
+    /// is pressed from a Blazor circuit -- one of those connections -- so called inline it waited on
+    /// itself, and every restart from the web UI sat out the 5 s. The request has to return at once.
+    /// </summary>
+    [Fact]
+    public void A_request_returns_without_waiting_for_the_hosts_stopping_callbacks()
+    {
+        using var release = new ManualResetEventSlim();
+        _lifetime.OnStop = () => release.Wait(TimeSpan.FromSeconds(10));
+        var shutdown = Shutdown();
+
+        var asked = System.Diagnostics.Stopwatch.StartNew();
+        shutdown.RequestRestart("Web UI");
+        asked.Stop();
+
+        try
+        {
+            Assert.True(asked.Elapsed < TimeSpan.FromSeconds(2), $"RequestRestart took {asked.Elapsed}.");
+            _lifetime.WaitForStopCalls(1);
+        }
+        finally
+        {
+            release.Set();
+        }
+    }
 
     [Fact]
     public void A_requested_restart_exits_with_its_own_non_zero_code()
@@ -74,7 +102,7 @@ public class HostShutdownTests
         Assert.Equal(HostShutdown.RestartExitCode, shutdown.ExitCode);
         Assert.NotEqual(0, shutdown.ExitCode);
         Assert.NotEqual(HostShutdown.TerminatedExitCode, shutdown.ExitCode);
-        Assert.Equal(1, _lifetime.StopCalls);
+        _lifetime.WaitForStopCalls(1);
     }
 
     [Fact]
@@ -201,8 +229,12 @@ public class HostShutdownTests
     private sealed class FakeHostApplicationLifetime : IHostApplicationLifetime
     {
         private readonly CancellationTokenSource _stopped = new();
+        private int _stopCalls;
 
-        public int StopCalls { get; private set; }
+        public int StopCalls => Volatile.Read(ref _stopCalls);
+
+        /// <summary>Runs inside StopApplication, the way the host's stopping callbacks do.</summary>
+        public Action? OnStop { get; set; }
 
         public CancellationToken ApplicationStarted => CancellationToken.None;
 
@@ -210,7 +242,20 @@ public class HostShutdownTests
 
         public CancellationToken ApplicationStopped => _stopped.Token;
 
-        public void StopApplication() => StopCalls++;
+        public void StopApplication()
+        {
+            Interlocked.Increment(ref _stopCalls);
+            OnStop?.Invoke();
+        }
+
+        /// <summary>The host is stopped off the caller's thread, so a test waits for it to have been.</summary>
+        public void WaitForStopCalls(int expected)
+        {
+            Assert.True(
+                SpinWait.SpinUntil(() => StopCalls >= expected, TimeSpan.FromSeconds(5)),
+                $"StopApplication was called {StopCalls} time(s), expected {expected}.");
+            Assert.Equal(expected, StopCalls);
+        }
 
         /// <summary>What the host itself does once every hosted service has stopped.</summary>
         public void NotifyStopped() => _stopped.Cancel();

@@ -37,6 +37,9 @@ public sealed class EnergyMonitorWorker : BackgroundService
     // a little of its coverage, which the row then says so on covered_seconds.
     private const int QueueCapacity = 512;
 
+    // One local SQLite row; anything near this long means the disk has gone, not that it is slow.
+    private static readonly TimeSpan ShutdownWriteTimeout = TimeSpan.FromSeconds(5);
+
     private readonly Channel<ChargeControlStatus> _queue = Channel.CreateBounded<ChargeControlStatus>(
         new BoundedChannelOptions(QueueCapacity)
         {
@@ -155,8 +158,11 @@ public sealed class EnergyMonitorWorker : BackgroundService
     /// <summary>
     /// Writes the interval that was still filling, so a planned restart keeps the minutes before it
     /// instead of throwing them away. The store merges this partial row with the one the next run
-    /// contributes for the same window, so the two halves end up as one whole interval. Runs on a
-    /// fresh token, like the charger's own shutdown pause.
+    /// contributes for the same window, so the two halves end up as one whole interval.
+    ///
+    /// <para>Runs on a deadline of its own, like the charger's shutdown pause, rather than on the
+    /// host's token: the host hands every hosted service one shared token, and the web server, which
+    /// stops first, can spend all of it waiting out an open connection before this is reached.</para>
     /// </summary>
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
@@ -164,8 +170,9 @@ public sealed class EnergyMonitorWorker : BackgroundService
         {
             try
             {
+                using var deadline = new CancellationTokenSource(ShutdownWriteTimeout, _timeProvider);
                 var completed = _tracker.Flush(_timeProvider.GetUtcNow());
-                await WriteAsync(completed, cancellationToken).ConfigureAwait(false);
+                await WriteAsync(completed, deadline.Token).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
