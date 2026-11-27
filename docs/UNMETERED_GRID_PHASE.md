@@ -86,7 +86,7 @@ If you cannot check it yourself, leave the field empty and ask the installer.
 ## What to enter
 
 The phase that reads 0 W: `L1`, `L2` or `L3`, or SolaX's `R`, `S` or `T` (R = L1, S = L2, T = L3).
-Save, then restart Gleanvolt from the Health page.
+Save, then restart Gleanvolt from **Settings → System**.
 
 ## What Gleanvolt does with it
 

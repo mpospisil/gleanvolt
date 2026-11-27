@@ -112,13 +112,17 @@ public class PvSystemPageTests : BunitContext
     /// Renders the page into a given context. Static and context-taking because bUnit registers
     /// services once per context, so a test that compares two configurations needs two of them.
     /// </summary>
-    private static IRenderedComponent<PvSystem> RenderIn(
+    private static IRenderedComponent<TPage> RenderIn<TPage>(
         BunitContext context,
         PvSystemInfo? site = null,
         EvInfo? car = null,
         MqttDisplayOptions? mqtt = null,
         ApiDisplayOptions? api = null,
-        IExternalProviders? providers = null)
+        IExternalProviders? providers = null,
+        FakeIntegrationsEditor? integrations = null,
+        bool signedIn = false,
+        string? at = null)
+        where TPage : Microsoft.AspNetCore.Components.IComponent
     {
         context.Services.AddSingleton(site ?? Site());
 
@@ -136,8 +140,8 @@ public class PvSystemPageTests : BunitContext
         // The edit form's dependencies, in the UI's default state: no login, so the form is read-only.
         context.Services.AddSingleton<IPvSystemEditor>(new FakePvSystemEditor());
         context.Services.AddSingleton<IDeviceSnapshot>(new FakeDeviceSnapshot());
-        context.Services.AddSingleton(Options.Create(new WebOptions()));
-        context.Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(null));
+        context.Services.AddSingleton(Options.Create(signedIn ? new WebOptions { PasswordHash = "hash" } : new WebOptions()));
+        context.Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(signedIn ? "hash" : null));
         context.Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());
         context.Services.AddSingleton<ISetupState>(new NoSetupState());
         context.Services.AddSingleton(provider => new Gleanvolt.Web.Auth.WebPasswordService(
@@ -149,7 +153,7 @@ public class PvSystemPageTests : BunitContext
         // The Solcast account's, with none configured.
         context.Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());
         context.Services.AddSingleton(providers ?? new FakeExternalProviders());
-        context.Services.AddSingleton<IIntegrationsEditor>(new FakeIntegrationsEditor());
+        context.Services.AddSingleton<IIntegrationsEditor>(integrations ?? new FakeIntegrationsEditor());
 
         // The tariff form's, with no tariff set up.
         context.Services.AddSingleton<ITariffEditor>(new FakeTariffEditor());
@@ -157,7 +161,12 @@ public class PvSystemPageTests : BunitContext
         context.Services.AddSingleton<TimeProvider>(
             new FixedTimeProvider(new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero), TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")));
 
-        return context.Render<PvSystem>();
+        if (at is not null)
+        {
+            context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(at);
+        }
+
+        return context.Render<TPage>();
     }
 
     private IRenderedComponent<PvSystem> Render(
@@ -165,7 +174,126 @@ public class PvSystemPageTests : BunitContext
         EvInfo? car = null,
         MqttDisplayOptions? mqtt = null,
         ApiDisplayOptions? api = null) =>
-        RenderIn(this, site, car, mqtt, api);
+        RenderIn<PvSystem>(this, site, car, mqtt, api);
+
+    // The MQTT and API sections live on Settings → Integrations since the 2026-11-27 reorganization.
+    private IRenderedComponent<Integrations> RenderIntegrations(
+        MqttDisplayOptions? mqtt = null,
+        ApiDisplayOptions? api = null) =>
+        RenderIn<Integrations>(this, mqtt: mqtt, api: api);
+
+    [Fact]
+    public void The_installation_tab_holds_only_the_installation()
+    {
+        var page = Render();
+
+        // The charger section shows with a charger kind registered: see the test below.
+        Assert.NotEmpty(page.FindAll("#pv-editor"));
+        foreach (var moved in new[] { "#solcast-editor", "#weather-editor", "#tariff-editor", "#mqtt-editor", "#api-editor" })
+        {
+            Assert.Empty(page.FindAll(moved));
+        }
+    }
+
+    [Fact]
+    public void Forecast_and_prices_holds_the_forecast_the_weather_and_the_tariff()
+    {
+        var page = RenderIn<ForecastPrices>(this);
+
+        Assert.NotEmpty(page.FindAll("#solcast-editor"));
+        Assert.NotEmpty(page.FindAll("#weather-editor"));
+        Assert.NotEmpty(page.FindAll("#tariff-editor"));
+        Assert.Empty(page.FindAll("#pv-editor"));
+    }
+
+    [Fact]
+    public void Integrations_has_one_restart_banner_for_both_forms()
+    {
+        var editor = new FakeIntegrationsEditor();
+        editor.Stored[IntegrationSettingKeys.MqttBrokerHost] = "192.168.1.5";
+        editor.Keys.Add(new ApiKeyEntry("claude", "abc", SettingSource.SecretStore, IsPending: true));
+
+        var page = RenderIn<Integrations>(this, integrations: editor);
+
+        Assert.Contains("2", page.Find("#integrations-pending").TextContent);
+        Assert.Empty(page.FindAll("#mqtt-pending"));
+        Assert.Empty(page.FindAll("#api-pending"));
+    }
+
+    [Fact]
+    public void A_change_saved_in_a_form_shows_in_the_banner_at_once()
+    {
+        var editor = new FakeIntegrationsEditor();
+        editor.Keys.Add(new ApiKeyEntry("claude", "abc", SettingSource.SecretStore, IsPending: true));
+        var page = RenderIn<Integrations>(this, integrations: editor, signedIn: true);
+        Assert.Contains("1", page.Find("#integrations-pending").TextContent);
+
+        editor.Stored[IntegrationSettingKeys.MqttBrokerHost] = "192.168.1.5";
+        page.Find("#api-enabled").Change(true);
+
+        Assert.Contains("3", page.Find("#integrations-pending").TextContent);
+    }
+
+    [Fact]
+    public void Removing_the_broker_password_shows_in_the_banner_at_once()
+    {
+        // The fake counts a set password as waiting for a restart, so removing it takes the banner's one
+        // change away -- and the banner has to notice without a reload.
+        var editor = new FakeIntegrationsEditor { Password = "s3cret" };
+        var page = RenderIn<Integrations>(this, integrations: editor, signedIn: true);
+        Assert.Contains("1", page.Find("#integrations-pending").TextContent);
+
+        page.Find("#mqtt-password-remove").Click();
+
+        Assert.Empty(page.FindAll("#integrations-pending"));
+    }
+
+    [Theory]
+    [InlineData("solcast-editor", "/settings/forecast-prices#solcast-editor")]
+    [InlineData("weather-editor", "/settings/forecast-prices#weather-editor")]
+    [InlineData("tariff-editor", "/settings/forecast-prices#tariff-editor")]
+    [InlineData("mqtt-editor", "/settings/integrations#mqtt-editor")]
+    [InlineData("api-editor", "/settings/integrations#api-editor")]
+    [InlineData("password", "/settings/system#password")]
+    public void An_old_bookmark_to_a_moved_section_goes_to_its_tab(string fragment, string where)
+    {
+        RenderIn<PvSystem>(this, at: "/settings#" + fragment);
+
+        Assert.Equal("http://localhost" + where, Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().Uri);
+    }
+
+    [Fact]
+    public void A_bookmark_to_a_section_still_here_stays()
+    {
+        RenderIn<PvSystem>(this, at: "/settings#charger-editor");
+
+        Assert.Equal("http://localhost/settings#charger-editor", Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().Uri);
+    }
+
+    [Fact]
+    public void The_example_call_uses_a_key_the_running_api_accepts()
+    {
+        var editor = new FakeIntegrationsEditor();
+        editor.Keys.Add(new ApiKeyEntry("new", "not-yet-running", SettingSource.SecretStore, IsPending: true));
+        editor.Keys.Add(new ApiKeyEntry("client", "a-real-key", SettingSource.SecretStore, IsPending: false));
+        var page = RenderIn<Integrations>(this, api: Api(), integrations: editor, signedIn: true);
+
+        page.Find("#api-example").QuerySelectorAll("button").First(button => button.TextContent == "Reveal").Click();
+
+        var example = page.Find("#api-example").TextContent;
+        Assert.Contains("a-real-key", example);
+        Assert.DoesNotContain("not-yet-running", example);
+    }
+
+    [Fact]
+    public void Integrations_holds_home_assistant_and_the_api()
+    {
+        var page = RenderIntegrations();
+
+        Assert.NotEmpty(page.FindAll("#mqtt-editor"));
+        Assert.NotEmpty(page.FindAll("#api-editor"));
+        Assert.Empty(page.FindAll("#pv-editor"));
+    }
 
     [Fact]
     public void External_providers_are_a_tab_of_their_own_and_the_charger_has_its_own_section()
@@ -177,7 +305,7 @@ public class PvSystemPageTests : BunitContext
             ProviderId: "shelly-topac", ProviderName: "Shelly TopAC", ProviderVersion: "1.0",
             Since: new DateTimeOffset(2026, 10, 21, 8, 0, 0, TimeSpan.Zero), PageUrl: new Uri("http://localhost:8097/")));
 
-        var page = RenderIn(this, providers: providers);
+        var page = RenderIn<PvSystem>(this, providers: providers);
 
         Assert.Empty(page.FindAll("#external-providers"));
 
@@ -217,13 +345,68 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Says_plainly_when_neither_link_is_configured()
     {
-        // Off is the default for both, so it has to read as a deliberate default rather than a fault --
-        // and the page has to say what turns each one on.
-        var page = Render();
+        // Off is the default for both. Home Assistant's own form says it with its checkbox; car telemetry,
+        // turned on on the Car page, says where.
+        var page = RenderIntegrations();
 
-        Assert.Contains("HomeAssistant__Enabled", page.Find("#ha-mqtt-off").TextContent);
-        Assert.Contains("Vehicle__Enabled", page.Find("#vehicle-mqtt-off").TextContent);
+        Assert.Empty(page.FindAll("#ha-mqtt-off"));
+        Assert.Equal("/car", page.Find("#vehicle-mqtt-off a").GetAttribute("href"));
         Assert.Empty(page.FindAll("table.topics"));
+    }
+
+    [Fact]
+    public void No_tab_tells_the_owner_to_edit_env_for_what_the_forms_do()
+    {
+        var off = RenderIntegrations().Markup;
+
+        using var on = new BunitContext();
+        var noTopic = RenderIn<Integrations>(on, mqtt: Mqtt(vehicle: Link(), vehicleTopic: "")).Markup;
+
+        foreach (var markup in new[] { off, noTopic })
+        {
+            Assert.DoesNotContain("HomeAssistant__Enabled", markup);
+            Assert.DoesNotContain("Vehicle__Enabled", markup);
+            Assert.DoesNotContain("Ev__Vehicles__0__Telemetry__Topic", markup);
+        }
+    }
+
+    [Fact]
+    public void The_broker_is_shown_once()
+    {
+        // The form edits the broker; the running details no longer repeat it.
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
+
+        Assert.DoesNotContain("mosquitto:1883", page.Find("#mqtt-editor").TextContent);
+    }
+
+    [Fact]
+    public void Topics_are_folded_until_asked_for()
+    {
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
+
+        var topics = page.Find("#ha-topics");
+        Assert.Equal("details", topics.TagName, ignoreCase: true);
+        Assert.False(topics.HasAttribute("open"));
+        Assert.NotNull(topics.QuerySelector("table.topics"));
+        Assert.NotNull(topics.Closest("#mqtt-editor"));
+    }
+
+    [Fact]
+    public void The_retiring_notice_stays_visible()
+    {
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link(), retiredDeviceIds: ["old_controller"]));
+
+        Assert.Null(page.Find("#ha-mqtt-retiring").Closest("details"));
+    }
+
+    [Fact]
+    public void Car_telemetry_is_a_section_of_its_own()
+    {
+        var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
+
+        var section = page.Find("#vehicle-telemetry");
+        Assert.Contains("gleanvolt/vehicle/id4/state", section.TextContent);
+        Assert.Contains("gleanvolt-vehicle-raspberrypi", section.TextContent);
     }
 
     [Fact]
@@ -231,7 +414,7 @@ public class PvSystemPageTests : BunitContext
     {
         // The one string nothing else prints: it is composed at startup from BaseTopic and Pv:Id, so it
         // is not guessable from either setting on its own.
-        var page = Render(mqtt: Mqtt(homeAssistant: Link()));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
 
         Assert.Contains("gleanvolt/home-roof", page.Markup);
         Assert.Contains("gleanvolt/home-roof/availability", page.Markup);
@@ -244,7 +427,7 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Marks_the_topics_that_can_change_what_the_charger_is_doing()
     {
-        var page = Render(mqtt: Mqtt(homeAssistant: Link()));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
 
         var rows = page.FindAll("table.topics tbody tr");
         var state = rows.Single(row => row.TextContent.Contains("gleanvolt/home-roof/state"));
@@ -257,11 +440,11 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Lists_the_battery_hold_topics_only_when_the_feature_is_on()
     {
-        Assert.DoesNotContain("battery_hold", Render(mqtt: Mqtt(homeAssistant: Link())).Markup);
+        Assert.DoesNotContain("battery_hold", RenderIntegrations(mqtt: Mqtt(homeAssistant: Link())).Markup);
 
         // A fresh context per render: bUnit registers services once.
         using var withHold = new BunitContext();
-        var withHoldPage = RenderIn(withHold, mqtt: Mqtt(homeAssistant: Link(), batteryHold: true));
+        var withHoldPage = RenderIn<Integrations>(withHold, mqtt: Mqtt(homeAssistant: Link(), batteryHold: true));
 
         Assert.Contains("gleanvolt/home-roof/battery_hold/set", withHoldPage.Markup);
     }
@@ -269,7 +452,7 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Warns_what_changing_the_device_id_costs()
     {
-        var page = Render(mqtt: Mqtt(homeAssistant: Link()));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
 
         Assert.Contains("solax_controller", page.Markup);
         Assert.Contains("every graph starts again", page.Markup);
@@ -280,7 +463,7 @@ public class PvSystemPageTests : BunitContext
     {
         // What the broker's connection log and its ACL file call us -- the string to search for when
         // the broker is the suspect.
-        var page = Render(mqtt: Mqtt(
+        var page = RenderIntegrations(mqtt: Mqtt(
             homeAssistant: Link(),
             vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
 
@@ -291,10 +474,10 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Shows_the_retirement_lists_only_when_an_installation_carries_one()
     {
-        Assert.Empty(Render(mqtt: Mqtt(homeAssistant: Link())).FindAll("#ha-mqtt-retiring"));
+        Assert.Empty(RenderIntegrations(mqtt: Mqtt(homeAssistant: Link())).FindAll("#ha-mqtt-retiring"));
 
         using var retiring = new BunitContext();
-        var retiringPage = RenderIn(retiring, mqtt: Mqtt(homeAssistant: Link(), retiredDeviceIds: ["old_controller"]));
+        var retiringPage = RenderIn<Integrations>(retiring, mqtt: Mqtt(homeAssistant: Link(), retiredDeviceIds: ["old_controller"]));
 
         Assert.Contains("old_controller", retiringPage.Find("#ha-mqtt-retiring").TextContent);
     }
@@ -302,7 +485,7 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Shows_the_topic_the_vehicle_feed_actually_subscribed_to()
     {
-        var page = Render(car: Car(), mqtt: Mqtt(vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
+        var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
 
         Assert.Contains("gleanvolt/vehicle/id4/state", page.Markup);
         Assert.Contains("12 h", page.Markup);
@@ -314,21 +497,20 @@ public class PvSystemPageTests : BunitContext
     {
         // The exact case the worker warns about once and then does nothing -- which from the dashboard
         // is indistinguishable from a car that never reports.
-        var page = Render(mqtt: Mqtt(vehicle: Link(), vehicleTopic: string.Empty));
+        var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(), vehicleTopic: string.Empty));
 
-        Assert.Contains(
-            "Ev__Vehicles__0__Telemetry__Topic", page.Find("#vehicle-mqtt-no-topic").TextContent);
+        Assert.Equal("/car", page.Find("#vehicle-mqtt-no-topic a").GetAttribute("href"));
     }
 
     [Fact]
     public void Says_when_the_two_links_share_one_broker_and_stays_quiet_when_they_do_not()
     {
-        var page = Render(mqtt: Mqtt(homeAssistant: Link(), vehicle: Link()));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link(), vehicle: Link()));
 
         Assert.Contains("mosquitto:1883", page.Find("#mqtt-one-broker").TextContent);
 
         using var separate = new BunitContext();
-        var separatePage = RenderIn(separate, mqtt: Mqtt(homeAssistant: Link(), vehicle: Link(host: "192.168.2.4")));
+        var separatePage = RenderIn<Integrations>(separate, mqtt: Mqtt(homeAssistant: Link(), vehicle: Link(host: "192.168.2.4")));
 
         Assert.Empty(separatePage.FindAll("#mqtt-one-broker"));
         Assert.Contains("192.168.2.4:1883", separatePage.Markup);
@@ -340,7 +522,7 @@ public class PvSystemPageTests : BunitContext
         // The structural half of the guarantee is the host's: with no login enforced it hands over a
         // null. This is the other half -- that a null renders as an explanation rather than as blank,
         // and that nothing secret is in the markup to be revealed by a view-source.
-        var page = Render(mqtt: Mqtt(homeAssistant: Link(password: null), vehicle: Link(password: null)));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link(password: null), vehicle: Link(password: null)));
 
         Assert.DoesNotContain("broker-secret", page.Markup);
         Assert.Contains("Web__PasswordHash", page.Markup);
@@ -350,7 +532,8 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void A_broker_password_renders_masked_until_it_is_asked_for()
     {
-        var page = Render(mqtt: Mqtt(homeAssistant: Link(password: "broker-secret")));
+        // The car telemetry link's: Home Assistant's password is the form's, and the form never shows it.
+        var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(password: "broker-secret")));
 
         // Behind a login is not behind a closed door: a shoulder and a screenshot are a different
         // threat from the network, so it starts hidden.
@@ -366,52 +549,58 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void An_anonymous_broker_does_not_read_as_a_withheld_password()
     {
-        var page = Render(mqtt: Mqtt(
-            homeAssistant: Link(username: string.Empty, password: null, hasPassword: false)));
+        var page = RenderIntegrations(mqtt: Mqtt(
+            vehicle: Link(username: string.Empty, password: null, hasPassword: false)));
 
-        // The MQTT section only: the edit forms around it name Web__PasswordHash for their own reason.
-        var start = page.Markup.IndexOf("<h2>MQTT</h2>", StringComparison.Ordinal);
-        var mqtt = page.Markup[start..page.Markup.IndexOf("id=\"api-editor\"", start, StringComparison.Ordinal)];
-        Assert.DoesNotContain("Web__PasswordHash", mqtt);
-        Assert.Contains("anonymous", mqtt);
+        // The car telemetry section only: the edit forms around it name Web__PasswordHash for their own reason.
+        var telemetry = page.Find("#vehicle-telemetry").InnerHtml;
+        Assert.DoesNotContain("Web__PasswordHash", telemetry);
+        Assert.Contains("anonymous", telemetry);
     }
 
     [Fact]
     public void Does_not_claim_that_a_configured_link_is_a_working_one()
     {
-        // Everything here was read at startup; nothing on this page knows whether the broker answered.
-        var page = Render(mqtt: Mqtt(homeAssistant: Link()));
+        // The folded details were read at startup; the form's Test connection is what checks the broker.
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
 
-        Assert.Contains("whether either connection is", page.Markup);
+        Assert.Contains("As the running controller uses them", page.Find("#ha-topics").TextContent);
     }
 
     // -- The API (#142).
 
-    [Fact]
-    public void Says_plainly_when_the_api_is_off()
+    /// <summary>The form's editor with the given keys, as saved here.</summary>
+    private static FakeIntegrationsEditor WithKeys(params (string Name, string Key)[] keys)
     {
-        // Off is the default, so it must read as a deliberate one -- and say what turns it on, keys
-        // included, since enabled without a key does not start at all.
-        var page = Render();
+        var editor = new FakeIntegrationsEditor();
+        editor.Keys.AddRange(keys.Select(key => new ApiKeyEntry(key.Name, key.Key, SettingSource.SecretStore, IsPending: false)));
+        return editor;
+    }
 
-        var off = page.Find("#api-off").TextContent;
-        Assert.Contains("Api__Enabled=true", off);
-        Assert.Contains("openssl rand -hex 32", off);
+    [Fact]
+    public void With_the_api_off_shows_no_address_and_no_example()
+    {
+        // The form's checkbox says it is off; nothing describes a surface that is not there, and nothing
+        // tells the owner to edit .env for what the checkbox does.
+        var page = RenderIntegrations();
 
-        // And nothing else: no key table and no example call to a surface that is not there.
-        Assert.Empty(page.FindAll("p.code-line"));
+        Assert.Empty(page.FindAll("#api-example"));
+        Assert.Empty(page.FindAll("#api-off"));
         Assert.DoesNotContain("openapi.json", page.Markup);
+        Assert.DoesNotContain("Api__Enabled", page.Markup);
     }
 
     [Fact]
     public void Shows_where_the_api_is_and_links_to_what_answers_without_a_key()
     {
-        var page = Render(api: Api(new ApiKeyDisplay("client", null)));
+        var page = RenderIntegrations(api: Api());
+
+        var form = page.Find("#api-editor");
 
         // Absolute, built from the address the browser used -- bUnit's is http://localhost/.
-        Assert.Contains("http://localhost/api/v1", page.Markup);
+        Assert.Contains("http://localhost/api/v1", form.TextContent);
 
-        var links = page.FindAll("a").Select(link => link.GetAttribute("href")).ToList();
+        var links = form.QuerySelectorAll("a").Select(link => link.GetAttribute("href")).ToList();
         Assert.Contains("http://localhost/api/v1", links);
         Assert.Contains("http://localhost/api/v1/openapi.json", links);
     }
@@ -421,61 +610,59 @@ public class PvSystemPageTests : BunitContext
     {
         // A proxy answering on 80 leaves no port in the URL, and the direct LAN address is still
         // host:8090. bUnit's base URI has no port, which is exactly that case.
-        var page = Render(api: Api(new ApiKeyDisplay("client", null)));
+        var page = RenderIntegrations(api: Api());
 
-        Assert.Contains("host:8090", page.Markup);
+        Assert.Contains("host:8090", page.Find("#api-editor").TextContent);
     }
 
     [Fact]
-    public void Lists_every_key_by_name()
+    public void One_keys_table()
     {
-        // The name is the column that earns its place: it is what the log and the recorded session
-        // attribute an action to.
-        var page = Render(api: Api(
-            new ApiKeyDisplay("claude-mcp", null),
-            new ApiKeyDisplay("dashboard", null)));
+        var page = RenderIn<Integrations>(this, api: Api(), integrations: WithKeys(("claude-mcp", "k1"), ("dashboard", "k2")));
 
-        Assert.Contains("claude-mcp", page.Markup);
-        Assert.Contains("dashboard", page.Markup);
+        var table = Assert.Single(page.FindAll("table"), table => table.QuerySelector("th")?.TextContent == "Name"
+            && table.TextContent.Contains("claude-mcp"));
+        Assert.Contains("dashboard", table.TextContent);
+        Assert.NotNull(table.Closest("#api-editor"));
     }
 
     [Fact]
     public void No_api_key_reaches_an_unauthenticated_page()
     {
-        // The host withholds the secret when no login is enforced. Nothing secret may be in the markup
-        // at all -- not masked, not in an attribute, not in the example call.
-        var page = Render(api: Api(new ApiKeyDisplay("client", null)));
+        // Signed out, nothing secret may be in the markup at all -- not masked, not in an attribute, not
+        // in the example call.
+        var page = RenderIn<Integrations>(this, api: Api(), integrations: WithKeys(("client", "a-real-key")));
 
         Assert.DoesNotContain("a-real-key", page.Markup);
-        Assert.Contains("Web__PasswordHash", page.Find("#api-keys-withheld").TextContent);
-        Assert.Empty(page.FindAll("button"));
+        Assert.Contains("Web__PasswordHash", page.Find("#api-readonly").TextContent);
 
         // The example call still has to be useful, so the key is a placeholder rather than absent.
-        Assert.Contains("Bearer &lt;key&gt;", page.Markup);
+        Assert.Contains("Bearer &lt;key&gt;", page.Find("#api-example").InnerHtml);
     }
 
     [Fact]
     public void An_api_key_renders_masked_until_it_is_asked_for()
     {
-        var page = Render(api: Api(new ApiKeyDisplay("client", "a-real-key")));
+        var page = RenderIn<Integrations>(this, api: Api(), integrations: WithKeys(("client", "a-real-key")), signedIn: true);
 
         Assert.DoesNotContain("a-real-key", page.Markup);
-        Assert.Contains("•", page.Markup);
-        Assert.Empty(page.FindAll("#api-keys-withheld"));
 
-        page.FindAll("button").First(button => button.TextContent == "Reveal").Click();
+        page.Find("#api-keys").QuerySelectorAll("button").First(button => button.TextContent == "Reveal").Click();
 
-        Assert.Contains("a-real-key", page.Markup);
+        Assert.Contains("a-real-key", page.Find("#api-keys").TextContent);
     }
 
     [Fact]
     public void The_example_call_carries_this_installations_own_address()
     {
-        // The task the section exists to serve: a line that can be pasted into a terminal on another
-        // machine and work, rather than one with placeholders to fill in.
-        var page = Render(api: Api(new ApiKeyDisplay("client", "a-real-key")));
+        // A line that can be pasted into a terminal on another machine and work, folded until wanted.
+        var page = RenderIn<Integrations>(this, api: Api(), integrations: WithKeys(("client", "a-real-key")), signedIn: true);
 
-        var call = page.Find("p.code-line").TextContent;
+        var example = page.Find("#api-example");
+        Assert.Equal("details", example.TagName, ignoreCase: true);
+        Assert.False(example.HasAttribute("open"));
+
+        var call = example.QuerySelector("p.code-line")!.TextContent;
         Assert.Contains("curl -H \"Authorization: Bearer", call);
         Assert.Contains("http://localhost/api/v1/status", call);
 
@@ -484,17 +671,34 @@ public class PvSystemPageTests : BunitContext
     }
 
     [Fact]
-    public void Every_string_on_the_settings_page_comes_from_a_resource()
+    public void Every_string_on_the_installation_page_comes_from_a_resource()
     {
-        var page = PseudoLocale.Render(() => Render(
+        var page = PseudoLocale.Render(() => Render());
+
+        PseudoLocale.AssertTranslated(
+            page.Markup,
+            "SolaX Acme", "SolaX Wallco"); // the brands in the inverter and charger drop-downs: names, never translated
+    }
+
+    [Fact]
+    public void Every_string_on_the_forecast_and_prices_page_comes_from_a_resource()
+    {
+        var page = PseudoLocale.Render(() => RenderIn<ForecastPrices>(this));
+
+        PseudoLocale.AssertTranslated(page.Markup);
+    }
+
+    [Fact]
+    public void Every_string_on_the_integrations_page_comes_from_a_resource()
+    {
+        var page = PseudoLocale.Render(() => RenderIntegrations(
             mqtt: Mqtt(homeAssistant: Link(), vehicle: Link(), batteryHold: true, retiredDeviceIds: ["solax_old"]),
-            api: Api(new ApiKeyDisplay("home-assistant", null))));
+            api: Api()));
 
         // Only the configuration's own values: host names, ids, topic paths and the example command.
         PseudoLocale.AssertTranslated(
             page.Markup,
             "mosquitto solax gleanvolt controller home roof homeassistant solax_controller solax_old vehicle id4 state",
-            "curl Authorization Bearer http localhost status api openapi json home assistant availability set",
-            "SolaX Acme", "SolaX Wallco"); // the brands in the inverter and charger drop-downs: names, never translated
+            "curl Authorization Bearer http localhost status api openapi json home assistant availability set");
     }
 }

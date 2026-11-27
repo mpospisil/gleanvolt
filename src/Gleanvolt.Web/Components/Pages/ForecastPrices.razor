@@ -1,0 +1,23 @@
+@page "/settings/forecast-prices"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@*
+    Settings: what Gleanvolt reads from outside the installation to plan with (2026-11-27) -- the solar
+    forecast, the weather and the price of grid energy. All three apply as soon as they are saved: the
+    services that use them read them afresh, so nothing here waits for a restart.
+*@
+
+<SiteTitle Page="@SettingsText.ForecastPricesPageTitle" />
+
+<h1>@SettingsText.SettingsTitle</h1>
+
+<SettingsTabs Current="SettingsTab.ForecastPrices" />
+
+<SetupModeBanner />
+
+<SolcastAccountForm />
+
+<WeatherForm />
+
+<TariffEditorForm />

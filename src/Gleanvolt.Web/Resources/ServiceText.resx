@@ -548,7 +548,7 @@
     <value>The broker port ('{0}') must be a number from 1 to 65535.</value>
   </data>
   <data name="Config_MqttNeedsPvId" xml:space="preserve">
-    <value>Home Assistant needs the installation's id (Installation → Id): it is the topic segment this system publishes under, so two installations on one broker do not overwrite each other.</value>
+    <value>Home Assistant needs the installation's id (Installation → Advanced → Id): it is the topic segment this system publishes under, so two installations on one broker do not overwrite each other.</value>
   </data>
   <data name="Config_NotABoolean" xml:space="preserve">
     <value>'{0}' is not true or false.</value>

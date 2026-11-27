@@ -609,7 +609,7 @@ public class TargetedTabTests : PageTest
         var page = RenderTab();
 
         Assert.True(page.Find("#low-tariff-targeted").HasAttribute("disabled"));
-        Assert.NotNull(page.Find(".low-tariff-option a[href='/settings#tariff-editor']"));
+        Assert.NotNull(page.Find(".low-tariff-option a[href='/settings/forecast-prices#tariff-editor']"));
     }
 
     [Fact]

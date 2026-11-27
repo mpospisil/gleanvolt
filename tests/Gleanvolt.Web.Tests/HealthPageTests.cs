@@ -28,12 +28,40 @@ public class HealthPageTests : PageTest
         Services.AddSingleton<TimeProvider>(_time);
         Services.AddSingleton<IServiceShutdown>(_shutdown);
         Services.AddSingleton<ISecretStore>(_secrets);
+
+        // The password change sits on this tab since 2026-11-27; no password set unless a test says so.
+        Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(null));
     }
 
     [Fact]
     public void External_providers_are_a_tab_of_their_own_not_part_of_health()
     {
         Assert.Empty(Render<Health>().FindAll("#external-providers"));
+    }
+
+    [Fact]
+    public void The_optional_settings_list_is_on_the_installation_tab_not_here()
+    {
+        Services.AddSingleton<ISetupState>(new MissingWeather());
+
+        Assert.Empty(Render<Health>().FindAll("#optional-settings"));
+    }
+
+    private sealed class MissingWeather : ISetupState
+    {
+        public bool SetupMode => false;
+
+        public SetupStatus AtStartup => Current();
+
+        public SetupStatus Current() => new([], [OptionalSetting.Weather]);
+    }
+
+    [Fact]
+    public void The_system_tab_offers_the_password_change()
+    {
+        Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(Gleanvolt.Web.Auth.WebPasswordHasher.Hash("s3cret-enough")));
+
+        Assert.NotEmpty(Render<Health>().FindAll("#password"));
     }
 
     /// <summary>

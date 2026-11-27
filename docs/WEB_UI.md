@@ -114,10 +114,13 @@ set it up.
 | **Energy** (`/energy`) | One recorded day at a time, drawn and printed. |
 | **Forecast** (`/forecast`) | Today's and tomorrow's solar forecast, drawn and printed. |
 | **Car** (`/car`) | The car, its account, and editing them. |
-| **Settings → Installation** (`/settings`) | The PV system and its devices, Solcast, weather, the grid tariff, the Home Assistant (MQTT) link, the API and the password. |
-| **Settings → Health** (`/settings/health`) | The running build, time zone and last poll; **Restart** and **Stop service**. |
+| **Settings → Installation** (`/settings`) | The PV system and its devices (expert fields under **Advanced**), and the charger. |
+| **Settings → External providers** (`/settings/providers`) | The plugins' token, pairing requests and each kind's session. |
+| **Settings → Forecast & prices** (`/settings/forecast-prices`) | Solcast, the weather and the grid tariff. Applies on save. |
+| **Settings → Integrations** (`/settings/integrations`) | The Home Assistant (MQTT) link, the car's MQTT telemetry and the API. Applies after a restart. |
+| **Settings → System** (`/settings/system`) | The running build, time zone and last poll; **Restart**, **Stop service** and the password. |
 
-`/pv-system` and `/health` still open the two Settings tabs. The header and the browser tab carry the
+`/pv-system` still opens Installation, and `/health` and `/settings/health` open System. The header and the browser tab carry the
 installation's name (`Overview — Home Roof`), so two tabs onto two installations can be told apart.
 The sign-in page keeps the product name.
 
@@ -225,8 +228,15 @@ devices — the inverter and each charger with model, address and unit id. See
 **What it shows is what is running.** Every value is read once at startup.
 
 **Edit** changes what the *next* start reads. The PV system form covers the `Pv` section — identity,
-location and orientation, capacity, the inverter and the charger. The Solcast, weather, tariff, MQTT
-and API forms below it work the same way, with their secrets going to the secret store.
+location and orientation, capacity and the inverter. The id, commissioning date, loss factor, battery
+charge efficiency, unmetered grid phase and the register snapshot sit under a folded **Advanced**, which
+opens by itself when one of them waits for a restart or a save was refused; the wizard shows them
+unfolded. The MQTT and API forms on **Settings → Integrations** work the same way, with their secrets
+going to the secret store, and one banner there counts both forms' pending changes.
+
+### Settings → Forecast & prices
+
+Solcast, the weather and the tariff. Each applies at once when saved.
 
 The **Weather** section is where the weather comes from (#424): **Not provided** or **External**. Like
 the solar forecast's source, a choice applies at once and is saved for the next start. With
@@ -326,7 +336,7 @@ not, and opens by itself when a read failed.
 
 Setting up the Data Act portal is in [VW_PORTAL_SETUP.md](VW_PORTAL_SETUP.md).
 
-### Settings → Health: Restart and Stop service
+### Settings → System: Restart, Stop service and the password
 
 **Restart** stops the controller gracefully and exits with code `75`, so Docker's
 `restart: on-failure` or the .deb's systemd unit starts it again — this is how a change saved on **Settings**
@@ -346,7 +356,7 @@ with it and only a shell on the host (`docker compose start gleanvolt-controller
 Overview, no history, no controls until a password exists.
 
 One shared password gates the whole UI (hashed with ASP.NET Core's `PasswordHasher`); there are no
-per-user accounts. The setup page can only set a *first* password. Change it on **Settings → Installation**,
+per-user accounts. The setup page can only set a *first* password. Change it on **Settings → System**,
 which asks for the current one; resetting a forgotten one is [below](#forgot-your-password).
 
 **Optionally**, set it ahead of time, so no setup page is ever shown, by supplying the hash as a secret

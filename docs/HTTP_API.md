@@ -16,8 +16,8 @@ camel-cased names (`fastNoBattery`).
 **It is off by default**, because two of its endpoints write to hardware, and anything that writes is
 switched on knowingly. It shares the web UI's port (8090).
 
-**In the web UI**, on **Settings → Installation → API access**: switch it on, type the client's name, and **Create key** makes a random key and keeps it in the
-secret store. The API can't be switched on without a key. **Restart** on **Settings → Health** applies
+**In the web UI**, on **Settings → Integrations → API access**: switch it on, type the client's name, and **Create key** makes a random key and keeps it in the
+secret store. The API can't be switched on without a key. **Restart** on **Settings → System** applies
 it.
 
 **Optionally, in configuration** — a key saved in the web UI wins over one with the same name here:
@@ -46,7 +46,7 @@ curl http://gleanvolt.local:8090/api/v1/            # no key: what this is, and 
 curl -H "Authorization: Bearer $API_KEY" http://gleanvolt.local:8090/api/v1/status
 ```
 
-**Settings → Installation** shows the API's address and keys, with that second command ready to copy.
+**Settings → Integrations** shows the API's address and keys, with that second command ready to copy.
 **Treat a key like a password**: it can stop the charger.
 
 ## What it exposes

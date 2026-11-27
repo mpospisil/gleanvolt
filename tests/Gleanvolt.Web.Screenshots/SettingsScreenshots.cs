@@ -97,7 +97,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
 
     [Fact]
     public void The_solar_forecast() =>
-        Capture(RenderPage<PvSystem>("/settings"), "settings-solcast", selector: "#solcast-editor");
+        Capture(RenderPage<ForecastPrices>("/settings/forecast-prices"), "settings-solcast", selector: "#solcast-editor");
 
     /// <summary>The External solar forecast (#388): the sample connected, its forecast received a minute ago.</summary>
     [Fact]
@@ -110,7 +110,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
             Since: Now.AddHours(-3), LastDataAt: Now.AddMinutes(-1)));
         _providers.Token = "gvp_8nR3yW6kM1qT9vB4xC7zD2fG5hJ0sL3eP6iU9oA1wE4";
 
-        Capture(RenderPage<PvSystem>("/settings"), "settings-solar-forecast-external", selector: "#solcast-editor");
+        Capture(RenderPage<ForecastPrices>("/settings/forecast-prices"), "settings-solar-forecast-external", selector: "#solcast-editor");
     }
 
     /// <summary>
@@ -125,7 +125,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
         _providers.Set(new ExternalProviderStatus("weather", "Weather", "/providers/weather", HasToken: true, ExternalProviderState.Waiting));
         _providers.Token = "gvp_8nR3yW6kM1qT9vB4xC7zD2fG5hJ0sL3eP6iU9oA1wE4";
 
-        Capture(RenderPage<PvSystem>("/settings"), "settings-weather", selector: "#weather-editor");
+        Capture(RenderPage<ForecastPrices>("/settings/forecast-prices"), "settings-weather", selector: "#weather-editor");
     }
 
     /// <summary>
@@ -142,7 +142,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
             Since: Now.AddHours(-3), LastDataAt: Now.AddMinutes(-4), Healthy: true, PageUrl: new Uri("http://192.168.2.7:8096/")));
         _providers.Token = "gvp_8nR3yW6kM1qT9vB4xC7zD2fG5hJ0sL3eP6iU9oA1wE4";
 
-        Capture(RenderPage<PvSystem>("/settings"), "settings-weather-external", selector: "#weather-editor",
+        Capture(RenderPage<ForecastPrices>("/settings/forecast-prices"), "settings-weather-external", selector: "#weather-editor",
             frames: new Dictionary<string, string> { ["/external/weather/page"] = ProviderPageScreenshot.OpenWeather(Now) });
     }
 
@@ -187,7 +187,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
 
     [Fact]
     public void The_tariff_table() =>
-        Capture(RenderPage<PvSystem>("/settings"), "settings-tariff", selector: "#tariff-editor");
+        Capture(RenderPage<ForecastPrices>("/settings/forecast-prices"), "settings-tariff", selector: "#tariff-editor");
 
     /// <summary>The External tariff (#401): a provider connected, its windows received a minute ago.</summary>
     [Fact]
@@ -200,7 +200,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
             Since: Now.AddHours(-3), LastDataAt: Now.AddMinutes(-1)));
         _providers.Token = "gvp_5mQ2xV9tL4pR8wK1nB7yC3dF6hJ0sA2eG5iU8oZ4qW1";
 
-        Capture(RenderPage<PvSystem>("/settings"), "settings-tariff-external", selector: "#tariff-editor");
+        Capture(RenderPage<ForecastPrices>("/settings/forecast-prices"), "settings-tariff-external", selector: "#tariff-editor");
     }
 
     /// <summary>External providers (#406): the one token, the tariff's provider connected, the forecast's awaited.</summary>
@@ -226,16 +226,34 @@ public sealed class SettingsScreenshots : ScreenshotTest
         _integrations.Stored[IntegrationSettingKeys.ApiEnabled] = "true";
         _integrations.Running[IntegrationSettingKeys.ApiEnabled] = "true";
         _integrations.Keys.Add(new ApiKeyEntry("home-assistant", "k3Q9xV7mT2pL8wR4nB6yC1dF", SettingSource.SecretStore, false));
-        Capture(RenderPage<PvSystem>("/settings"), "settings-api", selector: "#api-editor");
+        // Switched on in the running process too, so the section shows where the API answers.
+        Services.AddSingleton(new ApiDisplayOptions(Enabled: true, "/api/v1", "/api/v1/openapi.json", 8090));
+        Capture(RenderPage<Integrations>("/settings/integrations"), "settings-api", selector: "#api-editor");
+    }
+
+    /// <summary>The Home Assistant link set up, as the Integrations tab opens (2026-11-27).</summary>
+    [Fact]
+    public void The_home_assistant_link()
+    {
+        _integrations.Stored[IntegrationSettingKeys.MqttEnabled] = "true";
+        _integrations.Stored[IntegrationSettingKeys.MqttBrokerHost] = "192.168.1.5";
+        _integrations.Stored[IntegrationSettingKeys.MqttUsername] = "gleanvolt";
+        foreach (var (key, value) in _integrations.Stored)
+        {
+            _integrations.Running[key] = value;
+        }
+
+        _integrations.Password = "set";
+        Capture(RenderPage<Integrations>("/settings/integrations"), "settings-integrations", selector: "#mqtt-editor");
     }
 
     [Fact]
-    public void The_health_tab()
+    public void The_system_tab()
     {
         // A controller that polled a few seconds ago, in mode Off.
         Services.GetRequiredService<ChargeControlStatusHolder>().Set(Statuses.Sample(Now.AddSeconds(-4)));
 
-        Capture(RenderPage<Health>("/settings/health"), "settings-health", selector: Main);
+        Capture(RenderPage<Health>("/settings/system"), "settings-system", selector: Main);
     }
 
     [Fact]

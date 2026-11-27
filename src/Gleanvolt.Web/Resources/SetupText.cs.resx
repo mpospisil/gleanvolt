@@ -52,10 +52,10 @@
     <value>Spustit Gleanvolt</value>
   </data>
   <data name="FinishRunning" xml:space="preserve">
-    <value>Gleanvolt už běží. Uložené změny začnou platit po restartu, který najdete v {0}.</value>
+    <value>Gleanvolt už běží. Uložené změny začnou platit po restartu na kartě {0}.</value>
   </data>
   <data name="FinishRunning_0" xml:space="preserve">
-    <value>Stavu</value>
+    <value>Systém</value>
   </data>
   <data name="ToDashboard" xml:space="preserve">
     <value>Na přehled</value>
@@ -170,5 +170,8 @@
   </data>
   <data name="ChargerByHand" xml:space="preserve">
     <value>Připojit plugin ručně</value>
+  </data>
+  <data name="Recommended" xml:space="preserve">
+    <value>doporučeno</value>
   </data>
 </root>

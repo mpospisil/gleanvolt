@@ -106,7 +106,7 @@ refuses to convert from it; a target in kWh is unaffected. See
 [Setting a target](MODE_TARGETED.md#setting-a-target).
 
 The feed's health is shown on the Overview's vehicle card, as a band across every page when it needs
-you, on **Settings → Health**, and as the [**Car feed**](HOME_ASSISTANT.md#what-each-entity-means)
+you, on **Settings → System**, and as the [**Car feed**](HOME_ASSISTANT.md#what-each-entity-means)
 entity in Home Assistant: `Ok`, `Degraded` (it retries and clears itself) or `NeedsOwner` (it has
 stopped and waits for you).
 
@@ -269,7 +269,7 @@ and the controller reads it. On the **Car** page choose *A feed I publish myself
 
 The **topic** is set on the car, as `Ev:Vehicles:0:Telemetry:Topic`. `Vehicle:Username` and
 `Vehicle:Password`, for an authenticated broker, are secrets: `.env` or an environment variable
-(`Vehicle__Username`), never `appsettings.json`. **Settings → Installation** shows the broker, the user
+(`Vehicle__Username`), never `appsettings.json`. **Settings → Integrations** shows the broker, the user
 and the topic actually subscribed to.
 
 The payload:

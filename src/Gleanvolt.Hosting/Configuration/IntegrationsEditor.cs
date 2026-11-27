@@ -378,7 +378,7 @@ public sealed partial class IntegrationsEditor : IIntegrationsEditor
             if (string.IsNullOrWhiteSpace(Next(PvSystemSettingKeys.Id, stored)?.Value))
             {
                 problems.Add(
-                    "Home Assistant needs the installation's id (Installation → Id): it is the topic segment this "
+                    "Home Assistant needs the installation's id (Installation → Advanced → Id): it is the topic segment this "
                     + "system publishes under, so two installations on one broker do not overwrite each other.",
                     Phrase.Of("Config.MqttNeedsPvId"));
             }

@@ -8,7 +8,7 @@ namespace Gleanvolt.Web.Tests;
 
 /// <summary>
 /// #302's hybrid gate: optional settings never block anything. A page that needs one says it is not
-/// configured and where to set it; Health and Settings list what is still missing.
+/// configured and where to set it; the Installation tab lists what is still missing.
 /// </summary>
 public class OptionalSettingsTests : BunitContext
 {
@@ -29,7 +29,7 @@ public class OptionalSettingsTests : BunitContext
         var card = Render<NotConfiguredCard>(parameters => parameters.Add(c => c.Setting, OptionalSetting.Solcast));
 
         Assert.Contains("Solar forecast: not configured", card.Markup);
-        Assert.Equal("/settings#solcast-editor", card.Find("a").GetAttribute("href"));
+        Assert.Equal("/settings/forecast-prices#solcast-editor", card.Find("a").GetAttribute("href"));
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public class OptionalSettingsTests : BunitContext
     }
 
     [Fact]
-    public void Health_and_settings_list_every_missing_optional_setting()
+    public void Settings_lists_every_missing_optional_setting()
     {
         Services.AddSingleton<ISetupState>(new Setup(false, OptionalSetting.Mqtt, OptionalSetting.Weather));
 
@@ -73,5 +73,27 @@ public class OptionalSettingsTests : BunitContext
         Services.AddSingleton<ISetupState>(new Setup(true, OptionalSetting.Mqtt));
 
         Assert.Empty(Render<OptionalSettingsSection>().Markup.Trim());
+    }
+
+    [Theory]
+    [InlineData(OptionalSetting.Solcast, "/settings/forecast-prices#solcast-editor")]
+    [InlineData(OptionalSetting.Ev, "/car#car-editor")]
+    [InlineData(OptionalSetting.Tariff, "/settings/forecast-prices#tariff-editor")]
+    [InlineData(OptionalSetting.Mqtt, "/settings/integrations#mqtt-editor")]
+    [InlineData(OptionalSetting.Weather, "/settings/forecast-prices#weather-editor")]
+    public void Each_optional_setting_leads_to_the_tab_that_sets_it(OptionalSetting setting, string where)
+    {
+        Assert.Equal(where, OptionalSettings.Where(setting));
+    }
+
+    [Fact]
+    public void The_solar_forecast_is_marked_recommended()
+    {
+        Services.AddSingleton<ISetupState>(new Setup(false, OptionalSetting.Solcast, OptionalSetting.Weather));
+
+        var items = Render<OptionalSettingsSection>().FindAll(".optional-checklist li");
+
+        Assert.Contains(Gleanvolt.Web.Resources.SetupText.Recommended, items[0].TextContent);
+        Assert.DoesNotContain(Gleanvolt.Web.Resources.SetupText.Recommended, items[1].TextContent);
     }
 }

@@ -10,7 +10,7 @@ pick a charge mode, set what that mode needs, and start and stop charging. You d
 broker. It needs Gleanvolt 1.2.0 or later.
 
 :::caution[Use one way to connect, not both]
-Gleanvolt can also connect to Home Assistant over MQTT (**Settings → Home Assistant (MQTT)**). That way
+Gleanvolt can also connect to Home Assistant over MQTT (**Settings → Integrations → Home Assistant (MQTT)**). That way
 suits a home that already runs a broker. If both are on, Gleanvolt shows up in Home Assistant twice. So
 if you set up the integration, leave **Home Assistant (MQTT)** off.
 :::
@@ -19,14 +19,14 @@ if you set up the integration, leave **Home Assistant (MQTT)** off.
 
 <Steps>
 
-1. In Gleanvolt, open **Settings** and find **API access**. (Or the setup wizard's **Extras** step.)
+1. In Gleanvolt, open **Settings → Integrations** and find **API access**.
 
 2. Tick **Turn the API on**.
 
 3. Type `home-assistant` in **New key for**, and press **Create key**. The name is what Gleanvolt's log
    and each charge's history show as the source of anything Home Assistant starts.
 
-4. Press **Restart** on **Settings → Health**.
+4. Press **Restart** on **Settings → System**.
 
 </Steps>
 

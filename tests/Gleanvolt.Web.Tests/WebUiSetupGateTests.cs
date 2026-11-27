@@ -196,6 +196,14 @@ public sealed class WebUiSetupGateTests : IAsyncDisposable
         Assert.Equal(HttpStatusCode.Redirect, settings.StatusCode);
         Assert.Contains("/login", settings.Headers.Location!.ToString());
 
+        // And every tab of it, under the addresses of the 2026-11-27 reorganization.
+        foreach (var tab in new[] { "/settings/forecast-prices", "/settings/integrations", "/settings/system" })
+        {
+            var response = await client.GetAsync(tab);
+            Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+            Assert.Contains("/login", response.Headers.Location!.ToString());
+        }
+
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/login")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/forgot-password")).StatusCode);
     }

@@ -53,6 +53,12 @@ public sealed record IntegrationSettings(
     /// <summary>How many saved changes the running process does not have yet.</summary>
     public int PendingCount(IEnumerable<string> keys) =>
         keys.Count(key => this[key].IsPending);
+
+    /// <summary>How many saved changes of the Home Assistant link, its password and the API wait for a restart.</summary>
+    public int MqttPendingCount => PendingCount(IntegrationSettingKeys.Mqtt) + (MqttPassword.IsPending ? 1 : 0);
+
+    /// <inheritdoc cref="MqttPendingCount"/>
+    public int ApiPendingCount => PendingCount([IntegrationSettingKeys.ApiEnabled]) + ApiKeys.Count(key => key.IsPending);
 }
 
 /// <summary>A secret setting, described without its value.</summary>

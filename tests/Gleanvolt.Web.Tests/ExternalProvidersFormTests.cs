@@ -61,10 +61,10 @@ public class ExternalProvidersFormTests : BunitContext
         Assert.Equal("http://localhost", form.Find("#external-providers-address").TextContent);
         Assert.Contains("/providers/tariff", form.Find("#external-providers-tariff").TextContent);
         Assert.Contains("Make the provider token first", form.Find("#external-providers-tariff").TextContent);
-        Assert.Equal("/settings#tariff-editor", form.Find("#external-providers-tariff a").GetAttribute("href"));
+        Assert.Equal("/settings/forecast-prices#tariff-editor", form.Find("#external-providers-tariff a").GetAttribute("href"));
         Assert.Contains("/providers/solar-forecast", form.Find("#external-providers-solar-forecast").TextContent);
         Assert.Contains("Choose External and save", form.Find("#external-providers-solar-forecast").TextContent);
-        Assert.Equal("/settings#solcast-editor", form.Find("#external-providers-solar-forecast a").GetAttribute("href"));
+        Assert.Equal("/settings/forecast-prices#solcast-editor", form.Find("#external-providers-solar-forecast a").GetAttribute("href"));
     }
 
     [Fact]

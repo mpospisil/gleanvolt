@@ -248,7 +248,7 @@ replayed at an identity provider on a clock is how accounts get locked, and a co
 forever is answered by nobody.
 
 You will not miss it. While it lasts, the web UI carries a band across the top of **every** page with
-the reason and a link to this portal page, the **Health** page shows it as a `Car feed` row, and the
+the reason and a link to this portal page, **Settings → System** shows it as a `Car feed` row, and the
 controller logs it as a **warning** every six hours — a log line, never another request. The
 **Car feed** entity carries the same three states (`Ok`, `Degraded`, `NeedsOwner`) with the sentence as
 a `reason` attribute, which is what a Home Assistant notification keys off.

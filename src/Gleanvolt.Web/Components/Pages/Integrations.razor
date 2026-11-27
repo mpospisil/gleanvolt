@@ -1,0 +1,38 @@
+@page "/settings/integrations"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IIntegrationsEditor Editor
+
+@*
+    Settings: the links to other systems (2026-11-27) -- Home Assistant over MQTT, the car's telemetry
+    over MQTT, and the REST API. Each is read once at startup, so a save here is for the next start.
+*@
+
+<SiteTitle Page="@SettingsText.IntegrationsPageTitle" />
+
+<h1>@SettingsText.SettingsTitle</h1>
+
+<SettingsTabs Current="SettingsTab.Integrations" />
+
+<SetupModeBanner />
+
+<RestartPendingBanner Count="_pending" Id="integrations-pending" />
+
+<MqttEditorForm OnSaved="Recount" />
+
+<VehicleTelemetrySection />
+
+<ApiEditorForm OnSaved="Recount" />
+
+@code {
+    // Saved changes of both forms the running process does not have yet: one banner for the tab.
+    private int _pending;
+
+    protected override void OnInitialized() => Recount();
+
+    private void Recount()
+    {
+        var settings = Editor.Read();
+        _pending = settings.MqttPendingCount + settings.ApiPendingCount;
+    }
+}
