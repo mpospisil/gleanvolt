@@ -127,8 +127,9 @@ provider id and code (but not the same secret, which it never sees). Gleanvolt:
   owner compares code **and** address;
 - when two entries share a provider id, shows both with a warning and accepts neither in one click.
 
-This is no weaker than today: without Gleanvolt's (optional) login, anyone on the LAN can already reveal the token
-in Settings.
+Without Gleanvolt's (optional) login, anyone who can open Gleanvolt can accept a waiting plugin, on Settings and in the
+Wizard. The owner chose this so that an install without a password can pair, although Settings will not show the token
+itself without a login. Setting a password closes it.
 
 Gleanvolt never links to or frames the page URL sent in a knock before it is accepted: a copy could send its own
 page, showing its own code, and the check would confirm itself. The owner reaches a waiting plugin's page by its

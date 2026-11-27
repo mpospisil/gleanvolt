@@ -1,5 +1,6 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Web.Components;
 
@@ -9,11 +10,12 @@ namespace Gleanvolt.Web.Tests;
 public class PairingRequestsListTests : PageTest
 {
     private readonly FakeExternalProviders _providers = new();
+    private readonly FakeTimeProvider _time = new();
 
     public PairingRequestsListTests()
     {
         Services.AddSingleton<IExternalProviders>(_providers);
-        Services.AddSingleton<TimeProvider>(TimeProvider.System);
+        Services.AddSingleton<TimeProvider>(_time);
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
@@ -118,5 +120,43 @@ public class PairingRequestsListTests : PageTest
         _providers.RaiseChanged();
 
         page.WaitForAssertion(() => Assert.NotNull(page.Find("#pairing-r1")));
+    }
+
+    [Fact]
+    public void A_failed_accept_says_so()
+    {
+        _providers.Waiting.Add(Request());
+        _providers.AcceptFails = true;
+        var page = Render<PairingRequestsList>();
+
+        page.Find("#pairing-r1 .pairing-accept").Click();
+
+        Assert.Contains("could not be saved", page.Find(".pairing-message").TextContent);
+        Assert.NotNull(page.Find("#pairing-r1"));
+    }
+
+    [Fact]
+    public void An_accept_that_came_too_late_says_so()
+    {
+        _providers.Waiting.Add(Request());
+        _providers.AcceptResult = false;
+        var page = Render<PairingRequestsList>();
+
+        page.Find("#pairing-r1 .pairing-accept").Click();
+
+        Assert.Contains("no longer waiting", page.Find(".pairing-message").TextContent);
+    }
+
+    [Fact]
+    public void A_request_that_expires_without_a_change_notice_disappears_on_the_next_read()
+    {
+        _providers.Waiting.Add(Request());
+        var page = Render<PairingRequestsList>();
+
+        _providers.Waiting.Clear();
+        Assert.NotNull(page.Find("#pairing-r1"));
+        _time.Advance(TimeSpan.FromSeconds(5));
+
+        page.WaitForAssertion(() => Assert.Empty(page.FindAll("#pairing-r1")));
     }
 }

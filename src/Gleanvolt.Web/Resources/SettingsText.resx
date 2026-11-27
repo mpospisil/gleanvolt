@@ -1179,4 +1179,7 @@
   <data name="PairingBlockAnotherProvider" xml:space="preserve">
     <value>Gleanvolt already uses another charger plugin. Forget it first.</value>
   </data>
+  <data name="PairingGone" xml:space="preserve">
+    <value>That plugin is no longer waiting, or can no longer be accepted.</value>
+  </data>
 </root>

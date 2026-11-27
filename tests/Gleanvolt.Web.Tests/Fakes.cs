@@ -1464,10 +1464,19 @@ internal sealed class FakeExternalProviders : IExternalProviders
 
     public IReadOnlyList<PairingRequestView> Pairing => Waiting.ToList();
 
+    /// <summary>What accepting answers; false is a request that expired or got blocked first.</summary>
+    public bool AcceptResult { get; set; } = true;
+
+    /// <summary>Makes accepting throw, as when the token cannot be saved.</summary>
+    public bool AcceptFails { get; set; }
+
     public Task<bool> AcceptPairingAsync(string id)
     {
         Accepted.Add(id);
-        return Task.FromResult(true);
+
+        return AcceptFails
+            ? throw new InvalidOperationException("The secret store is unavailable (test double).")
+            : Task.FromResult(AcceptResult);
     }
 
     public void RejectPairing(string id)

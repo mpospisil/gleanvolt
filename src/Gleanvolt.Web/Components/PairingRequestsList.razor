@@ -8,6 +8,10 @@
     shared provider token. There is deliberately no link to the plugin's own page: the registry does not
     carry it, and a page a stranger names is not one to open from here.
 
+    Accept is allowed without Gleanvolt's login, here and in the Wizard: the owner chose that over the token
+    panel's read-only rule, so a plugin can be paired on an install without a password. Setting a password
+    closes it.
+
     Changed is not raised when a waiting request expires, so while anything waits the list is also read
     again every few seconds.
 *@
@@ -17,6 +21,11 @@
     <div id="pairing-requests" class="pairing-requests">
         <h3>@SettingsText.PairingTitle</h3>
         <p class="muted">@SettingsText.PairingIntro</p>
+
+        @if (_message is { } message)
+        {
+            <p class="error pairing-message">@message</p>
+        }
 
         @foreach (var request in _requests)
         {
@@ -54,6 +63,7 @@
     private readonly ViewerCulture _viewer = new();
     private IReadOnlyList<PairingRequestView> _requests = [];
     private ITimer? _timer;
+    private string? _message;
     private bool _busy;
 
     protected override void OnInitialized()
@@ -78,14 +88,20 @@
     private async Task AcceptAsync(string id)
     {
         _busy = true;
+        _message = null;
 
         try
         {
-            await Providers.AcceptPairingAsync(id);
+            // False: the request expired or became blocked between the render and the click.
+            if (!await Providers.AcceptPairingAsync(id))
+            {
+                _message = SettingsText.PairingGone;
+            }
         }
         catch (InvalidOperationException)
         {
-            // The token could not be made; the token panel on Settings says why, and the request stays.
+            // The token could not be made; the request stays, so the owner can try again.
+            _message = SettingsText.ExternalTokenFailed;
         }
         finally
         {
@@ -96,6 +112,7 @@
 
     private void Reject(string id)
     {
+        _message = null;
         Providers.RejectPairing(id);
         _requests = Providers.Pairing;
     }

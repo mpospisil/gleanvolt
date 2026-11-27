@@ -1144,4 +1144,7 @@
   <data name="PairingBlockAnotherProvider" xml:space="preserve">
     <value>Gleanvolt už používá jiný plugin nabíječky. Nejdřív ho zapomeňte.</value>
   </data>
+  <data name="PairingGone" xml:space="preserve">
+    <value>Tento plugin už nečeká nebo ho už nelze přijmout.</value>
+  </data>
 </root>
