@@ -154,6 +154,11 @@ gateway against a 172.x address); the code is what counts there.
 - The collect answer carries no endpoint. The plugin saves the endpoint it knocked on and was accepted at, next
   to the token, and uses only that one from then on: no mDNS browse on restart, so the token is never sent to
   whatever else answers as `_gleanvolt._tcp`.
+- A configured `Gleanvolt:Endpoint` wins over the saved one (final review, owner's ruling). The order for the
+  connection is: the configured endpoint, else the saved paired endpoint, else `http://localhost:8090`. It is the
+  owner's own setting, and the only way a paired plugin follows a Gleanvolt whose address changed (a DHCP lease,
+  say); it is no new search, so the reason for using only the accepted endpoint still holds. To unpair, delete
+  `gleanvolt-token` and `gleanvolt-endpoint` from the plugin's data directory, or make a new token in Gleanvolt.
 - The search order (config, localhost, mDNS) is used only for pairing. A plugin with `Gleanvolt:Token` in config
   and no endpoint keeps today's default, `http://localhost:8090`.
 - The page's frame-ancestors policy (`PageFraming`) comes from the endpoint in use, read per request, not fixed at

@@ -32,7 +32,8 @@ presses **Accept** in Gleanvolt, on Settings → External providers or in the se
 the owner never copies the token. The paired token and the address that accepted it are kept in
 `IProviderSecretStore` (register it with `AddGleanvoltProviderSecrets`; without it the pairing lasts until
 the provider restarts). A token in `options.Token` always wins and the provider never knocks; with no
-`Endpoint` it keeps `http://localhost:8090`.
+`Endpoint` it keeps `http://localhost:8090`. A configured `Endpoint` also wins over the paired address, so
+setting it is how a paired provider follows a Gleanvolt that moved.
 
 Two classes carry it, both registered by the `AddGleanvolt*Provider` methods:
 `ProviderCredentials` holds the token and the address in use (`Token`, `Endpoint`, `Source`:

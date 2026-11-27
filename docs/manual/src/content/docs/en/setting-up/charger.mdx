@@ -64,6 +64,12 @@ give it, or to `http://localhost:8090` if you give none. Make the token under **
 providers** with **Make the token**. Making a **new** token disconnects every plugin: a paired plugin
 asks again and you accept it again; one set up by hand needs the new token.
 
+**Gleanvolt moved.** A paired plugin keeps the address it was accepted at and doesn't look for Gleanvolt
+again, so if Gleanvolt gets a new address, tell the plugin: set `Gleanvolt__Endpoint` in its environment, or
+`--Gleanvolt:Endpoint=…`. That address wins over the saved one, and the plugin keeps its token. To unpair a
+plugin, delete `gleanvolt-token` and `gleanvolt-endpoint` from the plugin's data directory, or make a new
+token in Gleanvolt.
+
 ## Moving from the built-in driver
 
 Up to 1.3, Gleanvolt drove SolaX, Huawei and go-e chargers itself. 1.4 removed those built-in drivers:

@@ -241,7 +241,14 @@ Accept is turned off, with the reason shown, for a request that:
 
 **After pairing.** The provider talks only to the address that accepted it, and does not browse mDNS again,
 so the token is never sent to whatever else answers as `_gleanvolt._tcp`. The search order is used only
-for pairing. The page's `frame-ancestors` follows the address in use.
+for pairing. A configured `Gleanvolt:Endpoint` wins over the saved address: the connection uses the
+configured endpoint, else the paired one, else `http://localhost:8090`. The page's `frame-ancestors`
+follows the address in use.
+
+**Gleanvolt moved.** A paired provider does not search again, so when Gleanvolt's address changes (a new
+DHCP lease, say), set `Gleanvolt:Endpoint`; the provider keeps its token. To unpair, delete
+`gleanvolt-token` and `gleanvolt-endpoint` from the plugin's data directory (or make a new token in
+Gleanvolt).
 
 **A new token.** Making a new token closes every session. A provider whose token came from pairing and is
 refused with `401` deletes it and its saved address, and goes back to waiting: the owner accepts each

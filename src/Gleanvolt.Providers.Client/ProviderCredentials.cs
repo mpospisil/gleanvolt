@@ -18,7 +18,8 @@ public enum CredentialSource
 /// <summary>
 /// The token and the address a provider connects to Gleanvolt with, which can arrive while the provider
 /// runs: the owner accepts the pairing and <see cref="Save"/> is called. A configured token always wins over
-/// a paired one, so setting the token by hand keeps meaning what it meant before pairing existed.
+/// a paired one, so setting the token by hand keeps meaning what it meant before pairing existed, and a configured
+/// endpoint wins over the paired address, so setting it follows a Gleanvolt that moved.
 /// </summary>
 public sealed class ProviderCredentials
 {
@@ -63,16 +64,35 @@ public sealed class ProviderCredentials
         }
     }
 
-    /// <summary>Gleanvolt's address: the paired one when paired, else the configured one, else <c>http://localhost:8090</c>.</summary>
+    /// <summary>
+    /// Gleanvolt's address: the configured one, else the paired one when paired, else <c>http://localhost:8090</c>.
+    /// The configured one wins because it is the owner's own setting, and the only way to follow a Gleanvolt that
+    /// moved: a paired provider never searches again, so it would dial the old address for ever. That is no new
+    /// search either, so the token still goes only where the owner pointed it.
+    /// </summary>
     public Uri Endpoint
     {
         get
         {
             lock (_gate)
             {
-                return Source == CredentialSource.Paired && _pairedEndpoint is not null
-                    ? _pairedEndpoint
-                    : _options.Endpoint ?? DefaultEndpoint;
+                return _options.Endpoint ?? PairedEndpointInUse ?? DefaultEndpoint;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether <see cref="Endpoint"/> is the address saved at pairing, not the configured one nor the default. The
+    /// page's frame policy uses it: a paired address is whichever one the search found, often an IP from mDNS, while
+    /// the owner's browser may open Gleanvolt by another name.
+    /// </summary>
+    public bool EndpointIsPaired
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _options.Endpoint is null && PairedEndpointInUse is not null;
             }
         }
     }
@@ -190,6 +210,9 @@ public sealed class ProviderCredentials
             }
         }
     }
+
+    // A configured token wins over a paired one, and then so does its address.
+    private Uri? PairedEndpointInUse => Source == CredentialSource.Paired ? _pairedEndpoint : null;
 
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 

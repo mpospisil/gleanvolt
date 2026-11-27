@@ -17,8 +17,8 @@ public sealed class ProviderCredentialsTests : IDisposable
         }
     }
 
-    private ProviderCredentials Credentials(string token = "", IProviderSecretStore? store = null) =>
-        new(Options.Create(new ProviderOptions { Token = token }), store ?? new ProviderSecretStore(_directory));
+    private ProviderCredentials Credentials(string token = "", IProviderSecretStore? store = null, Uri? endpoint = null) =>
+        new(Options.Create(new ProviderOptions { Token = token, Endpoint = endpoint }), store ?? new ProviderSecretStore(_directory));
 
     [Fact]
     public void AConfiguredTokenWins()
@@ -50,6 +50,51 @@ public sealed class ProviderCredentialsTests : IDisposable
         Assert.Equal(CredentialSource.Paired, restarted.Source);
         Assert.Equal("t", restarted.Token);
         Assert.Equal(Paired, restarted.Endpoint);
+    }
+
+    [Fact]
+    public void AConfiguredEndpointWinsOverThePairedOne()
+    {
+        // Paired over mDNS at an address Gleanvolt has since lost: the owner points the plugin at the new one.
+        var moved = new Uri("http://192.0.2.9:8090/");
+        Assert.True(Credentials().Save(Paired, "t"));
+
+        var restarted = Credentials(endpoint: moved);
+
+        Assert.Equal(CredentialSource.Paired, restarted.Source);
+        Assert.Equal("t", restarted.Token);
+        Assert.Equal(moved, restarted.Endpoint);
+        Assert.False(restarted.EndpointIsPaired);
+    }
+
+    [Fact]
+    public void ThePairedEndpointWinsOverTheDefault()
+    {
+        var credentials = Credentials();
+        Assert.Equal(new Uri("http://localhost:8090"), credentials.Endpoint);
+        Assert.False(credentials.EndpointIsPaired);
+
+        credentials.Save(Paired, "t");
+
+        Assert.Equal(Paired, credentials.Endpoint);
+        Assert.True(credentials.EndpointIsPaired);
+    }
+
+    [Fact]
+    public async Task APairedConnectionDialsTheConfiguredEndpoint()
+    {
+        await using var host = new TestHost();
+        await host.StartAsync();
+        // Saved by an earlier pairing, at an address nothing answers on (TEST-NET-1).
+        new ProviderCredentials(Options.Create(new ProviderOptions()), new ProviderSecretStore(_directory))
+            .Save(new Uri("http://192.0.2.5:8090"), host.Token);
+
+        var (connection, credentials) = Connect(host, token: "");
+        await connection.StartAsync(CancellationToken.None);
+
+        Assert.Equal(CredentialSource.Paired, credentials.Source);
+        await Eventually.True(() => connection.IsAttached, "the paired token is used at the configured endpoint");
+        await connection.StopAsync(CancellationToken.None);
     }
 
     [Fact]
@@ -201,12 +246,21 @@ public sealed class ProviderCredentialsTests : IDisposable
             MaxRetryDelay = TimeSpan.FromMilliseconds(100),
             ConfigureHttp = http =>
             {
-                http.HttpMessageHandlerFactory = _ => host.Server.CreateHandler();
+                // Only the test server's own address reaches it, so a test can tell which endpoint was dialled.
+                http.HttpMessageHandlerFactory = _ => new OnlyAt(host.Server.BaseAddress, host.Server.CreateHandler());
                 http.Transports = HttpTransportType.LongPolling;
             },
         };
         var credentials = new ProviderCredentials(Options.Create(options), new ProviderSecretStore(_directory));
         return (new EchoConnection(options, credentials: credentials), credentials);
+    }
+
+    private sealed class OnlyAt(Uri address, HttpMessageHandler inner) : DelegatingHandler(inner)
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            request.RequestUri?.Authority == address.Authority
+                ? base.SendAsync(request, cancellationToken)
+                : throw new HttpRequestException($"Nothing listens at {request.RequestUri?.Authority}.");
     }
 
     private sealed class RefusingStore : IProviderSecretStore

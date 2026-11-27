@@ -63,6 +63,12 @@ nebo na `http://localhost:8090`, pokud žádnou nedáte. Token vytvoříte v **N
 tlačítkem **Vytvořit token**. **Nový** token odpojí všechny pluginy: spárovaný plugin se zeptá znovu a vy
 ho přijmete znovu, plugin nastavený ručně potřebuje nový token.
 
+**Gleanvolt se přestěhoval.** Spárovaný plugin si pamatuje adresu, na které ho přijali, a Gleanvolt už znovu
+nehledá. Když Gleanvolt dostane novou adresu, řekněte ji pluginu: nastavte `Gleanvolt__Endpoint` v jeho
+prostředí nebo `--Gleanvolt:Endpoint=…`. Ta adresa má přednost před uloženou a plugin si token ponechá.
+Chcete-li plugin odpárovat, smažte z jeho datového adresáře soubory `gleanvolt-token` a `gleanvolt-endpoint`,
+nebo v Gleanvoltu vytvořte nový token.
+
 ## Přechod ze zabudovaného ovladače
 
 Do verze 1.3 řídil Gleanvolt nabíječky SolaX, Huawei a go-e sám. Verze 1.4 tyto zabudované ovladače
