@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using Gleanvolt.Providers.Client;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -194,6 +195,57 @@ public sealed class ProviderPairingTests : IAsyncDisposable
         Assert.Equal([new Uri("http://192.168.1.5:8090"), new Uri("http://localhost:8090")], found);
     }
 
+    [Fact]
+    public async Task AGleanvoltThatAlwaysForgetsIsKnockedOnWithAGrowingBackoff()
+    {
+        // As two copies of one plugin see it: each replaces the other's request, so every collect is Unknown.
+        var gleanvolt = new ForgetfulGleanvolt(_time);
+        var log = new RecordingLogger();
+        _finder.Candidates = [new Uri("http://192.0.2.5:8090")];
+        await StartPluginAsync(http: gleanvolt, logger: log, defaultDelays: true);
+
+        for (var wait = 0; wait < 100 && gleanvolt.Knocks.Count < 8; wait++)
+        {
+            await AdvanceThroughWaitAsync(wait);
+        }
+
+        // Each knock is a 3 s poll that hears Unknown, then the backoff: 2 s doubling up to a minute.
+        var spacings = gleanvolt.Knocks.Zip(gleanvolt.Knocks.Skip(1), (first, next) => (next - first).TotalSeconds).Take(7);
+        Assert.Equal([5.0, 7, 11, 19, 35, 63, 63], spacings);
+        Assert.Single(log.Entries, entry => entry.Level == LogLevel.Information && entry.Message.Contains("no longer knows", StringComparison.Ordinal));
+        Assert.True(log.Entries.Count(entry => entry.Message.Contains("no longer knows", StringComparison.Ordinal)) >= 7);
+        // The first round's waiting and Unknown; every round after it is quiet.
+        Assert.Equal(2, log.Entries.Count(entry => entry.Level >= LogLevel.Information));
+    }
+
+    [Fact]
+    public async Task ARefusedKnockIsSaidOnceAsARefusal()
+    {
+        var log = new RecordingLogger();
+        _finder.Candidates = [new Uri("http://192.0.2.5:8090")];
+        await StartPluginAsync(http: new Answering(HttpStatusCode.BadRequest), logger: log);
+
+        await Until(() => log.Entries.Count(entry => entry.Message.Contains("refused", StringComparison.Ordinal)) >= 3,
+            "the plugin knocked a few times", TimeSpan.FromSeconds(1));
+
+        var warning = Assert.Single(log.Entries, entry => entry.Level == LogLevel.Warning);
+        Assert.Contains("refused the pairing request (400)", warning.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(log.Entries, entry => entry.Message.Contains("Found no Gleanvolt", StringComparison.Ordinal));
+    }
+
+    // Moves the clock to the end of the plugin's wait number index (from 0), once it has started it: a poll or a
+    // backoff, so the plugin runs on the clock alone and never on how fast this machine is.
+    private async Task AdvanceThroughWaitAsync(int index)
+    {
+        for (var i = 0; i < 400 && _time.Started <= index; i++)
+        {
+            await Task.Delay(5);
+        }
+
+        Assert.True(_time.Started > index, "the plugin started a wait");
+        _time.Advance(_time.Due(index) - _time.GetUtcNow());
+    }
+
     private async Task StartGleanvoltAsync()
     {
         await _host.StartAsync();
@@ -201,7 +253,8 @@ public sealed class ProviderPairingTests : IAsyncDisposable
         _finder.Candidates = [_host.Server.BaseAddress];
     }
 
-    private async Task<Plugin> StartPluginAsync(string token = "")
+    private async Task<Plugin> StartPluginAsync(string token = "", HttpMessageHandler? http = null, ILogger<ProviderPairing>? logger = null,
+        bool defaultDelays = false)
     {
         var options = new ProviderOptions
         {
@@ -209,8 +262,8 @@ public sealed class ProviderPairingTests : IAsyncDisposable
             ProviderId = "echo-pairing",
             Name = "Echo pairing",
             Version = "1.0",
-            InitialRetryDelay = TimeSpan.FromMilliseconds(50),
-            MaxRetryDelay = TimeSpan.FromMilliseconds(100),
+            InitialRetryDelay = defaultDelays ? TimeSpan.FromSeconds(2) : TimeSpan.FromMilliseconds(50),
+            MaxRetryDelay = defaultDelays ? TimeSpan.FromMinutes(1) : TimeSpan.FromMilliseconds(100),
             ConfigureHttp = http =>
             {
                 http.HttpMessageHandlerFactory = _ => _host.Server.CreateHandler();
@@ -219,8 +272,8 @@ public sealed class ProviderPairingTests : IAsyncDisposable
         };
         var store = new ProviderSecretStore(_directory);
         var credentials = new ProviderCredentials(Options.Create(options), store);
-        var pairing = new ProviderPairing(options, credentials, _finder, store, new Clients(_http), _time,
-            NullLogger<ProviderPairing>.Instance, EchoHub.Path);
+        var pairing = new ProviderPairing(options, credentials, _finder, store, new Clients(http ?? _http), _time,
+            logger ?? NullLogger<ProviderPairing>.Instance, EchoHub.Path);
         await pairing.StartAsync(CancellationToken.None);
         _running.Add(pairing);
         return new Plugin(pairing, credentials, options);
@@ -277,10 +330,102 @@ public sealed class ProviderPairingTests : IAsyncDisposable
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
     }
 
+    /// <summary>Takes every knock and has forgotten it by the first collect, noting when each knock came.</summary>
+    private sealed class ForgetfulGleanvolt(TimeProvider time) : HttpMessageHandler
+    {
+        private readonly List<DateTimeOffset> _knocks = [];
+
+        public IReadOnlyList<DateTimeOffset> Knocks
+        {
+            get
+            {
+                lock (_knocks)
+                {
+                    return [.. _knocks];
+                }
+            }
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/collect", StringComparison.Ordinal))
+            {
+                return Task.FromResult(Json("""{"state":"unknown"}"""));
+            }
+
+            lock (_knocks)
+            {
+                _knocks.Add(time.GetUtcNow());
+            }
+
+            return Task.FromResult(Json("""{"requestId":"r1"}"""));
+        }
+
+        private static HttpResponseMessage Json(string json) =>
+            new(HttpStatusCode.OK) { Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json") };
+    }
+
+    private sealed class Answering(HttpStatusCode status) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(status));
+    }
+
+    private sealed class RecordingLogger : ILogger<ProviderPairing>
+    {
+        private readonly List<(LogLevel Level, string Message)> _entries = [];
+
+        public IReadOnlyList<(LogLevel Level, string Message)> Entries
+        {
+            get
+            {
+                lock (_entries)
+                {
+                    return [.. _entries];
+                }
+            }
+        }
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            lock (_entries)
+            {
+                _entries.Add((logLevel, formatter(state, exception)));
+            }
+        }
+    }
+
     /// <summary>A fake clock that also says which waits were started on it.</summary>
     private sealed class WatchedTime : FakeTimeProvider
     {
         private readonly List<TimeSpan> _created = [];
+        private readonly List<DateTimeOffset> _due = [];
+
+        /// <summary>How many waits were started.</summary>
+        public int Started
+        {
+            get
+            {
+                lock (_created)
+                {
+                    return _created.Count;
+                }
+            }
+        }
+
+        /// <summary>When the wait number <paramref name="index"/> (from 0) ends.</summary>
+        public DateTimeOffset Due(int index)
+        {
+            lock (_created)
+            {
+                return _due[index];
+            }
+        }
 
         public int Created(TimeSpan dueTime)
         {
@@ -295,6 +440,7 @@ public sealed class ProviderPairingTests : IAsyncDisposable
             lock (_created)
             {
                 _created.Add(dueTime);
+                _due.Add(GetUtcNow() + dueTime);
             }
 
             return base.CreateTimer(callback, state, dueTime, period);

@@ -201,8 +201,10 @@ secret. A wrong secret gets `unknown`, the same as no such request. The answer c
 provider saves the address it knocked on and was accepted at.
 
 A provider collects every 3 seconds while it waits. `accepted` is given once, then the request is gone.
-`unknown` means Gleanvolt restarted (the list is in memory) or the request expired: the provider knocks
-again.
+`unknown` means Gleanvolt restarted (the list is in memory), the request expired, or another copy of the
+same plugin on the same address replaced it: the provider knocks again after the search's backoff (2
+seconds, doubling up to a minute), which only the owner's answer resets, and says so once at Information,
+then at Debug. A knock refused with `400` is logged once at Warning, with the status.
 
 **The waiting list.** Gleanvolt keeps what it was told in memory only: the kind, the id, the name, the
 version, the source address, the code and the time. It holds at most 16 entries (one more drops the

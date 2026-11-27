@@ -133,7 +133,7 @@ public sealed class ProviderPairing : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var delay = _options.InitialRetryDelay;
-        var toldNotFound = false;
+        var told = new Told();
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -149,19 +149,37 @@ public sealed class ProviderPairing : BackgroundService
                 }
 
                 var secret = EnsureSecret();
-                SetStatus(PairingPhase.Searching, null);
+                // Quiet while Gleanvolt keeps forgetting the request: each knock goes back through searching.
+                var level = told.Unknown ? LogLevel.Debug : LogLevel.Information;
+                SetStatus(PairingPhase.Searching, null, level);
 
-                if (await KnockAsync(secret, stoppingToken).ConfigureAwait(false) is not { } ticket)
+                var knock = await KnockAsync(secret, stoppingToken).ConfigureAwait(false);
+                if (knock.Ticket is not { } ticket)
                 {
-                    LogNotFound(ref toldNotFound, lost: null);
+                    if (knock.Refused is { } refused)
+                    {
+                        LogRefused(told, refused);
+                    }
+                    else
+                    {
+                        LogNotFound(told, lost: null);
+                    }
+
                     await WaitAsync(delay, stoppingToken).ConfigureAwait(false);
                     delay = Longer(delay);
                     continue;
                 }
 
-                toldNotFound = false;
-                delay = _options.InitialRetryDelay;
-                SetStatus(PairingPhase.Waiting, ticket.Gleanvolt);
+                // The backoff and what was said are reset only by the owner's answer, not by a knock taken nor by a
+                // poll that is still waiting: two copies of one plugin replace each other's request (same id, same
+                // address), so each knock is taken, each waits a poll or two, and each then hears Unknown. Reset by
+                // either, they would knock in turn every few seconds, filling the log and the source's knock budget.
+                SetStatus(PairingPhase.Waiting, ticket.Gleanvolt, level);
+                void Answered()
+                {
+                    told = new Told();
+                    delay = _options.InitialRetryDelay;
+                }
 
                 var answer = await AwaitAnswerAsync(ticket, secret, stoppingToken).ConfigureAwait(false);
                 switch (answer?.State)
@@ -171,7 +189,7 @@ public sealed class ProviderPairing : BackgroundService
                         // tells which, and a lost Gleanvolt is searched for again after the backoff.
                         if (_credentials.Token is null)
                         {
-                            LogNotFound(ref toldNotFound, ticket.Gleanvolt);
+                            LogNotFound(told, ticket.Gleanvolt);
                             await WaitAsync(delay, stoppingToken).ConfigureAwait(false);
                             delay = Longer(delay);
                         }
@@ -179,18 +197,25 @@ public sealed class ProviderPairing : BackgroundService
                         break;
 
                     case PairingState.Accepted when !string.IsNullOrWhiteSpace(answer.Token):
+                        Answered();
                         Paired(ticket.Gleanvolt, answer.Token);
                         break;
 
                     case PairingState.Rejected:
+                        Answered();
                         SetStatus(PairingPhase.Rejected, ticket.Gleanvolt);
                         await WaitAsync(RejectedDelay, stoppingToken).ConfigureAwait(false);
                         break;
 
                     default:
                         // Unknown: Gleanvolt restarted, or the request expired, and its waiting list is in memory
-                        // only. An Accepted without a token is no answer either. Knock again.
-                        _logger.LogInformation("Gleanvolt at {Gleanvolt} no longer knows the pairing request; asking again.", ticket.Gleanvolt);
+                        // only; or another copy of this plugin replaced the request. An Accepted without a token is no
+                        // answer either. Knock again after the backoff, said once at Information.
+                        _logger.Log(told.Unknown ? LogLevel.Debug : LogLevel.Information,
+                            "Gleanvolt at {Gleanvolt} no longer knows the pairing request; asking again in {Delay}.", ticket.Gleanvolt, delay);
+                        told.Unknown = true;
+                        await WaitAsync(delay, stoppingToken).ConfigureAwait(false);
+                        delay = Longer(delay);
                         break;
                 }
             }
@@ -223,8 +248,9 @@ public sealed class ProviderPairing : BackgroundService
         base.Dispose();
     }
 
-    // The first Gleanvolt that takes the knock, and the request it answered with; null when none did.
-    private async Task<Ticket?> KnockAsync(string secret, CancellationToken stoppingToken)
+    // The first Gleanvolt that takes the knock, and the request it answered with; no ticket when none did, and then
+    // the first Gleanvolt that refused it as wrong (400), if one did.
+    private async Task<KnockResult> KnockAsync(string secret, CancellationToken stoppingToken)
     {
         var knock = new PairingKnock(
             _hubPath,
@@ -233,6 +259,7 @@ public sealed class ProviderPairing : BackgroundService
             _options.Version ?? Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "0",
             _options.PageUrl,
             PairingSecret.Hash(secret));
+        Refusal? refused = null;
 
         await foreach (var candidate in _finder.CandidatesAsync(stoppingToken).ConfigureAwait(false))
         {
@@ -247,12 +274,17 @@ public sealed class ProviderPairing : BackgroundService
                 if (!response.IsSuccessStatusCode)
                 {
                     _logger.LogDebug("Gleanvolt at {Gleanvolt} did not take the pairing request ({Status}).", candidate, (int)response.StatusCode);
+                    if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                    {
+                        refused ??= new Refusal(candidate, (int)response.StatusCode);
+                    }
+
                     continue;
                 }
 
                 if (await response.Content.ReadFromJsonAsync<PairingTicket>(Json, stoppingToken).ConfigureAwait(false) is { RequestId.Length: > 0 } ticket)
                 {
-                    return new Ticket(candidate, ticket.RequestId);
+                    return new KnockResult(new Ticket(candidate, ticket.RequestId), null);
                 }
             }
             catch (Exception ex) when (IsFailure(ex, stoppingToken))
@@ -261,7 +293,7 @@ public sealed class ProviderPairing : BackgroundService
             }
         }
 
-        return null;
+        return new KnockResult(null, refused);
     }
 
     // The owner's answer; null when the token arrived another way, or the Gleanvolt asked could not be reached.
@@ -351,7 +383,7 @@ public sealed class ProviderPairing : BackgroundService
         }
     }
 
-    private void SetStatus(PairingPhase phase, Uri? gleanvolt)
+    private void SetStatus(PairingPhase phase, Uri? gleanvolt, LogLevel level = LogLevel.Information)
     {
         PairingStatus status;
         lock (_gate)
@@ -368,10 +400,10 @@ public sealed class ProviderPairing : BackgroundService
         switch (phase)
         {
             case PairingPhase.Searching:
-                _logger.LogInformation("Not paired with Gleanvolt yet: looking for it to ask. The pairing code is {Code}.", status.Code);
+                _logger.Log(level, "Not paired with Gleanvolt yet: looking for it to ask. The pairing code is {Code}.", status.Code);
                 break;
             case PairingPhase.Waiting:
-                _logger.LogInformation("Asked Gleanvolt at {Gleanvolt} to pair: accept it there, under External providers. The pairing code is {Code}.",
+                _logger.Log(level, "Asked Gleanvolt at {Gleanvolt} to pair: accept it there, under External providers. The pairing code is {Code}.",
                     gleanvolt, status.Code);
                 break;
             case PairingPhase.Rejected:
@@ -395,10 +427,10 @@ public sealed class ProviderPairing : BackgroundService
     }
 
     // Information the first time, Debug after: a plugin installed before Gleanvolt may look for days.
-    private void LogNotFound(ref bool told, Uri? lost)
+    private void LogNotFound(Told told, Uri? lost)
     {
-        var level = told ? LogLevel.Debug : LogLevel.Information;
-        told = true;
+        var level = told.NotFound ? LogLevel.Debug : LogLevel.Information;
+        told.NotFound = true;
         if (lost is null)
         {
             _logger.Log(level, "Found no Gleanvolt to pair with yet; still looking.");
@@ -407,6 +439,16 @@ public sealed class ProviderPairing : BackgroundService
         {
             _logger.Log(level, "Lost Gleanvolt at {Gleanvolt} while waiting for the owner; looking again.", lost);
         }
+    }
+
+    // A Gleanvolt that answers 400 found the knock wrong: it will refuse it every time, which is a plugin and a
+    // Gleanvolt that do not agree, not a Gleanvolt that is missing. A Warning once, then Debug.
+    private void LogRefused(Told told, Refusal refused)
+    {
+        var level = told.Refused ? LogLevel.Debug : LogLevel.Warning;
+        told.Refused = true;
+        _logger.Log(level, "Gleanvolt at {Gleanvolt} refused the pairing request ({Status}); is the plugin for a kind it serves? Still looking.",
+            refused.Gleanvolt, refused.Status);
     }
 
     private Task NextCredentialsChange()
@@ -462,6 +504,20 @@ public sealed class ProviderPairing : BackgroundService
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private sealed record Ticket(Uri Gleanvolt, string RequestId);
+
+    private sealed record Refusal(Uri Gleanvolt, int Status);
+
+    private sealed record KnockResult(Ticket? Ticket, Refusal? Refused);
+
+    // What has been said at Information (or Warning) since the last real answer, so it is not said again.
+    private sealed class Told
+    {
+        public bool NotFound { get; set; }
+
+        public bool Unknown { get; set; }
+
+        public bool Refused { get; set; }
+    }
 }
 
 /// <summary>Registration of pairing, shared by every kind's <c>AddGleanvolt*Provider</c>.</summary>
