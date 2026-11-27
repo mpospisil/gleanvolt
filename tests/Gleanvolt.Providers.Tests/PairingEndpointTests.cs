@@ -108,6 +108,28 @@ public sealed class PairingEndpointTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task TwoAcceptsAtOnceOnAFreshInstallHandOverOneToken()
+    {
+        await _host.StartAsync();
+        _host.Secrets.Delete(SecretNames.ProviderToken);
+        var first = await KnockAsync(Knock("secret-one", providerId: "echo-one"), IPAddress.Parse("192.168.1.20"));
+        var second = await KnockAsync(Knock("secret-two", providerId: "echo-two"), IPAddress.Parse("192.168.1.21"));
+        _host.Secrets.WriteDelay = TimeSpan.FromMilliseconds(200);
+
+        var accepted = await Task.WhenAll(
+            Task.Run(() => _host.Registry.AcceptPairingAsync(first)),
+            Task.Run(() => _host.Registry.AcceptPairingAsync(second)));
+
+        Assert.Equal([true, true], accepted);
+        var one = (await CollectAsync(first, "secret-one")).Token;
+        var two = (await CollectAsync(second, "secret-two")).Token;
+        Assert.NotNull(one);
+        Assert.Equal(one, two);
+        await using var connection = await _host.ConnectAsync(one);
+        Assert.NotNull(await connection.InvokeAsync<Welcome>("Hello", TestHost.Hello()));
+    }
+
+    [Fact]
     public async Task AKnockForAKindThatIsOffIsBlocked()
     {
         _host.Enabled = false;

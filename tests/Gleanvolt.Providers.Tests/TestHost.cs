@@ -103,6 +103,9 @@ internal sealed class MemorySecrets : ISecretStore
 {
     private readonly Dictionary<string, string> _values = [];
 
+    /// <summary>How long a write takes, so two at once overlap.</summary>
+    public TimeSpan WriteDelay { get; set; }
+
     public string? Read(string name)
     {
         lock (_values)
@@ -113,6 +116,11 @@ internal sealed class MemorySecrets : ISecretStore
 
     public bool Write(string name, string value)
     {
+        if (WriteDelay > TimeSpan.Zero)
+        {
+            Thread.Sleep(WriteDelay);
+        }
+
         lock (_values)
         {
             _values[name] = value;

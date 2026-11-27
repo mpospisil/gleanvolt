@@ -20,6 +20,10 @@ public sealed class ExternalProviderRegistry : IExternalProviders
     private readonly List<ProviderSessions> _sessions;
     private readonly Dictionary<Type, ProviderSessions> _byHub;
 
+    // Two Accepts at once on a fresh install (Settings and the Wizard, say) would each find no token and each make
+    // one, and the first plugin would collect a token the second replaced.
+    private readonly SemaphoreSlim _tokenGate = new(1, 1);
+
     internal ExternalProviderRegistry(
         IServiceProvider services,
         ISecretStore secrets,
@@ -122,7 +126,17 @@ public sealed class ExternalProviderRegistry : IExternalProviders
         }
 
         // The first pairing of a fresh install makes the token the plugin is about to collect (#406).
-        var token = Tokens.Read() ?? await CreateTokenAsync().ConfigureAwait(false);
+        string token;
+        await _tokenGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            token = Tokens.Read() ?? await CreateTokenAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _tokenGate.Release();
+        }
+
         return Requests.Accept(id, token);
     }
 
