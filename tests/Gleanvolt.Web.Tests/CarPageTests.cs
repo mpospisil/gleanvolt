@@ -476,7 +476,7 @@ public class CarPageTests : PageTest
     [Theory]
     [InlineData(VehicleFeed.DataAct, "signs in on every read")]
     [InlineData(VehicleFeed.OwnTopic, "you publish the readings yourself")]
-    [InlineData(VehicleFeed.External, "the provider signs in to the car's account itself")]
+    [InlineData(VehicleFeed.External, "the plugin signs in to the car's account itself")]
     [InlineData(VehicleFeed.ChargeOnly, "nothing reads this car")]
     public void A_feed_with_no_session_says_so_in_its_own_terms(VehicleFeed feed, string expected)
     {

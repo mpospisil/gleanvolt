@@ -39,28 +39,51 @@ public class ExternalProviderPanelTests : BunitContext
     }
 
     [Fact]
-    public void WithoutATokenItSendsTheOwnerToTheExternalProvidersSection()
+    public void WithoutATokenItWaitsForAPluginWithoutAWarning()
     {
+        // Accepting a plugin makes the token (#464), so no token is nothing to warn about (#470).
         var panel = RenderPanel();
 
-        Assert.Contains("Make the provider token first", panel.Find("#external-tariff-state").TextContent);
-        var pointer = panel.Find("#external-tariff-token-state");
-        Assert.Contains("warning", pointer.ClassList);
-        Assert.Equal("/settings/providers", pointer.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Equal("Waiting for a plugin to connect.", panel.Find("#external-tariff-state").TextContent.Trim());
+        Assert.Empty(panel.FindAll("#external-tariff-token-state"));
         Assert.Empty(panel.FindAll("#external-tariff-token"));
     }
 
     [Fact]
-    public void WithATokenItSaysWhereItIsAndNeverShowsIt()
+    public void WhileWaitingTheTipSaysWhatAPluginIsAndLinksToStartingOne()
     {
-        _providers.Set(new ExternalProviderStatus("tariff", "Tariff", "/providers/tariff", HasToken: true, ExternalProviderState.Waiting));
+        var panel = RenderPanel();
+
+        var tip = panel.Find("details.info");
+        Assert.Contains("This data comes from a plugin", tip.TextContent);
+        var link = tip.QuerySelector("a.plugin-help-tip-link")!;
+        Assert.Equal("How to start a plugin", link.TextContent);
+        Assert.EndsWith("/en/setting-up/plugins/", link.GetAttribute("href"));
+        Assert.Empty(panel.FindAll(".plugin-help-link"));
+    }
+
+    [Fact]
+    public void AChargerWaitingForItsPluginShowsTheLinkBesideTheState()
+    {
+        _providers.Set(new ExternalProviderStatus("charger", "Charger", "/providers/charger", HasToken: true, ExternalProviderState.Waiting));
+
+        var panel = Render<ExternalProviderPanel>(parameters => parameters.Add(p => p.Kind, "charger"));
+
+        var link = panel.Find("a.plugin-help-link");
+        Assert.Equal("How to add your charger", link.TextContent);
+        Assert.EndsWith("/en/setting-up/charger/", link.GetAttribute("href"));
+    }
+
+    [Fact]
+    public void ConnectedItSaysWhereTheTokenIsAndNeverShowsIt()
+    {
+        _providers.Set(new ExternalProviderStatus("tariff", "Tariff", "/providers/tariff", HasToken: true, ExternalProviderState.Connected,
+            ProviderId: "sample", ProviderName: "Sample", Since: Now));
         _providers.Token = "gvp_kept-in-the-secret-store";
 
         var panel = RenderPanel();
 
-        // With a token there is nothing to warn about: the pointer to it is in the (i).
-        Assert.Empty(panel.FindAll("#external-tariff-token-state"));
-        Assert.Contains("The provider token is under External providers.", panel.Find("details.info").TextContent);
+        Assert.Contains("The token is under Plugins.", panel.Find("details.info").TextContent);
         Assert.DoesNotContain("gvp_kept-in-the-secret-store", panel.Markup);
     }
 
@@ -100,7 +123,7 @@ public class ExternalProviderPanelTests : BunitContext
             StatusMessage: "The login expired. Sign in again on the provider's page.", StatusCode: "needs-sign-in",
             StatusMessages: new Dictionary<string, string> { ["en"] = "The login expired.", ["cs"] = "Přihlášení vypršelo." }));
 
-        Assert.Equal("The provider needs you: sign in on the provider's page. The login expired.",
+        Assert.Equal("The plugin needs you: sign in on the plugin's page. The login expired.",
             RenderPanel().Find("#external-tariff-unhealthy").TextContent.Trim());
 
         var ui = System.Globalization.CultureInfo.CurrentUICulture;
@@ -109,7 +132,7 @@ public class ExternalProviderPanelTests : BunitContext
         try
         {
             var czech = RenderPanel().Find("#external-tariff-unhealthy").TextContent.Trim();
-            Assert.Contains("přihlaste se na stránce poskytovatele. Přihlášení vypršelo.", czech);
+            Assert.Contains("přihlaste se na stránce pluginu. Přihlášení vypršelo.", czech);
             Assert.DoesNotContain("expired", czech);
         }
         finally
@@ -123,6 +146,6 @@ public class ExternalProviderPanelTests : BunitContext
     {
         _providers.Set(new ExternalProviderStatus("tariff", "Tariff", "/providers/tariff", true, ExternalProviderState.Off));
 
-        Assert.Contains("Choose External and save", RenderPanel().Find("#external-tariff-state").TextContent);
+        Assert.Contains("Choose A plugin and save", RenderPanel().Find("#external-tariff-state").TextContent);
     }
 }

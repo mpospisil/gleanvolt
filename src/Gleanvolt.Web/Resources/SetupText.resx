@@ -153,13 +153,13 @@
     <value>Your charger</value>
   </data>
   <data name="ChargerPlugin" xml:space="preserve">
-    <value>Gleanvolt controls the EV charger through a plugin: a small program for your charger's brand, with its own page where you enter the charger's address. Start the plugin: it asks to connect, and you accept it here or later on Settings → External providers. Gleanvolt uses the charger as soon as the plugin connects. Until then, no charging mode can be started.</value>
+    <value>Gleanvolt controls the EV charger through a plugin: a small program for your charger's brand, with its own page where you enter the charger's address. Start the plugin: it asks to connect, and you accept it here or later on Settings → Plugins. Gleanvolt uses the charger as soon as the plugin connects. Until then, no charging mode can be started.</value>
   </data>
   <data name="ChargerToken" xml:space="preserve">
-    <value>The provider token every plugin connects with:</value>
+    <value>The token every plugin connects with:</value>
   </data>
   <data name="ChargerNoToken" xml:space="preserve">
-    <value>Plugins connect with a provider token. There is none yet.</value>
+    <value>Plugins connect with a token. There is none yet.</value>
   </data>
   <data name="ChargerMakeToken" xml:space="preserve">
     <value>Make the token</value>

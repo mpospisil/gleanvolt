@@ -29,7 +29,7 @@
     <value>System</value>
   </data>
   <data name="ExternalProvidersPageTitle" xml:space="preserve">
-    <value>External providers</value>
+    <value>Plugins</value>
   </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Settings</value>
@@ -735,7 +735,7 @@
     <value>the weather</value>
   </data>
   <data name="WeatherTip1" xml:space="preserve">
-    <value>Gleanvolt calls no weather service itself: an external provider sends the weather, and its settings are entered on the provider's own page.</value>
+    <value>Gleanvolt calls no weather service itself: a plugin sends the weather, and its settings are entered on the plugin's own page.</value>
   </data>
   <data name="HomeAssistantLink" xml:space="preserve">
     <value>Home Assistant (MQTT)</value>
@@ -910,11 +910,11 @@
   </data>
   <!-- External data providers (#386, #401) -->
   <data name="TariffProvider_External" xml:space="preserve">
-    <value>External</value>
+    <value>A plugin</value>
     <comment>The tariff provider whose windows another program publishes to Gleanvolt.</comment>
   </data>
   <data name="ExternalProviderIntro" xml:space="preserve">
-    <value>A program outside Gleanvolt, a plugin, supplies this data. It connects with the provider token.</value>
+    <value>A program outside Gleanvolt, a plugin, supplies this data. It gets the token when you accept it.</value>
   </data>
   <data name="ExternalAddress" xml:space="preserve">
     <value>Gleanvolt address</value>
@@ -926,7 +926,7 @@
     <value>Token</value>
   </data>
   <data name="ExternalNoToken" xml:space="preserve">
-    <value>No token yet. Make one and give it to each provider.</value>
+    <value>No token yet. Accepting a plugin makes one; make one here only to give it to a plugin yourself.</value>
   </data>
   <data name="ExternalHasToken" xml:space="preserve">
     <value>A token exists.</value>
@@ -938,7 +938,7 @@
     <value>Make a new token</value>
   </data>
   <data name="ExternalNewTokenDisconnects" xml:space="preserve">
-    <value>A new token disconnects every provider until it is given the new one. Make one if the token has leaked.</value>
+    <value>A new token disconnects every plugin: one you accepted asks again, and one you gave the token needs the new one. Make one if the token has leaked.</value>
   </data>
   <data name="ExternalTokenFailed" xml:space="preserve">
     <value>The token could not be saved. See System for the secret store.</value>
@@ -947,13 +947,13 @@
     <value>Status</value>
   </data>
   <data name="ExternalState_Off" xml:space="preserve">
-    <value>Off. Choose External and save to turn it on.</value>
+    <value>Off. Choose A plugin and save to turn it on.</value>
   </data>
   <data name="ExternalState_NoToken" xml:space="preserve">
-    <value>Waiting. Make the provider token first: without it, no provider can connect.</value>
+    <value>Waiting for a plugin to connect.</value>
   </data>
   <data name="ExternalState_Waiting" xml:space="preserve">
-    <value>Waiting for a provider to connect.</value>
+    <value>Waiting for a plugin to connect.</value>
   </data>
   <data name="ExternalState_Connected" xml:space="preserve">
     <value>{0} {1} connected since {2}.</value>
@@ -971,45 +971,42 @@
     <value>No data received yet.</value>
   </data>
   <data name="ExternalUnanswered" xml:space="preserve">
-    <value>The provider did not answer the last request for fresh data.</value>
+    <value>The plugin did not answer the last request for fresh data.</value>
   </data>
   <data name="ExternalUnhealthy" xml:space="preserve">
-    <value>The provider reports a problem: {0}</value>
+    <value>The plugin reports a problem: {0}</value>
     <comment>{0} what the provider said, in English.</comment>
   </data>
   <data name="ExternalLastProblem" xml:space="preserve">
     <value>Its last data was refused:</value>
   </data>
   <data name="ExternalProviders" xml:space="preserve">
-    <value>External providers</value>
+    <value>Plugins</value>
   </data>
   <data name="ExternalProvidersTopic" xml:space="preserve">
-    <value>external providers</value>
+    <value>plugins</value>
   </data>
   <data name="ExternalProvidersTip1" xml:space="preserve">
-    <value>Programs outside Gleanvolt, plugins, can supply data in place of a built-in source: the tariff and the solar forecast. Each connects to its kind's hub at this address.</value>
+    <value>A plugin is a small program that runs beside Gleanvolt and does one job: it drives the charger, or supplies the car's data, the weather, the tariff or the solar forecast. Each connects to its kind's hub at this address.</value>
   </data>
   <data name="ExternalProvidersTip2" xml:space="preserve">
-    <value>A kind is turned on in its own section, by choosing External and saving.</value>
+    <value>The charger needs no choosing. The other kinds are turned on in their own section, by choosing A plugin and saving.</value>
   </data>
   <data name="ExternalProvidersIntro" xml:space="preserve">
-    <value>Every provider connects with the one token below. Give it to each plugin you run.</value>
+    <value>A plugin gets the token below when you accept it. Give it to a plugin yourself only when you start one with it.</value>
   </data>
   <data name="ExternalKind" xml:space="preserve">
     <value>Data</value>
   </data>
   <data name="ExternalTokenShared" xml:space="preserve">
-    <value>The provider token is under {0}.</value>
-  </data>
-  <data name="ExternalTokenSharedMissing" xml:space="preserve">
-    <value>No provider token yet. Make one under {0}: without it, no provider can connect.</value>
+    <value>The token is under {0}.</value>
   </data>
   <data name="ForecastSource" xml:space="preserve">
     <value>Source</value>
     <comment>Label above the choice of where the solar forecast comes from: Solcast or External.</comment>
   </data>
   <data name="ForecastSource_External" xml:space="preserve">
-    <value>External</value>
+    <value>A plugin</value>
     <comment>The solar forecast source whose forecast another program publishes to Gleanvolt.</comment>
   </data>
   <data name="ForecastSourceUnsaved" xml:space="preserve">
@@ -1021,17 +1018,17 @@
     <comment>{0} the source now in use.</comment>
   </data>
   <data name="ForecastExternalIntro" xml:space="preserve">
-    <value>Forecasted and Targeted plan by the forecast this provider publishes. Solcast is not called while External is selected; its account is kept for when you choose Solcast again. Until the provider sends its first forecast, the last one stays in use.</value>
+    <value>Forecasted and Targeted plan by the forecast this plugin publishes. Solcast is not called while A plugin is selected; its account is kept for when you choose Solcast again. Until the plugin sends its first forecast, the last one stays in use.</value>
   </data>
   <data name="ExternalKindVehicle" xml:space="preserve">
     <value>Car</value>
   </data>
   <data name="ExternalNeedsOwner" xml:space="preserve">
-    <value>The provider needs you: {0}</value>
+    <value>The plugin needs you: {0}</value>
     <comment>{0} what the provider said, in English.</comment>
   </data>
   <data name="ExternalState_OffVehicle" xml:space="preserve">
-    <value>Off. Choose An external provider on the Car page, save and restart to turn it on.</value>
+    <value>Off. Choose A plugin on the Car page, save and restart to turn it on.</value>
   </data>
   <data name="ExternalPage" xml:space="preserve">
     <value>Page</value>
@@ -1048,7 +1045,7 @@
     <comment>The weather source that records no weather.</comment>
   </data>
   <data name="WeatherSource_External" xml:space="preserve">
-    <value>External</value>
+    <value>A plugin</value>
     <comment>The weather source whose readings another program publishes to Gleanvolt.</comment>
   </data>
   <data name="WeatherSourceSaved" xml:space="preserve">
@@ -1056,21 +1053,21 @@
     <comment>{0} the source now in use.</comment>
   </data>
   <data name="WeatherNotProvided" xml:space="preserve">
-    <value>Sessions are recorded without the weather. Choose External to record it from a provider.</value>
+    <value>Sessions are recorded without the weather. Choose A plugin to record it from one.</value>
   </data>
   <data name="WeatherTip2" xml:space="preserve">
-    <value>Gleanvolt asks the provider when a charging session opens and when it closes; a session it doesn't answer is recorded without the weather.</value>
+    <value>Gleanvolt asks the plugin when a charging session opens and when it closes; a session it doesn't answer is recorded without the weather.</value>
     <comment>Second paragraph of the Weather section's tip (#457).</comment>
   </data>
   <data name="WeatherExternalWizard" xml:space="preserve">
-    <value>Connect the provider once setup is finished, on Settings: its address, the token and its own page are there.</value>
+    <value>Start the plugin once setup is finished, and accept it on Settings → Plugins; its own page then appears on Settings.</value>
   </data>
   <data name="WeatherExternalPageIntro" xml:space="preserve">
-    <value>{0} has a page of its own, shown here: enter its settings, such as an API key, there. It comes from the provider itself, not from Gleanvolt.</value>
+    <value>{0} has a page of its own, shown here: enter its settings, such as an API key, there. It comes from the plugin itself, not from Gleanvolt.</value>
     <comment>{0} the provider's name.</comment>
   </data>
   <data name="WeatherBuiltInRetired" xml:space="preserve">
-    <value>The built-in OpenWeather is gone, so External is chosen for you: OpenWeatherMap's weather now comes from the OpenWeather plugin. Run the plugin with the token from External providers, then enter your OpenWeatherMap key on its page, which appears here once it connects. A key saved here before was not kept. Until then, charges are recorded without the weather.</value>
+    <value>The built-in OpenWeather is gone, so A plugin is chosen for you: OpenWeatherMap's weather now comes from the OpenWeather plugin. Start the plugin and accept it on Settings → Plugins, then enter your OpenWeatherMap key on its page, which appears here once it connects. A key saved here before was not kept. Until then, charges are recorded without the weather.</value>
     <comment>Shown once after the upgrade that removed the built-in OpenWeather (#425), until a weather provider connects. OpenWeather and OpenWeatherMap are names.</comment>
   </data>
   <data name="ExternalRemembered" xml:space="preserve">
@@ -1086,11 +1083,11 @@
     <value>{0} was refused at {1}: {2}</value>
   </data>
   <data name="ExternalProviderTopic" xml:space="preserve">
-    <value>the provider</value>
+    <value>the plugin</value>
     <comment>Accessible name of the (i) beside a provider's session line on Settings: "About the provider" (#457).</comment>
   </data>
   <data name="ExternalPageSettingsIntro" xml:space="preserve">
-    <value>{0} has a page of its own, shown here: its settings are entered there. It comes from the provider itself, not from Gleanvolt.</value>
+    <value>{0} has a page of its own, shown here: its settings are entered there. It comes from the plugin itself, not from Gleanvolt.</value>
     <comment>In the tip under a provider's page on Settings (#457). {0} is the provider's name.</comment>
   </data>
   <data name="ChargerTopic" xml:space="preserve">
@@ -1098,14 +1095,14 @@
     <comment>Accessible name of the (i) beside the Charger heading on Settings: "About the charger" (#457).</comment>
   </data>
   <data name="ChargerTip1" xml:space="preserve">
-    <value>Gleanvolt drives the charger through a plugin: a program outside Gleanvolt that connects with the provider token. Which charger it is, and its settings, are on the plugin's own page.</value>
+    <value>Gleanvolt drives the charger through a plugin: a small program for your charger's brand that runs beside Gleanvolt. It connects here once you accept it, and its page, shown below, is where you enter the charger's address.</value>
     <comment>The Charger section's tip on Settings (#457).</comment>
   </data>
   <data name="PairingTitle" xml:space="preserve">
     <value>Plugins asking to connect</value>
   </data>
   <data name="PairingIntro" xml:space="preserve">
-    <value>A plugin waits here until you accept it. Accepting gives it the provider token.</value>
+    <value>A plugin waits here until you accept it. Accepting gives it the token.</value>
   </data>
   <data name="PairingThisMachine" xml:space="preserve">
     <value>This machine</value>
@@ -1126,7 +1123,7 @@
     <value>Two plugins ask with this name. Reject the one you don't know.</value>
   </data>
   <data name="PairingBlockKindOff" xml:space="preserve">
-    <value>This kind of provider is turned off.</value>
+    <value>This kind of plugin is turned off.</value>
   </data>
   <data name="PairingBlockAnotherProvider" xml:space="preserve">
     <value>Gleanvolt already uses another charger plugin. Forget it first.</value>
@@ -1151,5 +1148,17 @@
   </data>
   <data name="GroupAdvanced" xml:space="preserve">
     <value>Advanced</value>
+  </data>
+  <data name="PairingTopic" xml:space="preserve">
+    <value>plugins asking to connect</value>
+  </data>
+  <data name="PairingTip" xml:space="preserve">
+    <value>A plugin you started is asking to be let in. One on this computer needs only Accept. From another computer, accept only when the code and the address match the plugin's own page.</value>
+  </data>
+  <data name="ExternalForgetTopic" xml:space="preserve">
+    <value>Forget</value>
+  </data>
+  <data name="ExternalForgetTip" xml:space="preserve">
+    <value>Gleanvolt uses only the first charger plugin you accepted, so a second one can't take over your charger. Forget lets the next plugin in: stop the old one first.</value>
   </data>
 </root>

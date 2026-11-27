@@ -44,6 +44,8 @@ export default defineConfig({
             { slug: 'setting-up/setup-wizard' },
             { slug: 'setting-up/finding-devices' },
             { slug: 'setting-up/charger' },
+            { slug: 'setting-up/charger-refused' },
+            { slug: 'setting-up/plugins' },
             { slug: 'setting-up/solar-forecast' },
             { slug: 'setting-up/weather' },
             { slug: 'setting-up/grid-tariff' },

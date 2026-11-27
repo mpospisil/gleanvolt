@@ -2790,3 +2790,30 @@ label.check {
 .external-provider-page-link {
     margin: var(--space-2) 0 0;
 }
+
+/*
+    Help when a plugin is missing (#470): the link that says how to fix it, when it is shown, and the (i) that
+    says what the warning means, on one line under the warning.
+*/
+.plugin-help {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    font-size: 15px;
+}
+
+.overview-main > .plugin-help {
+    margin: calc(-1 * var(--space-4)) 0 var(--space-5);
+}
+
+.plugin-warning {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+}
+
+.plugin-warning p {
+    margin: 0;
+}

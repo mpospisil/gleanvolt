@@ -45,7 +45,7 @@ public class ForecastOriginNarrativeTests
     [InlineData(ExternalProviderState.Waiting)]
     public void ADisconnectedProvidersLastForecastIsAWarning(ExternalProviderState state) =>
         Assert.Equal(
-            ("The external forecast provider Solar forecast sample is disconnected. This forecast is its last, received 11:00.", true),
+            ("The forecast plugin Solar forecast sample is disconnected. This forecast is its last, received 11:00.", true),
             ForecastOriginNarrative.Describe(Held("external", "Solar forecast sample", Now.AddHours(-1)), state, Now, Prague));
 
     [Fact]

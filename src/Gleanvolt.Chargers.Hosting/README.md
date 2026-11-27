@@ -98,12 +98,12 @@ Run it, then accept it in Gleanvolt.
 
 ## Gleanvolt:Token
 
-Optional. Start the plugin, then accept it in Gleanvolt: Settings → External providers. Until then the page, open to
+Optional. Start the plugin, then accept it in Gleanvolt: Settings → Plugins. Until then the page, open to
 the whole network, shows only that it waits, the pairing code to compare with the one Gleanvolt shows, and the
 plugin's addresses; it moves on by itself once accepted, with no restart. The token and the address that accepted it
 are kept in the data directory.
 
-To set it by hand instead, run it with `--Gleanvolt:Token=<the token from Gleanvolt's Settings → External providers>`
+To set it by hand instead, run it with `--Gleanvolt:Token=<the token from Gleanvolt's Settings → Plugins>`
 (and `--Gleanvolt:Endpoint=` when Gleanvolt is not at `http://localhost:8090`). A token set this way always wins over
 a paired one. The page says which one it connects with.
 

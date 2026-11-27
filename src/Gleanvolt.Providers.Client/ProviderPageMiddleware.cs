@@ -121,7 +121,7 @@ internal sealed class ProviderPageMiddleware(
         logger.LogInformation("Refused {Path}: no valid ticket from Gleanvolt. Open the page from Gleanvolt.", context.Request.Path);
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         context.Response.ContentType = "text/plain; charset=utf-8";
-        return context.Response.WriteAsync("Open this page from Gleanvolt: the Car page, or Settings → External providers.");
+        return context.Response.WriteAsync("Open this page from Gleanvolt: the Car page, or Settings → Plugins.");
     }
 
     // The default waiting view. The pairing is optional: a host without it only learns that it is waiting.
@@ -133,7 +133,7 @@ internal sealed class ProviderPageMiddleware(
         if (context.RequestServices.GetService<ProviderPairing>()?.Status is { } status)
         {
             text += $"{Environment.NewLine}Phase: {status.Phase}{Environment.NewLine}Code: {status.Code}"
-                + $"{Environment.NewLine}Accept this provider in Gleanvolt, under Settings → External providers, if the code matches.";
+                + $"{Environment.NewLine}Accept this plugin in Gleanvolt, under Settings → Plugins, if the code matches.";
         }
 
         context.Response.ContentType = "text/plain; charset=utf-8";

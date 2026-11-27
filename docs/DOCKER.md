@@ -26,7 +26,7 @@ docker run -d --name gleanvolt-controller --restart on-failure --init \
 
 Then open **`http://gleanvolt.local:8090`** (or `http://<host>:8090`), choose a password and let the
 [setup wizard](WEB_UI.md#the-setup-wizard) find the inverter and set up the site. The charger is a
-plugin, started afterwards with the provider token.
+plugin, started afterwards and accepted on Settings → Plugins.
 Everything it saves goes to `data/`, so it survives a new container. Its **Start Gleanvolt** button
 restarts the container, which `--restart on-failure` brings straight back. `--init` puts a small init
 process in front of the controller, so that a crash ends the container and the restart policy sees it;

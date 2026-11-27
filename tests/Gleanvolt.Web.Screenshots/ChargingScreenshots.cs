@@ -95,6 +95,23 @@ public sealed class ChargingScreenshots : ScreenshotTest
     }
 
     [Fact]
+    public void The_overview_before_the_chargers_plugin_connects()
+    {
+        // #470: the first run, with no charger plugin yet; the headline says so, and the link under it says how.
+        _status.Set(Statuses.Sample(Now) with
+        {
+            BatterySocPercent = 64,
+            SolarPowerWatts = 6_800,
+            SurplusWatts = 4_900,
+            GridPowerWatts = -1_200,
+            Charger = new ChargerAvailability(ChargerAvailabilityState.NoPlugin, "No charger plugin is connected.",
+                Phrase.Of("Charger.NoPlugin"), Now.AddMinutes(-20)),
+        });
+
+        Capture(RenderPage<Dashboard>("/"), "overview-no-charger", selector: Main, width: 760, height: 200);
+    }
+
+    [Fact]
     public void The_solar_tab_before_anything_runs()
     {
         _status.Set(Statuses.Sample(Now) with { BatterySocPercent = 64, SolarPowerWatts = 6_800, SurplusWatts = 4_900, GridPowerWatts = -1_200 });

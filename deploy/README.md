@@ -527,7 +527,7 @@ pinning.
 ## Shipped plugins
 
 Some features come as plugins (#426): their own container, connected to the controller as an
-[external provider](../docs/PROVIDERS.md#shipped-plugins). The OpenWeather plugin is released with Gleanvolt, from the
+[external provider](../docs/PROVIDERS.md#shipped-plugins), shown on **Settings → Plugins**. The OpenWeather plugin is released with Gleanvolt, from the
 same tag; the charger plugins (#444) come from [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers),
 each released on its own (`SOLAX_PLUGIN_TAG` and so on; unset is the newest).
 
@@ -541,18 +541,19 @@ each released on its own (`SOLAX_PLUGIN_TAG` and so on; unset is the newest).
 
 To run one:
 
-1. In the web UI, under **Settings → External providers**, press **Make a token** and copy it.
-2. On the Pi, in `/opt/gleanvolt/.env`:
+1. On the Pi, in `/opt/gleanvolt/.env`:
 
    ```bash
    GLEANVOLT_PLUGINS=openweather
-   GLEANVOLT_PROVIDER_TOKEN=gvp_...
    ```
 
-3. Deploy as usual, with either script. It adds the plugin's compose profile, prepares
+2. Deploy as usual, with either script. It adds the plugin's compose profile, prepares
    `/opt/gleanvolt/plugins/openweather` (uid 1654, mode 700), and pulls and starts the plugin with the
    controller, from the same `IMAGE_TAG`.
-4. Under **Settings → Weather**, choose **External** and save. The plugin's page appears there: enter the
+3. The plugin asks to be paired (#464): accept it in the web UI, under **Settings → Plugins**. The token it
+   is given is kept in its `plugins/` directory. `GLEANVOLT_PROVIDER_TOKEN=gvp_...` in `.env`, the token from
+   that tab, still works instead and wins.
+4. Under **Settings → Weather**, choose **A plugin** and save. The plugin's page appears there: enter the
    OpenWeatherMap key and press **Save and check**. `OPENWEATHER_API_KEY` in `.env`, or the older
    `WEATHER_API_KEY`, is its key until then.
 
@@ -563,14 +564,14 @@ GLEANVOLT_PLUGINS=openweather,solax     # or huawei, goe, shelly; at most one ch
 ```
 
 The deploy runs it with `EV_CHARGER_HOST` as its address. Gleanvolt takes the first charger plugin that connects and
-remembers it; **Settings → External providers** shows it.
+remembers it; **Settings → Plugins** shows it.
 
 **Upgrading from a built-in charger driver (1.3 → 1.4).** Nothing to change: an `.env` with `EV_CHARGER_HOST` and no
 charger plugin in `GLEANVOLT_PLUGINS` gets the plugin that replaced its `PV_CHARGER_DRIVER` (`solax` when unset), and
 the deploy says so. Add it to `GLEANVOLT_PLUGINS` to silence that. `PV_CHARGER_DRIVER`, `PV_CHARGER_MODEL`,
 `PV_CHARGER_ID` and `GLEANVOLT_CHARGER_PLUGIN` are no longer read; delete them.
 
-**Upgrading from the built-in OpenWeather** (#425): the controller moves the weather to **External** by
+**Upgrading from the built-in OpenWeather** (#425): the controller moves the weather to **A plugin** by
 itself and says so under **Settings → Weather**. Turn the plugin on as above, and enter the key on its
 page again: the one saved on Settings before is deleted, not handed over. A key in `WEATHER_API_KEY`
 carries over.
@@ -582,8 +583,8 @@ moves it.
 Take a plugin off `GLEANVOLT_PLUGINS` and the next deploy removes its container. Its directory under
 `plugins/` stays, so putting it back brings it back as it was.
 
-A new token on Settings disconnects every plugin until `.env` has it too and you deploy again. Without
-the token the deploy refuses to start a plugin, which would otherwise stop and restart every few seconds.
+A new token on Settings disconnects every plugin: one that was accepted asks again, and one started with
+`GLEANVOLT_PROVIDER_TOKEN` needs the new one in `.env` and a deploy.
 
 The deploy scripts check what they can. When you run `docker compose` on the Pi yourself, the profile is
 yours to add: `COMPOSE_PROFILES=openweather docker compose up -d`.

@@ -655,14 +655,14 @@
     <comment>{0} what was asked for.</comment>
   </data>
   <data name="ExternalVehicle_Waiting" xml:space="preserve">
-    <value>waiting for the external car provider to connect</value>
+    <value>waiting for the car's plugin to connect</value>
   </data>
   <data name="ExternalVehicle_Disconnected" xml:space="preserve">
-    <value>external car provider disconnected, reading from {0} {1}</value>
+    <value>the car's plugin disconnected, reading from {0} {1}</value>
     <comment>{0} the reading's capture date, {1} its time.</comment>
   </data>
   <data name="ExternalVehicle_DisconnectedNoReading" xml:space="preserve">
-    <value>external car provider disconnected, with no reading yet</value>
+    <value>the car's plugin disconnected, with no reading yet</value>
   </data>
   <data name="ExternalVehicle_ProviderNeedsOwner" xml:space="preserve">
     <value>{0} needs you: {1}</value>
@@ -738,7 +738,7 @@
     <value>Vehicle:External would be on beside a manufacturer's live feed. An installation reads its car from one feed.</value>
   </data>
   <data name="ProviderStatus_NotSetUp" xml:space="preserve">
-    <value>the account isn't entered yet; enter it on the provider's page</value>
+    <value>the account isn't entered yet; enter it on the plugin's page</value>
     <comment>An external provider's status code (#415), after "needs you:" or "cannot read the car:". Lower case, no final full stop.</comment>
   </data>
   <data name="ProviderStatus_NotSetUpCharger" xml:space="preserve">
@@ -746,11 +746,11 @@
     <comment>The not-set-up status of a charger plugin: what it lacks is the charger (its address), not an account.</comment>
   </data>
   <data name="ProviderStatus_NeedsSignIn" xml:space="preserve">
-    <value>sign in on the provider's page</value>
+    <value>sign in on the plugin's page</value>
     <comment>An external provider's status code (#415), after "needs you:" or "cannot read the car:". Lower case, no final full stop.</comment>
   </data>
   <data name="ProviderStatus_NeedsCode" xml:space="preserve">
-    <value>enter the code you were sent, on the provider's page</value>
+    <value>enter the code you were sent, on the plugin's page</value>
     <comment>An external provider's status code (#415), after "needs you:" or "cannot read the car:". Lower case, no final full stop.</comment>
   </data>
   <data name="ProviderStatus_Unreachable" xml:space="preserve">
@@ -864,7 +864,7 @@
     <value>The mode is longer than {0} characters.</value>
   </data>
   <data name="Provider_Remembered" xml:space="preserve">
-    <value>Gleanvolt remembers the plugin {0} and lets in no other until you press Forget on Settings → External providers.</value>
+    <value>Gleanvolt remembers the plugin {0} and lets in no other until you press Forget on Settings → Plugins.</value>
   </data>
   <data name="Provider_AnotherConnected" xml:space="preserve">
     <value>Another plugin, {0} ({1}), is connected. Only one is active at a time.</value>
@@ -888,6 +888,6 @@
     <value>No mode can start while Gleanvolt can't control the charger: {0}</value>
   </data>
   <data name="Config_SetupChargerKey" xml:space="preserve">
-    <value>{0}: the charger isn't part of setup any more. A charger is a plugin, set up on its own page, that connects with the provider token from Settings → External providers. Take the charger's keys out of the setup file.</value>
+    <value>{0}: the charger isn't part of setup any more. A charger is a plugin, set up on its own page, that you accept on Settings → Plugins. Take the charger's keys out of the setup file.</value>
   </data>
 </root>

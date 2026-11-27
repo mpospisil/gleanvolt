@@ -138,7 +138,7 @@ password to.
 
 ## The token
 
-Every provider connects with one token, made on Settings under **External providers** with **Make a
+Every provider connects with one token, made on Settings under **Plugins** with **Make a
 token**. Gleanvolt keeps it in the secret store, like the API keys, and Settings shows it masked, with
 **Reveal** and **Copy**, to a signed-in owner. Without a web login it is never shown. A new token
 disconnects every provider until each is given the new one, or, for a provider that was paired,
@@ -212,7 +212,7 @@ oldest), an entry expires after 15 minutes in which the provider neither knocked
 source address may knock 10 times a minute. A knock from the same provider id and the same address
 replaces the earlier one, since a container started without its data volume has a new secret each time.
 
-**Accepting.** Settings → External providers lists each waiting plugin with its name, id, address (or
+**Accepting.** Settings → Plugins lists each waiting plugin with its name, id, address (or
 *This machine*), code, **Accept** and **Reject**. The setup Wizard's **Finish** step lists the same
 requests under the charger. Accept hands the provider the shared token: if there is none yet, Accept
 makes it, and a token in use is reused, so an owner whose plugins all pair never meets the token step.
@@ -300,7 +300,7 @@ was turned off (`disabled`), a newer connection of the same provider replaced th
 or the owner made a new token (`token-replaced`), which closes every kind's session. For the charger,
 the owner pressed **Forget** (`forgotten`).
 
-**Settings → External providers** shows the last refused hello of each kind since the start, with its
+**Settings → Plugins** shows the last refused hello of each kind since the start, with its
 reason, until one is accepted. It is also in the API's `GET /api/providers` as `lastRefusal`.
 
 **Requests.** Gleanvolt never waits for a provider inside a call. When it wants fresh data, it sends a
@@ -370,7 +370,7 @@ frame (below). The status and the API still show the `pageUrl` as sent. A loopba
 provider on another machine is left alone: it means that machine's browser.
 
 **Where the owner sees it.** For a car provider, the Car page shows the page in a frame under
-*External provider*, with an **Open in a new tab** link beside it. **Settings → External providers**
+*External provider*, with an **Open in a new tab** link beside it. **Settings → Plugins**
 links to the page of each kind's provider that has one. Both show only while the provider is
 connected.
 
@@ -829,7 +829,7 @@ the same check.
 overrides file as `ExternalCharger:PluginId`. From then on any other plugin id is refused with
 `another-provider`, whether the remembered one is connected or not: a second plugin started by mistake,
 a sample, must not write to the charger. The same id reconnecting is accepted as always. To change
-plugins, stop the old one and press **Forget** beside it on **Settings → External providers**. That
+plugins, stop the old one and press **Forget** beside it on **Settings → Plugins**. That
 closes its session if it is still connected, and the next plugin to say hello is remembered. A refused
 plugin tries again 5 minutes later with the SDK's defaults. Setting `ExternalCharger__PluginId` in the
 environment pins a plugin; Forget then lasts only until the next start.
@@ -899,7 +899,7 @@ back, when the mode resumes by itself. So report `healthy: false` only for somet
 being controlled, and `healthy: true` again as soon as it is fixed. See
 [When the charger is unavailable](CHARGE_CONTROL.md#when-the-charger-is-unavailable).
 
-**What Gleanvolt does with it.** Everything: the Overview, the charging modes, sessions, Home Assistant. **Settings → External providers** shows the session, the remembered
+**What Gleanvolt does with it.** Everything: the Overview, the charging modes, sessions, Home Assistant. **Settings → Plugins** shows the session, the remembered
 plugin with **Forget**, the last refusal, and links to the plugin's page. There is no register snapshot.
 
 ## The protocol, for a client in another language

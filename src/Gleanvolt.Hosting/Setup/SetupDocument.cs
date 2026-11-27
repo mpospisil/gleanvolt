@@ -145,7 +145,7 @@ public sealed class SetupDocument
                 {
                     notAllowed.Add(
                         $"{key}: the charger isn't part of setup any more. A charger is a plugin, set up on its own page, "
-                        + "that connects with the provider token from Settings → External providers. Take the charger's "
+                        + "that you accept on Settings → Plugins. Take the charger's "
                         + "keys out of the setup file.",
                         Phrase.Of("Config.SetupChargerKey", new PhraseArg.Text(key)));
                     continue;

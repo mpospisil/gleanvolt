@@ -85,7 +85,7 @@ public class PairingRequestsListTests : PageTest
 
     [Theory]
     [InlineData(PairingBlock.Duplicate, "Two plugins ask with this name")]
-    [InlineData(PairingBlock.KindOff, "This kind of provider is turned off.")]
+    [InlineData(PairingBlock.KindOff, "This kind of plugin is turned off.")]
     [InlineData(PairingBlock.AnotherProvider, "already uses another charger plugin")]
     public void A_blocked_request_cannot_be_accepted_and_says_why(PairingBlock block, string why)
     {

@@ -30,8 +30,8 @@ public static class SharedText
     // The waiting view, until the owner accepts the plugin in Gleanvolt (#459).
     public static readonly Words PairingSearching = new("Looking for Gleanvolt on this network.", "Hledá se Gleanvolt v této síti.");
     public static readonly Words PairingWaiting = new(
-        "Waiting for the owner to accept this plugin in Gleanvolt: Settings → External providers.",
-        "Čeká se, až vlastník tento plugin přijme v Gleanvoltu: Nastavení → Externí poskytovatelé.");
+        "Waiting for the owner to accept this plugin in Gleanvolt: Settings → Plugins.",
+        "Čeká se, až vlastník tento plugin přijme v Gleanvoltu: Nastavení → Pluginy.");
     public static readonly Words PairingRejected = new(
         "Gleanvolt rejected this plugin. It asks again in an hour, or when restarted.",
         "Gleanvolt tento plugin odmítl. Znovu se zeptá za hodinu nebo po restartu.");

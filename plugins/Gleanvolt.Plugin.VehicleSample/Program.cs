@@ -32,8 +32,8 @@ builder.Services.AddSingleton(new SampleOptions(simulateLoginExpiry));
 builder.Services.AddGleanvoltVehicleProvider<SimulatedCar>(options =>
 {
     options.Endpoint = new Uri(builder.Configuration["Gleanvolt:Endpoint"] ?? "http://localhost:8090");
-    options.Token = builder.Configuration["Gleanvolt:Token"]
-        ?? throw new InvalidOperationException("Set Gleanvolt:Token to the token from Settings → External providers.");
+    // Optional (#464, #470): without it the provider asks to be paired, and the owner accepts it on Settings → Plugins.
+    options.Token = builder.Configuration["Gleanvolt:Token"] ?? string.Empty;
     options.ProviderId = "vehicle-sample";
     options.Name = "Vehicle sample";
     options.PageUrl = new Uri(pageUrl);

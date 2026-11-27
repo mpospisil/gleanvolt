@@ -92,8 +92,8 @@ Gleanvolt sets up only itself (#442): **Inverter → Site → Finish**.
 2. **Site.** Location and time zone (recommended), the home battery's usable capacity and charge
    efficiency, the array's details.
 3. **Finish.** What is still missing, each with a link to its step; the recommended settings not yet set;
-   **Your charger**, which says the charger is a plugin set up on its own page, shows the provider token
-   (or **Make the token**) and links to the manual; the optional settings not yet set (Solcast, the car,
+   **Your charger**, which says the charger is a plugin set up on its own page, lists the plugins asking to
+   connect, keeps the token by hand folded, and links to the manual; the optional settings not yet set (Solcast, the car,
    the tariff, MQTT, the weather), each linking to Settings or the Car page; and **Start Gleanvolt**, which
    restarts it out of setup mode and then opens the Overview.
 
@@ -115,7 +115,7 @@ set it up.
 | **Forecast** (`/forecast`) | Today's and tomorrow's solar forecast, drawn and printed. |
 | **Car** (`/car`) | The car, its account, and editing them. |
 | **Settings → Installation** (`/settings`) | The PV system and its devices (expert fields under **Advanced**), and the charger. |
-| **Settings → External providers** (`/settings/providers`) | The plugins' token, pairing requests and each kind's session. |
+| **Settings → Plugins** (`/settings/providers`) | The plugins' token, pairing requests and each kind's session. |
 | **Settings → Forecast & prices** (`/settings/forecast-prices`) | Solcast, the weather and the grid tariff. Applies on save. |
 | **Settings → Integrations** (`/settings/integrations`) | The API, then the Home Assistant (MQTT) link and the car's MQTT telemetry. Applies after a restart. |
 | **Settings → System** (`/settings/system`) | The running build, time zone and last poll; **Restart**, **Stop service** and the password. |

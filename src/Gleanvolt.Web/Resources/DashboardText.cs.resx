@@ -538,7 +538,7 @@
     <value>Zdroj předpovědi: {0}, přijato {1}.</value>
   </data>
   <data name="ForecastFromDisconnected" xml:space="preserve">
-    <value>Externí zdroj předpovědi {0} je odpojený. Toto je jeho poslední předpověď, přijatá {1}.</value>
+    <value>Plugin předpovědi {0} je odpojený. Toto je jeho poslední předpověď, přijatá {1}.</value>
   </data>
   <data name="SuspendedForCharger" xml:space="preserve">
     <value>Režim {0} je přerušen od {1:HH:mm} ({2}): Gleanvolt nemůže nabíječku řídit. {3}</value>

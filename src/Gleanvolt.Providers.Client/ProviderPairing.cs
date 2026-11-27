@@ -403,7 +403,7 @@ public sealed class ProviderPairing : BackgroundService
                 _logger.Log(level, "Not paired with Gleanvolt yet: looking for it to ask. The pairing code is {Code}.", status.Code);
                 break;
             case PairingPhase.Waiting:
-                _logger.Log(level, "Asked Gleanvolt at {Gleanvolt} to pair: accept it there, under External providers. The pairing code is {Code}.",
+                _logger.Log(level, "Asked Gleanvolt at {Gleanvolt} to pair: accept it there, under Settings → Plugins. The pairing code is {Code}.",
                     gleanvolt, status.Code);
                 break;
             case PairingPhase.Rejected:

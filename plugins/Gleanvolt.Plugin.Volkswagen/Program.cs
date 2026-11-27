@@ -51,8 +51,8 @@ var frameAncestors = "'self' " + ProviderPageFraming.Sources(gleanvolt, builder.
 builder.Services.AddGleanvoltVehicleProvider<VolkswagenFeed>(options =>
 {
     options.Endpoint = gleanvolt;
-    options.Token = builder.Configuration["Gleanvolt:Token"]
-        ?? throw new InvalidOperationException("Set Gleanvolt:Token to the token from Gleanvolt's Settings → External providers.");
+    // Optional (#464, #470): without it the provider asks to be paired, and the owner accepts it on Settings → Plugins.
+    options.Token = builder.Configuration["Gleanvolt:Token"] ?? string.Empty;
     options.ProviderId = "volkswagen";
     options.Name = "Volkswagen";
     options.PageUrl = new Uri(pageUrl);

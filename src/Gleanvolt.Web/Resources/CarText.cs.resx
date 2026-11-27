@@ -619,25 +619,25 @@
     <value>Dočasná chyba</value>
   </data>
   <data name="FeedExternal" xml:space="preserve">
-    <value>Externí zdroj dat</value>
+    <value>Plugin</value>
   </data>
   <data name="FreshExternal" xml:space="preserve">
-    <value>tak často, jak program publikuje</value>
+    <value>tak často, jak plugin publikuje</value>
   </data>
   <data name="NoteExternal" xml:space="preserve">
-    <value>Program mimo Gleanvolt čte auto a publikuje, co hlásí: jakékoli auto, přes jeho aplikaci, cloud nebo OBD adaptér. Gleanvolt se ho pravidelně neptá; program publikuje, kdykoli má auto něco nového. Adresu a token, se kterými se připojuje, najdete v Nastavení → Externí zdroje dat.</value>
+    <value>Plugin, program mimo Gleanvolt, čte auto a publikuje, co hlásí: jakékoli auto, přes jeho aplikaci, cloud nebo OBD adaptér. Gleanvolt se ho pravidelně neptá; plugin publikuje, kdykoli má auto něco nového. Spusťte ho a přijměte ho v Nastavení → Pluginy.</value>
   </data>
   <data name="AccountExternal" xml:space="preserve">
-    <value>Tady se nic nepřihlašuje: k účtu auta se přihlašuje externí program sám a Gleanvolt pro něj žádný účet nedrží. Když mu přihlášení vyprší, program to nahlásí a přehled vás požádá o zásah. Program s vlastní stránkou ji ukáže níže pod Externím zdrojem dat: tam se přihlásíte.</value>
+    <value>Tady se nic nepřihlašuje: k účtu auta se přihlašuje plugin sám a Gleanvolt pro něj žádný účet nedrží. Když mu přihlášení vyprší, plugin to nahlásí a přehled vás požádá o zásah. Plugin s vlastní stránkou ji ukáže níže pod Pluginem: tam se přihlásíte.</value>
   </data>
   <data name="ExternalAskIntro" xml:space="preserve">
-    <value>Zeptá se programu {0} na {1}, a to jednou a hned teď. Program má na odpověď minutu a jeho údaj se propíše i do karty na přehledu. Sám publikuje, kdykoli má auto něco nového, takže ptát se obvykle není třeba.</value>
+    <value>Zeptá se pluginu {0} na {1}, a to jednou a hned teď. Plugin má na odpověď minutu a jeho údaj se propíše i do karty na přehledu. Sám publikuje, kdykoli má auto něco nového, takže ptát se obvykle není třeba.</value>
   </data>
   <data name="ExternalProvider" xml:space="preserve">
-    <value>Externí zdroj dat</value>
+    <value>Plugin</value>
   </data>
   <data name="ExternalPageIntro" xml:space="preserve">
-    <value>{0} má vlastní stránku, zobrazenou tady: v ní se přihlásíte k účtu auta, a pokud přijde e-mailem kód, zadáte ho tam. Stránka pochází od samotného programu, ne od Gleanvoltu.</value>
+    <value>{0} má vlastní stránku, zobrazenou tady: v ní se přihlásíte k účtu auta, a pokud přijde e-mailem kód, zadáte ho tam. Stránka pochází od samotného pluginu, ne od Gleanvoltu.</value>
   </data>
   <data name="ExternalPageNewTab" xml:space="preserve">
     <value>Otevřít na nové kartě</value>

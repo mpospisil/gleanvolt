@@ -1,0 +1,80 @@
+---
+title: Pluginy
+description: Co je plugin, jak ho spustit a vpustit a co dělat, když se odpojí.
+---
+
+**Plugin** je malý program, který běží vedle Gleanvoltu a dělá pro něj jednu věc:
+
+- **Nabíječka.** Gleanvolt řídí každou nabíječku elektromobilu přes plugin pro její značku. Viz
+  [Vaše nabíječka](../charger/).
+- **Počasí.** Plugin OpenWeather je součástí každého vydání Gleanvoltu. Viz [Počasí](../weather/).
+- **Auto, tarif nebo předpověď výroby** z programu, který napíše někdo jiný, místo vlastního zdroje
+  Gleanvoltu. Viz [Auto](../car/), [Tarif](../grid-tariff/) a [Předpověď výroby](../solar-forecast/).
+
+Plugin běží na stejném počítači jako Gleanvolt nebo na jiném v domácí síti. Mnohé mají vlastní stránku
+se svým nastavením, kterou Gleanvolt ukazuje uvnitř svých stránek.
+
+## Spuštění pluginu
+
+Postup závisí na pluginu a na tom, jak jste nainstalovali Gleanvolt. Napíše ho stránka pluginu v této
+příručce nebo jeho vlastní poznámky. Plugin nepotřebuje token ani adresu: najde Gleanvolt a požádá
+o vpuštění. Nezáleží na tom, co se spustí dřív. U auta, tarifu a předpovědi výroby nejdřív v jejich sekci
+vyberte **Plugin** a uložte.
+
+## Přijetí pluginu
+
+Dokud plugin čeká, říká to pruh nahoře na každé stránce a odkazuje na seznam. V **Nastavení → Pluginy**
+nebo v kroku průvodce **Dokončení** ho najdete v seznamu **Pluginy žádající o připojení**. Klikněte na
+**Přijmout**. Gleanvolt pluginu předá token sám, takže nic nekopírujete, a plugin nemusíte restartovat.
+
+Plugin na stejném počítači jako Gleanvolt je označený **Tento počítač** a stačí mu **Přijmout**. Plugin
+na jiném počítači ukáže svou adresu a šestimístný **kód**, například `482 193`. Otevřete vlastní stránku
+pluginu na jeho adrese nebo si přečtěte jeho log: obojí ukazuje stejný kód a stránka navíc uvádí vlastní
+adresy pluginu. Klikněte na **Přijmout**, jen když kód souhlasí **a** adresa, kterou ukazuje Gleanvolt, je
+jednou z adres na stránce pluginu. Jiný počítač ve vaší síti může žádost pluginu přeposlat i se správným
+kódem a prozradí ho jen adresa. Pokud něco nesouhlasí, klikněte na **Odmítnout**.
+
+:::caution[Přijetí nevyžaduje přihlášení]
+Čekající plugin může přijmout kdokoli, kdo otevře Gleanvolt, v **Nastavení** i v průvodci, ať je
+přihlášený, nebo ne. Díky tomu lze plugin vpustit i do Gleanvoltu bez hesla. **Nastavením hesla se to
+uzavře**: v síti, kam se k Gleanvoltu dostanou i další lidé, si heslo nastavte.
+:::
+
+Tlačítko **Přijmout** zůstane šedé a vedle něj je důvod, když dva čekající pluginy uvádějí stejný název
+(odmítněte ten, který neznáte), když je ten druh pluginu vypnutý, nebo když Gleanvolt už používá jiný
+plugin nabíječky. Plugin, který odmítnete, se zeptá znovu za hodinu nebo po restartu. Žádost, na kterou
+nikdo neodpoví, zmizí po 15 minutách a plugin se zeptá znovu.
+
+## Záložka Pluginy
+
+**Nastavení → Pluginy** má řádek pro každý druh dat: zda je plugin připojený a odkaz **Otevřít** na jeho
+stránku. Název druhu vede do sekce, kde se data používají. Řádek **Nabíječka** navíc ukazuje plugin, který si
+Gleanvolt pamatuje, s tlačítkem **Zapomenout**, a proč byl plugin naposledy odmítnut. Každá sekce, která
+bere data z pluginu, ho ukazuje také, s jeho stránkou pod ním. Tlačítko (i) u každé věci ji vysvětlí.
+
+## Když se plugin odpojí
+
+Sekce napíše, kdy byl naposledy připojený. Zkontrolujte, že plugin pořád běží: ve Windows, že je jeho okno
+otevřené. Jakmile zase poběží, připojí se sám a znovu ho přijímat nemusíte. Co Gleanvolt mezitím dělá,
+záleží na druhu: bez nabíječky se režim nabíjení přeruší, nabíjení se zaznamená bez počasí, poslední údaj
+z auta zůstává a poslední tarif i předpověď platí dál.
+
+## Jen jeden plugin nabíječky
+
+Gleanvolt pustí jen první plugin nabíječky, který přijal, aby vaši nabíječku nepřevzal druhý, omylem
+spuštěný. Chcete-li plugin vyměnit, zastavte starý a v **Nastavení → Pluginy** klikněte vedle řádku
+**Nabíječka** na **Zapomenout**. Viz [Když je plugin nabíječky odmítnut](../charger-refused/).
+
+## Token ručně
+
+Token můžete pluginu dál dát sami, jako `Gleanvolt__Token` v jeho prostředí nebo `--Gleanvolt:Token=…`.
+Má přednost před přijetím a plugin se pak připojí na adresu, kterou mu dáte, nebo na
+`http://localhost:8090`, pokud žádnou nedáte. Token najdete v **Nastavení → Pluginy** s tlačítkem
+**Vytvořit token**. **Nový** token odpojí všechny pluginy: přijatý plugin se zeptá znovu a vy ho přijmete
+znovu, plugin nastavený ručně potřebuje nový token.
+
+**Gleanvolt se přestěhoval.** Přijatý plugin si pamatuje adresu, na které ho přijali, a Gleanvolt už znovu
+nehledá. Když Gleanvolt dostane novou adresu, řekněte ji pluginu: nastavte `Gleanvolt__Endpoint` v jeho
+prostředí nebo `--Gleanvolt:Endpoint=…`. Ta adresa má přednost před uloženou a plugin si token ponechá.
+Chcete-li, aby se plugin zeptal úplně od začátku, smažte z jeho datové složky soubory `gleanvolt-token`
+a `gleanvolt-endpoint`, nebo v Gleanvoltu vytvořte nový token.

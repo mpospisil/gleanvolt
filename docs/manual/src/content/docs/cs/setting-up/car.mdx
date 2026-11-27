@@ -128,29 +128,26 @@ vám to. Přihlaste se do portálu v prohlížeči, vyřešte to tam a Gleanvolt
 <TabItem label="Přes jiný program">
 
 Jakékoli auto může číst program mimo Gleanvolt, který ho čte, jak to jde: přes aplikaci nebo cloud
-výrobce, přes Bluetooth nebo z adaptéru v autě. To je **Externí zdroj dat**. Takový program musí někdo
+výrobce, přes Bluetooth nebo z adaptéru v autě. Na stránce **Auto** je to volba **Plugin**. Takový program musí někdo
 napsat nebo nainstalovat; Gleanvolt žádný nemá. Vývojáři najdou postup v
 [příručce pro zdroje dat](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md#the-vehicle-kind) (anglicky).
 
 <Steps>
 
-1. Na stránce **Auto** zvolte u **Odkud se čtou údaje auta** možnost **Externí zdroj dat**. Stiskněte
+1. Na stránce **Auto** zvolte u **Odkud se čtou údaje auta** možnost **Plugin**. Stiskněte
    **Uložit** a pak **Restartovat**.
 
-   ![Stránka Auto se zvoleným externím zdrojem dat a pod tím údaje o autě.](../../../../assets/screenshots/car-external.png)
+   ![Stránka Auto se zvolenou možností Plugin a pod tím údaje o autě.](../../../../assets/screenshots/car-external.png)
 
-2. Otevřete **Nastavení → Externí zdroje dat** a stiskněte **Vytvořit token** a pak
-   **Kopírovat**. Pokud tam token už je, protože ho používá jiný program, zkopírujte ten: všechny
-   programy používají stejný token.
+2. Spusťte program. Požádá o připojení: přijměte ho v **Nastavení → Pluginy**. Viz
+   [Pluginy](../plugins/).
 
-3. Předejte programu **Adresu Gleanvoltu** a token.
-
-4. Zpátky na stránce **Auto** část **Externí zdroj dat** říká, kdy se program připojil a kdy přišel jeho
+3. Zpátky na stránce **Auto** část **Plugin** říká, kdy se program připojil a kdy přišel jeho
    poslední údaj. Jmenuje ho i karta auta na **Přehledu**.
 
-   ![Část Externí zdroj dat na stránce Auto: hub, ke kterému se program připojuje, a připojený program Vehicle sample.](../../../../assets/screenshots/car-external-provider.png)
+   ![Část Plugin na stránce Auto: hub, ke kterému se program připojuje, a připojený program Vehicle sample.](../../../../assets/screenshots/car-external-provider.png)
 
-5. Pokud má program vlastní stránku, stránka **Auto** ji ukáže pod **Externím zdrojem dat**, přímo
+4. Pokud má program vlastní stránku, stránka **Auto** ji ukáže pod **Pluginem**, přímo
    v Gleanvoltu. Tam se přihlásíte k účtu auta a zadáte kód, který vám Volkswagen nebo jiný výrobce
    pošle e-mailem. Stránka pochází od programu, ne od Gleanvoltu, a otevře ji jen ten, kdo je přihlášený
    do Gleanvoltu. Pokud zůstane prázdná, stiskněte **Otevřít na nové kartě**.

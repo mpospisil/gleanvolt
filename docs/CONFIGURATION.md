@@ -224,7 +224,7 @@ the setup wizard's Extras step, or with `gleanvolt setup`. A choice applies at o
 | `Weather:Source` | |
 |---|---|
 | `NotProvided` | No weather. Sessions are recorded without it. Also what unset means |
-| `External` | An external provider publishes it, e.g. the OpenWeather plugin |
+| `External` | A plugin publishes it, e.g. the OpenWeather plugin (**A plugin** on Settings) |
 
 Any case is accepted. A value that names neither is logged and treated as unset.
 
@@ -271,8 +271,8 @@ Settings it is read-only until the UI has a login.
   entities read *unknown*. None never means "always low".
 - **Table** — the periods you type in, below.
 - **External** — windows another program publishes to Gleanvolt over its hub on the web port
-  (#401): for a tariff a table can't hold, such as day-ahead spot prices. The token for it is the
-  one every provider uses, made under **External providers** on the same page. The windows are saved in `external-tariff.json` beside `tariff.json`, and
+  (#401): for a tariff a table can't hold, such as day-ahead spot prices. It is **A plugin** on
+  Settings; the plugin is accepted on **Settings → Plugins**. The windows are saved in `external-tariff.json` beside `tariff.json`, and
   still count after the program disconnects or Gleanvolt restarts, until the last one ends. What such a program sends, and the rules it is held to, are in
   [PROVIDERS.md](PROVIDERS.md).
 

@@ -185,6 +185,42 @@ public class ChargingPlanPageTests : PageTest
     }
 
     [Fact]
+    public void A_missing_charger_plugin_links_to_adding_the_charger_beside_the_warning_and_in_its_tip()
+    {
+        // #470: the warning says what is wrong, the tip what it means, the link how to fix it.
+        _holder.Set(Statuses.Sample(_time.Now) with
+        {
+            Charger = new ChargerAvailability(ChargerAvailabilityState.NoPlugin, "No charger plugin is connected.",
+                Phrase.Of("Charger.NoPlugin"), _time.Now.AddMinutes(-5)),
+        });
+
+        var help = RenderTab("solar").Find("#charger-unavailable #plan-charger-help");
+
+        Assert.EndsWith("/en/setting-up/charger/", help.QuerySelector("a.plugin-help-link")!.GetAttribute("href"));
+        Assert.Contains("Gleanvolt doesn't talk to the charger itself", help.QuerySelector("details.info")!.TextContent);
+        Assert.Equal("How to add your charger", help.QuerySelector("a.plugin-help-tip-link")!.TextContent);
+    }
+
+    [Fact]
+    public void A_plugin_that_cant_reach_the_charger_links_to_its_page_only_in_the_tip()
+    {
+        _holder.Set(Statuses.Sample(_time.Now) with
+        {
+            Charger = new ChargerAvailability(ChargerAvailabilityState.Error, "Gleanvolt can't read the charger: timeout",
+                Phrase.Of("Charger.Unreadable", new PhraseArg.Said(null, "timeout")), _time.Now.AddMinutes(-5)),
+        });
+
+        var help = RenderTab("solar").Find("#plan-charger-help");
+
+        Assert.Empty(help.QuerySelectorAll("a.plugin-help-link"));
+        Assert.Equal("/settings#charger-editor", help.QuerySelector("a.plugin-help-tip-link")!.GetAttribute("href"));
+    }
+
+    [Fact]
+    public void An_available_charger_shows_no_plugin_help() =>
+        Assert.Empty(RenderTab("solar").FindAll("#plan-charger-help"));
+
+    [Fact]
     public void Says_when_and_from_where_the_running_mode_was_started()
     {
         var page = RenderTab("solar");

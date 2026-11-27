@@ -60,10 +60,10 @@ public class ExternalProvidersFormTests : BunitContext
 
         Assert.Equal("http://localhost", form.Find("#external-providers-address").TextContent);
         Assert.Contains("/providers/tariff", form.Find("#external-providers-tariff").TextContent);
-        Assert.Contains("Make the provider token first", form.Find("#external-providers-tariff").TextContent);
+        Assert.Contains("Waiting for a plugin to connect.", form.Find("#external-providers-tariff").TextContent);
         Assert.Equal("/settings/forecast-prices#tariff-editor", form.Find("#external-providers-tariff a").GetAttribute("href"));
         Assert.Contains("/providers/solar-forecast", form.Find("#external-providers-solar-forecast").TextContent);
-        Assert.Contains("Choose External and save", form.Find("#external-providers-solar-forecast").TextContent);
+        Assert.Contains("Choose A plugin and save", form.Find("#external-providers-solar-forecast").TextContent);
         Assert.Equal("/settings/forecast-prices#solcast-editor", form.Find("#external-providers-solar-forecast a").GetAttribute("href"));
     }
 
@@ -144,7 +144,7 @@ public class ExternalProvidersFormTests : BunitContext
     {
         var form = RenderForm();
 
-        Assert.Equal("No token yet. Make one and give it to each provider.", form.Find("#external-providers-token-state").TextContent.Trim());
+        Assert.Equal("No token yet. Accepting a plugin makes one; make one here only to give it to a plugin yourself.", form.Find("#external-providers-token-state").TextContent.Trim());
         Assert.Equal("Make a token", form.Find("#external-providers-token").TextContent.Trim());
     }
 
@@ -160,7 +160,7 @@ public class ExternalProvidersFormTests : BunitContext
         Assert.DoesNotContain(token, form.Markup);
         Assert.All(_providers.Statuses, status => Assert.True(status.HasToken));
         Assert.Equal("Make a new token", form.Find("#external-providers-token").TextContent.Trim());
-        Assert.Contains("disconnects every provider", form.Find("#external-providers-token-replaces").TextContent);
+        Assert.Contains("disconnects every plugin", form.Find("#external-providers-token-replaces").TextContent);
 
         form.Find("#external-providers-token-value button").Click();
         Assert.Contains(token, form.Find("#external-providers-token-value code").TextContent);

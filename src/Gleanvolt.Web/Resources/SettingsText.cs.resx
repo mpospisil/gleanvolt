@@ -28,7 +28,7 @@
     <value>Systém</value>
   </data>
   <data name="ExternalProvidersPageTitle" xml:space="preserve">
-    <value>Externí zdroje dat</value>
+    <value>Pluginy</value>
   </data>
   <data name="SettingsTitle" xml:space="preserve">
     <value>Nastavení</value>
@@ -721,7 +721,7 @@
     <value>počasí</value>
   </data>
   <data name="WeatherTip1" xml:space="preserve">
-    <value>Gleanvolt se sám žádné služby počasí neptá: počasí mu posílá externí zdroj a jeho nastavení se zadává na vlastní stránce zdroje.</value>
+    <value>Gleanvolt se sám žádné služby počasí neptá: počasí mu posílá plugin a jeho nastavení se zadává na vlastní stránce pluginu.</value>
   </data>
   <data name="HomeAssistantLink" xml:space="preserve">
     <value>Home Assistant (MQTT)</value>
@@ -896,10 +896,10 @@
   </data>
   <!-- External data providers (#386, #401) -->
   <data name="TariffProvider_External" xml:space="preserve">
-    <value>Externí</value>
+    <value>Plugin</value>
   </data>
   <data name="ExternalProviderIntro" xml:space="preserve">
-    <value>Tato data dodává program mimo Gleanvolt, plugin. Připojuje se s tokenem pro zdroje dat.</value>
+    <value>Tato data dodává program mimo Gleanvolt, plugin. Token dostane, když ho přijmete.</value>
   </data>
   <data name="ExternalAddress" xml:space="preserve">
     <value>Adresa Gleanvoltu</value>
@@ -911,7 +911,7 @@
     <value>Token</value>
   </data>
   <data name="ExternalNoToken" xml:space="preserve">
-    <value>Token zatím není. Vytvořte ho a předejte ho každému zdroji dat.</value>
+    <value>Token zatím není. Vytvoří se přijetím pluginu; tady ho vytvořte, jen pokud ho chcete pluginu předat sami.</value>
   </data>
   <data name="ExternalHasToken" xml:space="preserve">
     <value>Token existuje.</value>
@@ -923,7 +923,7 @@
     <value>Vytvořit nový token</value>
   </data>
   <data name="ExternalNewTokenDisconnects" xml:space="preserve">
-    <value>Nový token odpojí všechny zdroje, dokud nedostanou ten nový. Vytvořte ho, pokud token unikl.</value>
+    <value>Nový token odpojí všechny pluginy: přijatý plugin požádá znovu a plugin, kterému jste token předali, potřebuje ten nový. Vytvořte ho, pokud token unikl.</value>
   </data>
   <data name="ExternalTokenFailed" xml:space="preserve">
     <value>Token se nepodařilo uložit. Úložiště tajných údajů najdete na kartě Systém.</value>
@@ -932,13 +932,13 @@
     <value>Stav</value>
   </data>
   <data name="ExternalState_Off" xml:space="preserve">
-    <value>Vypnuto. Zapnete ho volbou Externí a uložením.</value>
+    <value>Vypnuto. Zapnete ho volbou Plugin a uložením.</value>
   </data>
   <data name="ExternalState_NoToken" xml:space="preserve">
-    <value>Čeká se. Nejdřív vytvořte token pro zdroje dat, bez něj se žádný zdroj nepřipojí.</value>
+    <value>Čeká se na připojení pluginu.</value>
   </data>
   <data name="ExternalState_Waiting" xml:space="preserve">
-    <value>Čeká se na připojení zdroje.</value>
+    <value>Čeká se na připojení pluginu.</value>
   </data>
   <data name="ExternalState_Connected" xml:space="preserve">
     <value>{0} {1} připojen od {2}.</value>
@@ -953,43 +953,40 @@
     <value>Zatím nepřišla žádná data.</value>
   </data>
   <data name="ExternalUnanswered" xml:space="preserve">
-    <value>Zdroj neodpověděl na poslední žádost o nová data.</value>
+    <value>Plugin neodpověděl na poslední žádost o nová data.</value>
   </data>
   <data name="ExternalUnhealthy" xml:space="preserve">
-    <value>Zdroj hlásí problém: {0}</value>
+    <value>Plugin hlásí problém: {0}</value>
   </data>
   <data name="ExternalLastProblem" xml:space="preserve">
     <value>Jeho poslední data byla odmítnuta:</value>
   </data>
   <data name="ExternalProviders" xml:space="preserve">
-    <value>Externí zdroje dat</value>
+    <value>Pluginy</value>
   </data>
   <data name="ExternalProvidersTopic" xml:space="preserve">
-    <value>externí zdroje dat</value>
+    <value>pluginy</value>
   </data>
   <data name="ExternalProvidersTip1" xml:space="preserve">
-    <value>Programy mimo Gleanvolt, pluginy, mohou dodávat data místo vestavěného zdroje: tarif a předpověď výroby. Každý se připojuje k hubu svého druhu na této adrese.</value>
+    <value>Plugin je malý program, který běží vedle Gleanvoltu a dělá jednu věc: řídí nabíječku, nebo dodává data o autě, počasí, tarif či předpověď výroby. Každý se připojuje k hubu svého druhu na této adrese.</value>
   </data>
   <data name="ExternalProvidersTip2" xml:space="preserve">
-    <value>Druh se zapíná ve své vlastní části, volbou Externí a uložením.</value>
+    <value>Nabíječka se nevybírá. Ostatní druhy se zapínají ve své vlastní části, volbou Plugin a uložením.</value>
   </data>
   <data name="ExternalProvidersIntro" xml:space="preserve">
-    <value>Všechny zdroje se připojují jedním tokenem níže. Předejte ho každému pluginu, který spouštíte.</value>
+    <value>Plugin dostane token níže, když ho přijmete. Sami ho pluginu předejte, jen když ho s tokenem spouštíte.</value>
   </data>
   <data name="ExternalKind" xml:space="preserve">
     <value>Data</value>
   </data>
   <data name="ExternalTokenShared" xml:space="preserve">
-    <value>Token pro zdroje dat je v části {0}.</value>
-  </data>
-  <data name="ExternalTokenSharedMissing" xml:space="preserve">
-    <value>Token pro zdroje dat zatím není. Vytvořte ho v části {0}, bez něj se žádný zdroj nepřipojí.</value>
+    <value>Token je v části {0}.</value>
   </data>
   <data name="ForecastSource" xml:space="preserve">
     <value>Zdroj předpovědi</value>
   </data>
   <data name="ForecastSource_External" xml:space="preserve">
-    <value>Externí</value>
+    <value>Plugin</value>
   </data>
   <data name="ForecastSourceUnsaved" xml:space="preserve">
     <value>Neuloženo: stále se používá {0}.</value>
@@ -998,16 +995,16 @@
     <value>Uloženo. Zdroj předpovědi: {0}.</value>
   </data>
   <data name="ForecastExternalIntro" xml:space="preserve">
-    <value>Režimy Forecasted a Targeted plánují podle předpovědi, kterou posílá tento zdroj. Dokud je vybrána volba Externí, Solcast se nevolá; jeho účet zůstává uložený pro chvíli, kdy Solcast znovu vyberete. Než zdroj pošle první předpověď, platí ta poslední.</value>
+    <value>Režimy Forecasted a Targeted plánují podle předpovědi, kterou posílá tento plugin. Dokud je vybrána volba Plugin, Solcast se nevolá; jeho účet zůstává uložený pro chvíli, kdy Solcast znovu vyberete. Než plugin pošle první předpověď, platí ta poslední.</value>
   </data>
   <data name="ExternalKindVehicle" xml:space="preserve">
     <value>Auto</value>
   </data>
   <data name="ExternalNeedsOwner" xml:space="preserve">
-    <value>Zdroj potřebuje váš zásah: {0}</value>
+    <value>Plugin potřebuje váš zásah: {0}</value>
   </data>
   <data name="ExternalState_OffVehicle" xml:space="preserve">
-    <value>Vypnuto. Zapne se volbou Externí zdroj dat na stránce Auto, uložením a restartem.</value>
+    <value>Vypnuto. Zapne se volbou Plugin na stránce Auto, uložením a restartem.</value>
   </data>
   <data name="ExternalPage" xml:space="preserve">
     <value>Stránka</value>
@@ -1022,25 +1019,25 @@
     <value>Bez počasí</value>
   </data>
   <data name="WeatherSource_External" xml:space="preserve">
-    <value>Externí</value>
+    <value>Plugin</value>
   </data>
   <data name="WeatherSourceSaved" xml:space="preserve">
     <value>Uloženo. Zdroj počasí: {0}.</value>
   </data>
   <data name="WeatherNotProvided" xml:space="preserve">
-    <value>Nabíjení se zaznamenává bez počasí. Pokud ho chcete zaznamenávat ze zdroje, vyberte Externí.</value>
+    <value>Nabíjení se zaznamenává bez počasí. Pokud ho chcete zaznamenávat z pluginu, vyberte Plugin.</value>
   </data>
   <data name="WeatherTip2" xml:space="preserve">
-    <value>Gleanvolt se zdroje zeptá, když nabíjení začne a když skončí; pokud zdroj neodpoví, nabíjení se zaznamená bez počasí.</value>
+    <value>Gleanvolt se pluginu zeptá, když nabíjení začne a když skončí; pokud plugin neodpoví, nabíjení se zaznamená bez počasí.</value>
   </data>
   <data name="WeatherExternalWizard" xml:space="preserve">
-    <value>Zdroj připojíte po dokončení nastavení v Nastavení: najdete tam adresu, token i vlastní stránku zdroje.</value>
+    <value>Plugin spusťte po dokončení nastavení a přijměte ho v Nastavení → Pluginy; jeho vlastní stránka se pak objeví v Nastavení.</value>
   </data>
   <data name="WeatherExternalPageIntro" xml:space="preserve">
-    <value>{0} má vlastní stránku, zobrazenou tady: zadejte na ní jeho nastavení, například klíč API. Stránka pochází přímo od zdroje, ne od Gleanvoltu.</value>
+    <value>{0} má vlastní stránku, zobrazenou tady: zadejte na ní jeho nastavení, například klíč API. Stránka pochází přímo od pluginu, ne od Gleanvoltu.</value>
   </data>
   <data name="WeatherBuiltInRetired" xml:space="preserve">
-    <value>Vestavěné OpenWeather skončilo, a proto je vybrána volba Externí: počasí z OpenWeatherMap teď dodává plugin OpenWeather. Spusťte plugin s tokenem z Externích zdrojů dat a pak na jeho stránce, která se tu objeví po připojení, zadejte svůj klíč OpenWeatherMap. Klíč dřív uložený tady se nezachoval. Do té doby se nabíjení zaznamenává bez počasí.</value>
+    <value>Vestavěné OpenWeather skončilo, a proto je vybrána volba Plugin: počasí z OpenWeatherMap teď dodává plugin OpenWeather. Spusťte plugin, přijměte ho v Nastavení → Pluginy a pak na jeho stránce, která se tu objeví po připojení, zadejte svůj klíč OpenWeatherMap. Klíč dřív uložený tady se nezachoval. Do té doby se nabíjení zaznamenává bez počasí.</value>
   </data>
   <data name="ExternalRemembered" xml:space="preserve">
     <value>Zapamatovaný: {0}. Žádný jiný plugin není vpuštěn.</value>
@@ -1055,22 +1052,22 @@
     <value>{0} byl odmítnut {1}: {2}</value>
   </data>
   <data name="ExternalProviderTopic" xml:space="preserve">
-    <value>zdroj</value>
+    <value>plugin</value>
   </data>
   <data name="ExternalPageSettingsIntro" xml:space="preserve">
-    <value>{0} má vlastní stránku, zobrazenou tady: zadává se na ní jeho nastavení. Stránka pochází přímo od zdroje, ne od Gleanvoltu.</value>
+    <value>{0} má vlastní stránku, zobrazenou tady: zadává se na ní jeho nastavení. Stránka pochází přímo od pluginu, ne od Gleanvoltu.</value>
   </data>
   <data name="ChargerTopic" xml:space="preserve">
     <value>nabíječka</value>
   </data>
   <data name="ChargerTip1" xml:space="preserve">
-    <value>Gleanvolt řídí nabíječku přes plugin: program mimo Gleanvolt, který se připojuje s tokenem pro zdroje dat. Která nabíječka to je a její nastavení najdete na vlastní stránce pluginu.</value>
+    <value>Gleanvolt řídí nabíječku přes plugin: malý program pro značku vaší nabíječky, který běží vedle Gleanvoltu. Připojí se sem, jakmile ho přijmete, a na jeho stránce, zobrazené níže, zadáte adresu nabíječky.</value>
   </data>
   <data name="PairingTitle" xml:space="preserve">
     <value>Pluginy žádající o připojení</value>
   </data>
   <data name="PairingIntro" xml:space="preserve">
-    <value>Plugin tu čeká, dokud ho nepřijmete. Přijetím dostane token zdroje.</value>
+    <value>Plugin tu čeká, dokud ho nepřijmete. Přijetím dostane token.</value>
   </data>
   <data name="PairingThisMachine" xml:space="preserve">
     <value>Tento počítač</value>
@@ -1091,7 +1088,7 @@
     <value>Dva pluginy žádají pod tímto názvem. Odmítněte ten, který neznáte.</value>
   </data>
   <data name="PairingBlockKindOff" xml:space="preserve">
-    <value>Tento druh zdroje je vypnutý.</value>
+    <value>Tento druh pluginu je vypnutý.</value>
   </data>
   <data name="PairingBlockAnotherProvider" xml:space="preserve">
     <value>Gleanvolt už používá jiný plugin nabíječky. Nejdřív ho zapomeňte.</value>
@@ -1116,5 +1113,17 @@
   </data>
   <data name="GroupAdvanced" xml:space="preserve">
     <value>Pokročilé</value>
+  </data>
+  <data name="PairingTopic" xml:space="preserve">
+    <value>pluginy žádající o připojení</value>
+  </data>
+  <data name="PairingTip" xml:space="preserve">
+    <value>Plugin, který jste spustili, žádá o vpuštění. Plugin na tomto počítači stačí přijmout. Z jiného počítače ho přijměte, jen když kód a adresa odpovídají vlastní stránce pluginu.</value>
+  </data>
+  <data name="ExternalForgetTopic" xml:space="preserve">
+    <value>Zapomenout</value>
+  </data>
+  <data name="ExternalForgetTip" xml:space="preserve">
+    <value>Gleanvolt používá jen první plugin nabíječky, který jste přijali, aby vaši nabíječku nemohl převzít druhý. Zapomenout vpustí další plugin: ten starý nejdřív zastavte.</value>
   </data>
 </root>

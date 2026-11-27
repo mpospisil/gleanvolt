@@ -1,0 +1,29 @@
+---
+title: Když je plugin nabíječky odmítnut
+description: Proč Gleanvolt odmítne plugin nabíječky, který běží, a co změnit.
+---
+
+Plugin nabíječky běží a žádá o připojení, ale Gleanvolt ho nepustí. Dokud ho nepustí, nelze spustit žádný
+režim nabíjení. Který z těchto dvou důvodů to je, napíše sekce **Nabíječka** v **Nastavení** a řádek
+**Nabíječka** v **Nastavení → Pluginy**.
+
+## Nabíječka neumí to, co Gleanvolt chce
+
+Při připojení plugin sdělí, co jeho nabíječka umí: nejnižší a nejvyšší proud a počet fází. Pokud
+**Maximální proud (A)** nebo **Fáze** na stránce [Auto](../car/) chtějí víc, Gleanvolt ho odmítne.
+Například tři fáze u jednofázové nabíječky nebo 32 A u nabíječky, která zvládne 16 A.
+
+1. Snižte toto nastavení na stránce **Auto** a klikněte na **Uložit**.
+2. Restartujte Gleanvolt v **Nastavení → Systém**.
+
+Plugin to do 5 minut zkusí znovu a připojí se.
+
+## Gleanvolt už používá jiný plugin nabíječky
+
+Gleanvolt pustí jen první plugin nabíječky, který přijal, aby vaši nabíječku nepřevzal druhý, omylem
+spuštěný. Chcete-li plugin vyměnit, například po výměně nabíječky:
+
+1. Zastavte starý plugin.
+2. V **Nastavení → Pluginy** klikněte vedle řádku **Nabíječka** na **Zapomenout**.
+
+Zapamatován bude plugin nabíječky, který se připojí jako další.

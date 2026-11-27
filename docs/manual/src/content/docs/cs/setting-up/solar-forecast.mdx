@@ -68,31 +68,28 @@ při každém spuštění. Proto:
 ## Nebo ji nechte dodávat jiný program
 
 Předpověď může místo Solcastu dodávat program mimo Gleanvolt, například takový, který čte jinou
-předpovědní službu. Je to zdroj **Externí**. Takový program musí někdo napsat nebo nainstalovat;
+předpovědní službu. Je to zdroj **Plugin**. Takový program musí někdo napsat nebo nainstalovat;
 Gleanvolt žádný nemá. Vývojáři najdou postup v
 [příručce pro zdroje dat](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md) (anglicky).
 
 <Steps>
 
 1. Otevřete **Nastavení → Předpověď a ceny**, najděte **Předpověď solární energie**, u **Zdroj předpovědi** zvolte
-   **Externí** a stiskněte **Uložit**.
+   **Plugin** a stiskněte **Uložit**.
 
-2. Na záložce **Externí zdroje dat** stiskněte **Vytvořit token** a pak **Kopírovat**.
-   Pokud tam token už je, protože ho používá jiný program, zkopírujte ten: všechny programy používají
-   stejný token. **Zobrazit** ho ukáže, hned i kdykoli později.
+2. Spusťte program. Požádá o připojení: přijměte ho v **Nastavení → Pluginy**. Viz
+   [Pluginy](../plugins/).
 
-   ![Část Externí zdroje dat: adresa Gleanvoltu, token a každý druh dat s jeho hubem a stavem.](../../../../assets/screenshots/settings-external-providers.png)
+   ![Záložka Pluginy: adresa Gleanvoltu, token a každý druh dat s jeho hubem a stavem.](../../../../assets/screenshots/settings-external-providers.png)
 
-3. Předejte programu **Adresu Gleanvoltu** a token.
-
-4. Když se program připojí, **Stav** ho jmenuje a **Poslední data přišla** říká, kdy jeho předpověď
+3. Když se program připojí, **Stav** ho jmenuje a **Poslední data přišla** říká, kdy jeho předpověď
    dorazila. Jmenuje ho i řádek pod tabulkou předpovědi na **Přehledu**.
 
 </Steps>
 
-![Sekce předpovědi se zvoleným zdrojem Externí: adresa, na kterou se program připojuje, odkaz na token a připojený program Solar forecast sample.](../../../../assets/screenshots/settings-solar-forecast-external.png)
+![Sekce předpovědi se zvoleným zdrojem Plugin: adresa, na kterou se program připojuje, odkaz na token a připojený program Solar forecast sample.](../../../../assets/screenshots/settings-solar-forecast-external.png)
 
-- **Dokud je zvolen zdroj Externí, Solcast se nevolá.** Účet Solcastu zůstává uložený, takže pro
+- **Dokud je zvolen zdroj Plugin, Solcast se nevolá.** Účet Solcastu zůstává uložený, takže pro
   návrat stačí zvolit **Solcast**.
 - **Když se program odpojí**, Gleanvolt dál plánuje podle předpovědi, kterou program naposledy poslal,
   a **Přehled** napíše, že je od odpojeného programu. Sám se k Solcastu nevrací.
@@ -100,6 +97,6 @@ Gleanvolt žádný nemá. Vývojáři najdou postup v
   znovu připojí.
 - **Na pořadí spuštění nezáleží.** Program se připojuje, dokud Gleanvolt neodpoví, a po restartu nebo
   aktualizaci Gleanvoltu se připojí sám.
-- **Když token unikne**, stiskněte **Vytvořit nový token** v části **Externí zdroje dat**. Všechny
-  programy se odpojí, dokud jim nový token nepředáte.
-- **Volba Solcast** program odpojí a znovu se připojit může, až zase zvolíte **Externí**.
+- **Když token unikne**, stiskněte **Vytvořit nový token** v **Nastavení → Pluginy**. Všechny
+  programy se odpojí a znovu požádají o připojení: přijměte je znovu.
+- **Volba Solcast** program odpojí a znovu se připojit může, až zase zvolíte **Plugin**.

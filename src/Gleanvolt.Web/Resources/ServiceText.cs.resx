@@ -614,13 +614,13 @@
     <value>{0} není zdroj předpovědi solární energie.</value>
   </data>
   <data name="ExternalVehicle_Waiting" xml:space="preserve">
-    <value>čeká se, až se připojí externí zdroj dat o autě</value>
+    <value>čeká se, až se připojí plugin auta</value>
   </data>
   <data name="ExternalVehicle_Disconnected" xml:space="preserve">
-    <value>externí zdroj dat o autě je odpojený, údaj je z {0} {1}</value>
+    <value>plugin auta je odpojený, údaj je z {0} {1}</value>
   </data>
   <data name="ExternalVehicle_DisconnectedNoReading" xml:space="preserve">
-    <value>externí zdroj dat o autě je odpojený a zatím neposlal žádný údaj</value>
+    <value>plugin auta je odpojený a zatím neposlal žádný údaj</value>
   </data>
   <data name="ExternalVehicle_ProviderNeedsOwner" xml:space="preserve">
     <value>{0} potřebuje váš zásah: {1}</value>
@@ -680,16 +680,16 @@
     <value>Vehicle:External by byl zapnutý vedle živého zdroje výrobce. Instalace čte auto z jednoho zdroje.</value>
   </data>
   <data name="ProviderStatus_NotSetUp" xml:space="preserve">
-    <value>účet ještě není zadaný; zadejte ho na stránce poskytovatele</value>
+    <value>účet ještě není zadaný; zadejte ho na stránce pluginu</value>
   </data>
   <data name="ProviderStatus_NotSetUpCharger" xml:space="preserve">
     <value>nabíječka ještě není nastavená; nastavte ji na stránce pluginu</value>
   </data>
   <data name="ProviderStatus_NeedsSignIn" xml:space="preserve">
-    <value>přihlaste se na stránce poskytovatele</value>
+    <value>přihlaste se na stránce pluginu</value>
   </data>
   <data name="ProviderStatus_NeedsCode" xml:space="preserve">
-    <value>na stránce poskytovatele zadejte kód, který vám přišel</value>
+    <value>na stránce pluginu zadejte kód, který vám přišel</value>
   </data>
   <data name="ProviderStatus_Unreachable" xml:space="preserve">
     <value>jeho služba není dostupná</value>
@@ -782,7 +782,7 @@
     <value>Režim je delší než {0} znaků.</value>
   </data>
   <data name="Provider_Remembered" xml:space="preserve">
-    <value>Gleanvolt si pamatuje plugin {0} a žádný jiný nepustí, dokud nestisknete Zapomenout v Nastavení → Externí zdroje dat.</value>
+    <value>Gleanvolt si pamatuje plugin {0} a žádný jiný nepustí, dokud nestisknete Zapomenout v Nastavení → Pluginy.</value>
   </data>
   <data name="Provider_AnotherConnected" xml:space="preserve">
     <value>Je připojen jiný plugin, {0} ({1}). Aktivní je vždy jen jeden.</value>
@@ -806,6 +806,6 @@
     <value>Dokud Gleanvolt nemůže nabíječku řídit, žádný režim nelze spustit: {0}</value>
   </data>
   <data name="Config_SetupChargerKey" xml:space="preserve">
-    <value>{0}: nabíječka už není součástí nastavení. Nabíječka je plugin s vlastní stránkou nastavení, který se připojuje tokenem z Nastavení → Externí zdroje dat. Klíče nabíječky z instalačního souboru odstraňte.</value>
+    <value>{0}: nabíječka už není součástí nastavení. Nabíječka je plugin s vlastní stránkou nastavení, který přijmete v Nastavení → Pluginy. Klíče nabíječky z instalačního souboru odstraňte.</value>
   </data>
 </root>

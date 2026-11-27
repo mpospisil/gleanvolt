@@ -1,0 +1,31 @@
+@*
+    Help beside a warning about a missing plugin (#470): an (i) whose tip says what the warning means and ends
+    with the link that says how to fix it. In the first-run case (no charger plugin yet) the link is shown
+    beside the warning too, since a new owner may never press a small (i).
+*@
+@if (Help is { } help)
+{
+    @* A block, never inside a <p>: a <details> there is pushed out of it by the HTML parser on prerender. *@
+    <div class="plugin-help" id="@Id">
+        @if (help.Prominent)
+        {
+            <HelpLink Help="help" Class="plugin-help-link" />
+        }
+        <InfoTip Topic="@SharedText.PluginHelpTopic" End="@End" Group="@Group">
+            <p>@help.Tip</p>
+            <p><HelpLink Help="help" Class="plugin-help-tip-link" /></p>
+        </InfoTip>
+    </div>
+}
+
+@code {
+    /// <summary>The help to show; nothing is rendered for null.</summary>
+    [Parameter] public PluginHelp? Help { get; set; }
+
+    [Parameter] public string? Id { get; set; }
+
+    /// <summary>Opens leftwards, for a warning near the right edge.</summary>
+    [Parameter] public bool End { get; set; }
+
+    [Parameter] public string Group { get; set; } = "info";
+}

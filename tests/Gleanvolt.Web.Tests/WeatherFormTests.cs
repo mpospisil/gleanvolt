@@ -91,7 +91,7 @@ public class WeatherFormTests : BunitContext
         form.Find("#weather-source-save").Click();
 
         Assert.Equal([WeatherSource.External], sources.Chosen);
-        Assert.Equal("Saved. Weather source: External.", form.Find("#weather-message").TextContent.Trim());
+        Assert.Equal("Saved. Weather source: A plugin.", form.Find("#weather-message").TextContent.Trim());
         Assert.Empty(form.FindAll("#weather-source-unsaved"));
     }
 

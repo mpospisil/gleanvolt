@@ -52,15 +52,16 @@ password, let it find the inverter and the charger, and restart from the last st
 The weather each charging session ran in can come from the OpenWeather plugin, released with Gleanvolt
 (#426). It is in the compose file under the `openweather` profile and doesn't start unless asked for:
 
-1. In the web UI, under **Settings → External providers**, press **Make a token** and copy it.
-2. Set `GLEANVOLT_PROVIDER_TOKEN` to it and `COMPOSE_PROFILES` to `openweather`, where you set `TZ`
-   (or start it with `docker compose --profile openweather up -d`).
-3. Under **Settings → Weather**, choose **External** and save, then enter the OpenWeatherMap key on the
+1. Set `COMPOSE_PROFILES` to `openweather`, where you set `TZ` (or start it with
+   `docker compose --profile openweather up -d`).
+2. The plugin asks to be paired: accept it under **Settings → Plugins**. (`GLEANVOLT_PROVIDER_TOKEN`, set to
+   the token from that tab, still works instead.)
+3. Under **Settings → Weather**, choose **A plugin** and save, then enter the OpenWeatherMap key on the
    plugin's page that appears there.
 
 Its page is the NAS's port 8096 (`OPENWEATHER_PORT`). Its key is kept in `plugins/openweather/` beside
-`data/`. A NAS UI that ignores profiles starts it with everything else: without a token it stops at once
-and keeps restarting, so either set the token or delete its service from the file.
+`data/`, with the token it is given. A NAS UI that ignores profiles starts it with everything else; it then
+waits to be accepted, so delete its service from the file if you don't want it.
 
 ## The charger plugin
 
@@ -68,12 +69,12 @@ The charger is driven through a plugin from [gleanvolt-chargers](https://github.
 (#444): `solax`, `huawei`, `goe` or `shelly`, each in the compose file under its own profile. Since 1.4 it is the only
 way: the controller never opens a connection to the charger (#445). To use one:
 
-1. Make the token as for the weather plugin, and set `GLEANVOLT_PROVIDER_TOKEN`.
-2. Add the charger's profile to `COMPOSE_PROFILES` (`openweather,solax`) and set `EV_CHARGER_HOST`: it is the
-   plugin's address.
-3. The plugin's page appears under **Settings → External providers**.
+1. Add the charger's profile to `COMPOSE_PROFILES` (`openweather,solax`) and set `EV_CHARGER_HOST`: it is the
+   charger's address, until one is saved on the plugin's page.
+2. Accept the plugin under **Settings → Plugins**.
+3. The plugin's page appears under **Settings → Charger**.
 
-Upgrading a NAS that ran a built-in charger driver: do step 2 with the plugin that replaced it (`solax` for SolaX,
+Upgrading a NAS that ran a built-in charger driver: do step 1 with the plugin that replaced it (`solax` for SolaX,
 `huawei` for an SCharger, `goe` for a go-e), and remove `GLEANVOLT_CHARGER_PLUGIN` if you set it.
 
 At most one: a NAS UI that ignores profiles starts all four, which is harmless but wasteful. Gleanvolt accepts the
