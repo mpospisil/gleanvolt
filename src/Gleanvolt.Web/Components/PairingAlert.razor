@@ -16,16 +16,19 @@
 
 @if (_requests.Count > 0 && !OnProvidersPage)
 {
-    <div id="pairing-alert" class="alert" role="alert">
-        @if (_requests is [var only])
-        {
-            @Localized.Format(SharedText.PairingAlertOne, only.ProviderName, only.OnThisMachine ? SharedText.PairingAlertThisMachine : only.Source)
-        }
-        else
-        {
-            @Localized.Format(SharedText.PairingAlertMany, _requests.Count)
-        }
-        @(" ")<a href="@ProvidersPath">@SharedText.PairingAlertReview</a>
+    @* Tinted and with a button rather than the plain alert's line of text: nothing else tells the owner. *@
+    <div id="pairing-alert" class="alert attention" role="alert">
+        <strong class="pairing-alert-text">
+            @if (_requests is [var only])
+            {
+                @Localized.Format(SharedText.PairingAlertOne, only.ProviderName, only.OnThisMachine ? SharedText.PairingAlertThisMachine : only.Source)
+            }
+            else
+            {
+                @Localized.Format(SharedText.PairingAlertMany, _requests.Count)
+            }
+        </strong>
+        <a class="button-link" href="@ProvidersPath">@SharedText.PairingAlertReview</a>
     </div>
 }
 

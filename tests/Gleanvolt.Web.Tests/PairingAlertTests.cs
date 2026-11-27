@@ -46,6 +46,19 @@ public class PairingAlertTests : PageTest
     }
 
     [Fact]
+    public void The_band_stands_out_from_the_page()
+    {
+        // A tinted band with a button, not a line of text: the owner has to notice it to accept the plugin.
+        _providers.Waiting.Add(Request());
+
+        var alert = Render<PairingAlert>().Find("#pairing-alert");
+
+        Assert.Contains("attention", alert.ClassList);
+        Assert.NotNull(alert.QuerySelector("strong.pairing-alert-text"));
+        Assert.Contains("button-link", alert.QuerySelector("a")!.ClassList);
+    }
+
+    [Fact]
     public void One_plugin_elsewhere_says_its_address()
     {
         _providers.Waiting.Add(Request(local: false));
