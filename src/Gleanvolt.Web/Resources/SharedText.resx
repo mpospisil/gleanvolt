@@ -599,4 +599,17 @@
   <data name="ChargeControlState_Suspended" xml:space="preserve">
     <value>Suspended</value>
   </data>
+  <!-- Pairing: the band on every page while a plugin waits -->
+  <data name="PairingAlertOne" xml:space="preserve">
+    <value>A plugin asks to connect: {0} ({1}).</value>
+  </data>
+  <data name="PairingAlertMany" xml:space="preserve">
+    <value>Plugins asking to connect: {0}.</value>
+  </data>
+  <data name="PairingAlertThisMachine" xml:space="preserve">
+    <value>this machine</value>
+  </data>
+  <data name="PairingAlertReview" xml:space="preserve">
+    <value>Open Settings → External providers</value>
+  </data>
 </root>

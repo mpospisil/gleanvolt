@@ -1,0 +1,67 @@
+@implements IDisposable
+@inject IExternalProviders Providers
+@inject NavigationManager Navigation
+@inject TimeProvider Time
+
+@*
+    A plugin waiting to be paired, said on every page. The list with Accept lives on Settings → External
+    providers, a tab nobody opens unprompted, and a plugin waits there until somebody does: a plugin started
+    before Gleanvolt looked, to its owner, as if pairing had not worked at all. The band names who waits and
+    links to that list; accepting stays there, beside the code check, and there is no link to the plugin's
+    own page (see PairingRequestsList).
+
+    Not on the providers page itself, where the list is right there. Changed is not raised when a request
+    expires, so while anything waits it is read again every few seconds, as the list does.
+*@
+
+@if (_requests.Count > 0 && !OnProvidersPage)
+{
+    <div id="pairing-alert" class="alert" role="alert">
+        @if (_requests is [var only])
+        {
+            @Localized.Format(SharedText.PairingAlertOne, only.ProviderName, only.OnThisMachine ? SharedText.PairingAlertThisMachine : only.Source)
+        }
+        else
+        {
+            @Localized.Format(SharedText.PairingAlertMany, _requests.Count)
+        }
+        @(" ")<a href="@ProvidersPath">@SharedText.PairingAlertReview</a>
+    </div>
+}
+
+@code {
+    private const string ProvidersPath = "/settings/providers";
+
+    private static readonly TimeSpan Reread = TimeSpan.FromSeconds(5);
+
+    // The viewer's culture, for the renders the registry and the timer ask for (#290).
+    private readonly ViewerCulture _viewer = new();
+    private IReadOnlyList<PairingRequestView> _requests = [];
+    private ITimer? _timer;
+
+    private bool OnProvidersPage =>
+        string.Equals("/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].TrimEnd('/'), ProvidersPath, StringComparison.OrdinalIgnoreCase);
+
+    protected override void OnInitialized()
+    {
+        _requests = Providers.Pairing;
+        Providers.Changed += Refresh;
+        Navigation.LocationChanged += OnLocationChanged;
+        _timer = Time.CreateTimer(_ => Refresh(), null, Reread, Reread);
+    }
+
+    public void Dispose()
+    {
+        Providers.Changed -= Refresh;
+        Navigation.LocationChanged -= OnLocationChanged;
+        _timer?.Dispose();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) => Refresh();
+
+    private void Refresh() => _ = InvokeAsync(_viewer.Wrap(() =>
+    {
+        _requests = Providers.Pairing;
+        StateHasChanged();
+    }));
+}
