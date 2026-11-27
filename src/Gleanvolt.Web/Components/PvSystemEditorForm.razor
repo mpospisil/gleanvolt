@@ -46,91 +46,40 @@
         <h3>@group</h3>
 
         <div class="pv-fields">
-            @foreach (var key in keys.Where(Shown))
+            @foreach (var key in keys.Where(key => Shown(key) && !(Folds && AdvancedKeys.Contains(key))))
             {
-                var setting = _settings[key];
-                var id = "pv-" + key.Replace(':', '-');
-
-                <div class="pv-field">
-                    <div class="field-head">
-                        <label for="@id">@Labels[key]</label>
-                        <InfoTip Topic="@Labels[key]" Group="settings-info">
-                            <p>
-                                @Help[key]
-                                @if (key == PvSystemSettingKeys.InverterUnmeteredGridPhase)
-                                {
-                                    @(" ")<ManualLink Page="how-it-works/unmetered-phase">@SettingsText.HelpUnmeteredPhaseLink</ManualLink>
-                                }
-                            </p>
-                            <p>@Localized.Format(SettingsText.CurrentValueFrom, SourcePhrase(setting))</p>
-                            <p>@SourceTitle(setting)</p>
-                        </InfoTip>
-                    </div>
-                    @if (key == PvSystemSettingKeys.InverterDriver)
-                    {
-                        <select id="@id" disabled="@(!Editable || _busy)" value="@SelectedDriverId"
-                                @onchange="e => SelectDriver(e.Value?.ToString() ?? string.Empty)">
-                            @foreach (var driver in Editor.InverterDrivers)
-                            {
-                                <option value="@driver.Id">@driver.DisplayName</option>
-                            }
-                            @if (SelectedDriver is null)
-                            {
-                                @* Configured outside the page with an id this build does not have: shown as it is, so
-                                   the owner can see what the save is refusing, and pick a real one. *@
-                                <option value="@SelectedDriverId">@SelectedDriverId</option>
-                            }
-                        </select>
-                    }
-                    else if (key == PvSystemSettingKeys.InverterTopology && SelectedDriver is { } topologyDriver)
-                    {
-                        <select id="@id" disabled="@(!Editable || _busy)" value="@SelectedTopologyId"
-                                @onchange="e => SelectTopology(e.Value?.ToString() ?? string.Empty)">
-                            @foreach (var topology in topologyDriver.Topologies)
-                            {
-                                <option value="@topology.Id">@topology.DisplayName</option>
-                            }
-                            @if (topologyDriver.Topologies.All(topology => topology.Id != SelectedTopologyId))
-                            {
-                                @* Configured outside the page with a way this driver does not have: shown as it is, as for the driver. *@
-                                <option value="@SelectedTopologyId">@SelectedTopologyId</option>
-                            }
-                        </select>
-                    }
-                    else
-                    {
-                        <input id="@id" type="text" spellcheck="false" autocomplete="off"
-                               placeholder="@Hint(key)"
-                               disabled="@(!Editable || _busy)"
-                               value="@_values[key]"
-                               @oninput="e => _values[key] = e.Value?.ToString() ?? string.Empty" />
-                    }
-                    @if (Note(key, _values[key]) is { } note)
-                    {
-                        <span class="field-note">@note</span>
-                    }
-                    @if (key == PvSystemSettingKeys.InverterTopology && SelectedTopologyId == EmmaTopology)
-                    {
-                        <span class="field-note" id="pv-emma-one-client">@SettingsText.NoteEmmaOneClient</span>
-                    }
-                    @if (setting.IsPending)
-                    {
-                        <span class="field-pending">@Localized.Format(SettingsText.RunningRestartToApply, Show(setting.Running))</span>
-                    }
-                    @if (setting.IsEdited && Editable)
-                    {
-                        <button type="button" class="link revert" disabled="@_busy" @onclick="() => Revert(key)">
-                            @Localized.Format(SettingsText.RevertTo, Show(setting.Underlying))
-                        </button>
-                    }
-                </div>
+                @Field(key)
             }
         </div>
 
-        @if (OfferSnapshot && !ReadOnly && section is PvEditorSection.Inverter)
+        @if (!Folds && OfferSnapshot && !ReadOnly && section is PvEditorSection.Inverter)
         {
             <DeviceSnapshotPanel />
         }
+    }
+
+    @*
+        The expert fields, folded on Settings (2026-11-27): an owner coming back months later sees the essentials
+        first. It opens itself when one of them waits for a restart or a save was refused, so nothing that needs
+        attention is hidden. The wizard, which shows chosen sections, has no fold.
+    *@
+    @if (Folds)
+    {
+        <details id="pv-advanced" open="@AdvancedOpen">
+            <summary>@SettingsText.GroupAdvanced</summary>
+
+            <div class="pv-fields">
+                @foreach (var key in AdvancedKeys.Where(Shown))
+                {
+                    @Field(key)
+                }
+            </div>
+
+            @if (OfferSnapshot && !ReadOnly)
+            {
+                <DeviceSnapshotPanel />
+            }
+        </details>
     }
 
     @if (_warnings.Count > 0)
@@ -333,6 +282,99 @@
     private const string EmmaTopology = "emma";
 
     // A field the selected driver has no use for is not shown: the topology, for a driver reached one way.
+    // One field: label and (i), its input, and what it says about being pending or edited. Shared by the
+    // groups and the Advanced fold.
+    private RenderFragment Field(string key) => __builder =>
+    {
+        var setting = _settings[key];
+        var id = "pv-" + key.Replace(':', '-');
+
+        <div class="pv-field">
+            <div class="field-head">
+                <label for="@id">@Labels[key]</label>
+                <InfoTip Topic="@Labels[key]" Group="settings-info">
+                    <p>
+                        @Help[key]
+                        @if (key == PvSystemSettingKeys.InverterUnmeteredGridPhase)
+                        {
+                            @(" ")<ManualLink Page="how-it-works/unmetered-phase">@SettingsText.HelpUnmeteredPhaseLink</ManualLink>
+                        }
+                    </p>
+                    <p>@Localized.Format(SettingsText.CurrentValueFrom, SourcePhrase(setting))</p>
+                    <p>@SourceTitle(setting)</p>
+                </InfoTip>
+            </div>
+            @if (key == PvSystemSettingKeys.InverterDriver)
+            {
+                <select id="@id" disabled="@(!Editable || _busy)" value="@SelectedDriverId"
+                        @onchange="e => SelectDriver(e.Value?.ToString() ?? string.Empty)">
+                    @foreach (var driver in Editor.InverterDrivers)
+                    {
+                        <option value="@driver.Id">@driver.DisplayName</option>
+                    }
+                    @if (SelectedDriver is null)
+                    {
+                        @* Configured outside the page with an id this build does not have: shown as it is, so
+                           the owner can see what the save is refusing, and pick a real one. *@
+                        <option value="@SelectedDriverId">@SelectedDriverId</option>
+                    }
+                </select>
+            }
+            else if (key == PvSystemSettingKeys.InverterTopology && SelectedDriver is { } topologyDriver)
+            {
+                <select id="@id" disabled="@(!Editable || _busy)" value="@SelectedTopologyId"
+                        @onchange="e => SelectTopology(e.Value?.ToString() ?? string.Empty)">
+                    @foreach (var topology in topologyDriver.Topologies)
+                    {
+                        <option value="@topology.Id">@topology.DisplayName</option>
+                    }
+                    @if (topologyDriver.Topologies.All(topology => topology.Id != SelectedTopologyId))
+                    {
+                        @* Configured outside the page with a way this driver does not have: shown as it is, as for the driver. *@
+                        <option value="@SelectedTopologyId">@SelectedTopologyId</option>
+                    }
+                </select>
+            }
+            else
+            {
+                <input id="@id" type="text" spellcheck="false" autocomplete="off"
+                       placeholder="@Hint(key)"
+                       disabled="@(!Editable || _busy)"
+                       value="@_values[key]"
+                       @oninput="e => _values[key] = e.Value?.ToString() ?? string.Empty" />
+            }
+            @if (Note(key, _values[key]) is { } note)
+            {
+                <span class="field-note">@note</span>
+            }
+            @if (key == PvSystemSettingKeys.InverterTopology && SelectedTopologyId == EmmaTopology)
+            {
+                <span class="field-note" id="pv-emma-one-client">@SettingsText.NoteEmmaOneClient</span>
+            }
+            @if (setting.IsPending)
+            {
+                <span class="field-pending">@Localized.Format(SettingsText.RunningRestartToApply, Show(setting.Running))</span>
+            }
+            @if (setting.IsEdited && Editable)
+            {
+                <button type="button" class="link revert" disabled="@_busy" @onclick="() => Revert(key)">
+                    @Localized.Format(SettingsText.RevertTo, Show(setting.Underlying))
+                </button>
+            }
+        </div>
+    };
+
+    // Settings folds; the wizard, which passes the sections it wants, does not.
+    private bool Folds => Sections is null;
+
+    private static readonly string[] AdvancedKeys =
+    [
+        PvSystemSettingKeys.Id, PvSystemSettingKeys.InstallDate, PvSystemSettingKeys.LossFactor,
+        PvSystemSettingKeys.HomeBatteryChargeEfficiency, PvSystemSettingKeys.InverterUnmeteredGridPhase,
+    ];
+
+    private bool AdvancedOpen => _problems.Count > 0 || AdvancedKeys.Any(key => _settings[key].IsPending);
+
     private bool Shown(string key) =>
         key != PvSystemSettingKeys.InverterTopology || SelectedDriver is { Topologies.Count: > 0 };
 

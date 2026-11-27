@@ -1114,4 +1114,7 @@
   <data name="VehicleTelemetryOff" xml:space="preserve">
     <value>Vypnuto: stav nabití auta se přes MQTT nečte. Zapíná se i s tématem, do kterého váš zdroj publikuje, na stránce {0}.</value>
   </data>
+  <data name="GroupAdvanced" xml:space="preserve">
+    <value>Pokročilé</value>
+  </data>
 </root>

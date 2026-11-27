@@ -1149,4 +1149,7 @@
   <data name="VehicleTelemetryOff" xml:space="preserve">
     <value>Off: the car's state of charge is not read over MQTT. It is turned on, with the topic your publisher writes to, on the {0} page.</value>
   </data>
+  <data name="GroupAdvanced" xml:space="preserve">
+    <value>Advanced</value>
+  </data>
 </root>

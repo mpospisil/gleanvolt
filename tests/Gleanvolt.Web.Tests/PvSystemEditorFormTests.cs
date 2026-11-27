@@ -45,6 +45,63 @@ public class PvSystemEditorFormTests : BunitContext
         throw new InvalidOperationException("Gleanvolt.slnx not found above " + AppContext.BaseDirectory);
     }
 
+    // -- Advanced (2026-11-27): the expert fields folded on Settings, never in the wizard.
+
+    private static readonly string[] AdvancedKeys =
+    [
+        PvSystemSettingKeys.Id, PvSystemSettingKeys.InstallDate, PvSystemSettingKeys.LossFactor,
+        PvSystemSettingKeys.HomeBatteryChargeEfficiency, PvSystemSettingKeys.InverterUnmeteredGridPhase,
+    ];
+
+    [Fact]
+    public void Advanced_fields_are_folded_on_settings()
+    {
+        var form = Render<PvSystemEditorForm>();
+
+        var advanced = form.Find("#pv-advanced");
+        Assert.Equal("details", advanced.TagName, ignoreCase: true);
+        Assert.False(advanced.HasAttribute("open"));
+        foreach (var key in AdvancedKeys)
+        {
+            Assert.NotNull(advanced.QuerySelector(Field(key)));
+        }
+
+        Assert.Null(advanced.QuerySelector(Field(PvSystemSettingKeys.Name)));
+        Assert.Null(advanced.QuerySelector(Field(PvSystemSettingKeys.InverterHost)));
+        Assert.Single(form.FindAll(Field(PvSystemSettingKeys.Id)));
+    }
+
+    [Fact]
+    public void A_pending_advanced_field_opens_the_fold()
+    {
+        _editor.Stored[PvSystemSettingKeys.LossFactor] = "0.85";
+
+        Assert.True(Render<PvSystemEditorForm>().Find("#pv-advanced").HasAttribute("open"));
+    }
+
+    [Fact]
+    public void A_refused_save_opens_the_fold()
+    {
+        _editor.Refuse = ["The loss factor must be between 0 and 1."];
+        var form = Render<PvSystemEditorForm>();
+
+        form.Find(Field(PvSystemSettingKeys.Name)).Input("Other roof");
+        form.Find("#pv-save").Click();
+
+        Assert.True(form.Find("#pv-advanced").HasAttribute("open"));
+    }
+
+    [Fact]
+    public void The_wizard_has_no_fold()
+    {
+        var form = Render<PvSystemEditorForm>(parameters => parameters
+            .Add(f => f.Sections, [PvEditorSection.Identity, PvEditorSection.Capacity]));
+
+        Assert.Empty(form.FindAll("#pv-advanced"));
+        Assert.NotNull(form.Find(Field(PvSystemSettingKeys.Id)));
+        Assert.NotNull(form.Find(Field(PvSystemSettingKeys.LossFactor)));
+    }
+
     [Fact]
     public void Says_where_each_value_comes_from()
     {
