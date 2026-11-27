@@ -177,12 +177,35 @@ public sealed class ChargersHostingTests
 
         Assert.Equal("frame-ancestors 'self' http://*:8090 https://*:8090", await PolicyAsync(plugin, "/"));
 
-        credentials.Save(new Uri("http://192.168.1.5:8090"), "gvp_paired");
+        // Paired over mDNS at an IP, while the owner opens Gleanvolt at gleanvolt.local: any host on the paired port.
+        // TEST-NET-1, so the connection that starts with the token dials nothing real.
+        credentials.Save(new Uri("http://192.0.2.5:8091"), "gvp_paired");
 
         // Every response carries it: the refusal of a request without a ticket, the page, and a static file.
-        Assert.Contains("http://192.168.1.5:8090", await PolicyAsync(plugin, "/"), StringComparison.Ordinal);
-        Assert.Contains("http://192.168.1.5:8090", await PolicyAsync(plugin, "/?" + ProviderPage.TicketParameter + "=" + Ticket("gvp_paired")), StringComparison.Ordinal);
-        Assert.Contains("http://192.168.1.5:8090", await PolicyAsync(plugin, "/app.css"), StringComparison.Ordinal);
+        const string Paired = "frame-ancestors 'self' http://*:8091 https://*:8091";
+        Assert.Equal(Paired, await PolicyAsync(plugin, "/"));
+        Assert.Equal(Paired, await PolicyAsync(plugin, "/?" + ProviderPage.TicketParameter + "=" + Ticket("gvp_paired")));
+        Assert.Equal(Paired, await PolicyAsync(plugin, "/app.css"));
+    }
+
+    [Fact]
+    public async Task AConfiguredEndpointIsFramedByItsOwnOriginEvenWhenPaired()
+    {
+        await using var plugin = await PluginApp.StartAsync(extra: ["--Gleanvolt:Endpoint=http://192.0.2.5:8090"]);
+
+        plugin.App.Services.GetRequiredService<ProviderCredentials>().Save(new Uri("http://192.0.2.6:8091"), "gvp_paired");
+
+        Assert.Equal("frame-ancestors 'self' http://192.0.2.5:8090", await PolicyAsync(plugin, "/"));
+    }
+
+    [Fact]
+    public async Task ConfiguredFrameAncestorsWinOverAPairedEndpoint()
+    {
+        await using var plugin = await PluginApp.StartAsync(extra: ["--Gleanvolt:FrameAncestors=http://gleanvolt.local:8090"]);
+
+        plugin.App.Services.GetRequiredService<ProviderCredentials>().Save(new Uri("http://192.0.2.5:8091"), "gvp_paired");
+
+        Assert.Equal("frame-ancestors 'self' http://gleanvolt.local:8090", await PolicyAsync(plugin, "/"));
     }
 
     [Fact]
@@ -225,7 +248,7 @@ public sealed class ChargersHostingTests
 
         public HttpClient Client { get; }
 
-        public static async Task<PluginApp> StartAsync(string name = "Test charger")
+        public static async Task<PluginApp> StartAsync(string name = "Test charger", string[]? extra = null)
         {
             var directory = Path.Combine(Path.GetTempPath(), "gleanvolt-plugin-" + Guid.NewGuid().ToString("N"));
             var plugin = new PluginInfo(Id, name, "Test", 8110, 502) { PageAssembly = typeof(TestPluginPage).Assembly };
@@ -233,7 +256,7 @@ public sealed class ChargersHostingTests
             // the host's serves its stylesheet at /app.css, from the source in Development as a plugin run from its
             // project does.
             var builder = PluginHost.CreateBuilder<TestCharger>(
-                [$"--DataDirectory={directory}", "--applicationName=Gleanvolt.Chargers.Hosting", "--environment=Development"], plugin);
+                [$"--DataDirectory={directory}", "--applicationName=Gleanvolt.Chargers.Hosting", "--environment=Development", .. extra ?? []], plugin);
             builder.WebHost.UseTestServer();
             builder.Services.AddSingleton<IGleanvoltFinder, NoGleanvolt>();
             var app = PluginHost.Build(builder);

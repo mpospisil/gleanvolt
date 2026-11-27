@@ -177,7 +177,25 @@ public static class ProviderPageFraming
         }
 
         return endpoint.IsLoopback
-            ? $"http://*:{endpoint.Port} https://*:{endpoint.Port}"
+            ? AnyHostOn(endpoint)
             : endpoint.GetLeftPart(UriPartial.Authority);
     }
+
+    /// <summary>
+    /// The sources that may frame the page, for the Gleanvolt in use by <paramref name="credentials"/>: as
+    /// <see cref="Sources(Uri, string?)"/>, except that a paired endpoint is treated like one on this machine, any host
+    /// on its port. A paired endpoint is whichever address the search found, often an IP from mDNS, while the owner
+    /// opens Gleanvolt at <c>gleanvolt.local</c> or another name; the ticket still decides who sees the page.
+    /// </summary>
+    public static string Sources(ProviderCredentials credentials, string? configured)
+    {
+        ArgumentNullException.ThrowIfNull(credentials);
+
+        var endpoint = credentials.Endpoint;
+        return credentials.EndpointIsPaired && string.IsNullOrWhiteSpace(configured)
+            ? AnyHostOn(endpoint)
+            : Sources(endpoint, configured);
+    }
+
+    private static string AnyHostOn(Uri endpoint) => $"http://*:{endpoint.Port} https://*:{endpoint.Port}";
 }

@@ -141,8 +141,8 @@ public static class PluginHost
         var app = builder.Build();
         var plugin = app.Services.GetRequiredService<PluginInfo>();
 
-        // On every response, the waiting view and the refusals and the static files too, and read per request: once
-        // paired, the Gleanvolt that may frame the page is the one that accepted it, not the one configured.
+        // On every response, the waiting view and the refusals and the static files too, and read per request: pairing
+        // can change the Gleanvolt in use while the plugin runs.
         var framing = app.Services.GetRequiredService<PageFraming>();
         app.Use((context, next) =>
         {
@@ -199,12 +199,13 @@ public static class PluginHost
 
 /// <summary>
 /// The page's frame-ancestors policy: its own origin and Gleanvolt's, or the ones the owner configured. Gleanvolt's is
-/// the one in use, so it moves to the paired one when the owner accepts the plugin (#459).
+/// the one in use, so it moves to the paired one when the owner accepts the plugin (#459); a paired one allows any host
+/// on its port, since the browser may open Gleanvolt by a name other than the address the plugin found.
 /// </summary>
 /// <param name="credentials">Where the Gleanvolt in use is.</param>
 /// <param name="configured"><c>Gleanvolt:FrameAncestors</c>, which wins when set.</param>
 public sealed class PageFraming(ProviderCredentials credentials, string? configured)
 {
     /// <summary>The <c>frame-ancestors</c> sources now, e.g. <c>'self' http://192.168.1.5:8090</c>.</summary>
-    public string FrameAncestors() => "'self' " + ProviderPageFraming.Sources(credentials.Endpoint, configured);
+    public string FrameAncestors() => "'self' " + ProviderPageFraming.Sources(credentials, configured);
 }

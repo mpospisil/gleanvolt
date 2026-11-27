@@ -165,6 +165,26 @@ public sealed class ProviderPageTests : IAsyncLifetime
     public void ThePageMayBeFramedByGleanvoltAtTheNamesItCanHave(string endpoint, string? configured, string expected) =>
         Assert.Equal(expected, ProviderPageFraming.Sources(new Uri(endpoint), configured));
 
+    [Fact]
+    public void APairedEndpointMayBeFramedByAnyHostOnItsPort()
+    {
+        var credentials = new ProviderCredentials(Options.Create(new ProviderOptions()));
+        credentials.Save(new Uri("http://192.0.2.5:8091"), "t");
+
+        Assert.Equal("http://*:8091 https://*:8091", ProviderPageFraming.Sources(credentials, null));
+        Assert.Equal("http://gleanvolt.local:8090", ProviderPageFraming.Sources(credentials, "http://gleanvolt.local:8090"));
+    }
+
+    [Fact]
+    public void AConfiguredEndpointKeepsItsOwnOriginWhenPaired()
+    {
+        var credentials = new ProviderCredentials(Options.Create(
+            new ProviderOptions { Endpoint = new Uri("http://192.0.2.5:8090") }));
+        credentials.Save(new Uri("http://192.0.2.6:8091"), "t");
+
+        Assert.Equal("http://192.0.2.5:8090", ProviderPageFraming.Sources(credentials, null));
+    }
+
     private async Task<Uri> RedirectAsync(string host)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"/external/{EchoHub.Kind}/page");

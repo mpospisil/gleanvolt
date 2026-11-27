@@ -162,7 +162,11 @@ gateway against a 172.x address); the code is what counts there.
 - The search order (config, localhost, mDNS) is used only for pairing. A plugin with `Gleanvolt:Token` in config
   and no endpoint keeps today's default, `http://localhost:8090`.
 - The page's frame-ancestors policy (`PageFraming`) comes from the endpoint in use, read per request, not fixed at
-  startup, because pairing can set the endpoint while the plugin runs.
+  startup, because pairing can set the endpoint while the plugin runs. For a paired endpoint it is any host on that
+  endpoint's port (`http://*:<port> https://*:<port>`), as for a loopback endpoint (#426), unless
+  `Gleanvolt:FrameAncestors` is configured (final review, owner's ruling): an mDNS search saves
+  `http://<IPv4>:<port>`, while the owner opens Gleanvolt at `http://gleanvolt.local:8090`. The ticket still
+  decides who sees the page. A configured endpoint keeps its own origin.
 - A paired token being refused clears the saved endpoint too, so re-pairing searches again.
 
 ### Reject, new token, forget

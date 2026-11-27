@@ -243,7 +243,11 @@ Accept is turned off, with the reason shown, for a request that:
 so the token is never sent to whatever else answers as `_gleanvolt._tcp`. The search order is used only
 for pairing. A configured `Gleanvolt:Endpoint` wins over the saved address: the connection uses the
 configured endpoint, else the paired one, else `http://localhost:8090`. The page's `frame-ancestors`
-follows the address in use.
+follows the address in use. For a paired address it is any host on that address's port
+(`http://*:8090 https://*:8090`), as for a Gleanvolt on the same machine: the search found Gleanvolt at an
+IP, while the owner's browser may open it at `gleanvolt.local`. The ticket still decides who sees the
+page. `Gleanvolt:FrameAncestors` wins when set, and a configured endpoint keeps its own origin
+(`ProviderPageFraming.Sources(credentials, configured)`).
 
 **Gleanvolt moved.** A paired provider does not search again, so when Gleanvolt's address changes (a new
 DHCP lease, say), set `Gleanvolt:Endpoint`; the provider keeps its token. To unpair, delete
