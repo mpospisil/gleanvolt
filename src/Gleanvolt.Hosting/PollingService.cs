@@ -184,7 +184,7 @@ public sealed class PollingService : BackgroundService
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         _modeFile?.Flush(_timeProvider.GetUtcNow());
-        await _chargingControl.PauseOnShutdownAsync(cancellationToken);
+        await _chargingControl.PauseOnShutdownAsync();
 
         if (_batteryHoldOptions.Enabled)
         {

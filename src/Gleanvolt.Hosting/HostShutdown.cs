@@ -194,10 +194,7 @@ public sealed class HostShutdown : IServiceShutdown
         _stopSource = source;
         _stopRequested = true;
 
-        // Non-blocking by design: it signals ApplicationStopping and returns, so the caller's own
-        // work (rendering the confirmation, acknowledging the MQTT command) completes normally.
-        // Idempotent in the host — a second call while stopping does nothing.
-        _lifetime.StopApplication();
+        StopOffThisThread();
     }
 
     public void RequestRestart(string source)
@@ -216,6 +213,15 @@ public sealed class HostShutdown : IServiceShutdown
         _restartRequested = true;
         _stopRequested = true;
 
-        _lifetime.StopApplication();
+        StopOffThisThread();
     }
+
+    // StopApplication is not the non-blocking signal it looks like: it runs every ApplicationStopping
+    // callback on the calling thread before it returns, and SignalR's closes its connections and
+    // waits up to 5 s for them. A stop or restart pressed in the web UI is called from a Blazor
+    // circuit -- one of those very connections, blocked here -- so inline it waited on itself and
+    // every stop from the UI sat out the 5 s. On the thread pool the caller's own work (rendering
+    // the confirmation, acknowledging the MQTT command) completes normally, and the circuit closes
+    // when it is asked to. Idempotent in the host -- a second call while stopping does nothing.
+    private void StopOffThisThread() => _ = Task.Run(_lifetime.StopApplication);
 }

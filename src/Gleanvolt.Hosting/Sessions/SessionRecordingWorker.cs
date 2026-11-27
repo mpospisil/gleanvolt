@@ -27,6 +27,13 @@ public sealed class SessionRecordingWorker : BackgroundService
     // simply hold the last known power across the gap, which costs a little accuracy and nothing else.
     private const int QueueCapacity = 512;
 
+    // Closing a session can ask an external weather provider for the end reading, which waits up to
+    // WeatherOptions.ExternalRequestTimeout (15 s) and on cancellation returns no reading rather than
+    // throwing. This covers that wait and the SQLite writes behind it, so a slow provider costs the
+    // session its weather and not its close, and still ends a shutdown that hangs well inside the
+    // 60 s stop grace period.
+    private static readonly TimeSpan ShutdownWriteTimeout = TimeSpan.FromSeconds(20);
+
     private readonly Channel<ChargeControlStatus> _queue = Channel.CreateBounded<ChargeControlStatus>(
         new BoundedChannelOptions(QueueCapacity)
         {
@@ -157,9 +164,12 @@ public sealed class SessionRecordingWorker : BackgroundService
         {
             try
             {
+                // A deadline of its own rather than the host's token, for the reason EnergyMonitorWorker
+                // gives: the web server stops first and can spend all of that token before this runs.
+                using var deadline = new CancellationTokenSource(ShutdownWriteTimeout, _timeProvider);
                 var update = _tracker.Close(ChargingSessionEndReason.ServiceStopped, _timeProvider.GetUtcNow());
-                await PersistAsync(update, cancellationToken).ConfigureAwait(false);
-                await FlushAsync(cancellationToken).ConfigureAwait(false);
+                await PersistAsync(update, deadline.Token).ConfigureAwait(false);
+                await FlushAsync(deadline.Token).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

@@ -4,6 +4,62 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-27 — Stop and restart no longer sit out the 30 s shutdown timeout
+
+**Found.** In a test on a PC with the SolaX charger plugin, every restart from the web UI took exactly 30 s, and each
+one logged "Failed to write the part-finished energy interval on shutdown; it is lost". Reproduced on a throwaway
+instance (its own data directory and port, no hardware) with a headless Chrome on `/health`: a web UI Restart always
+took 30 s, and a plain SIGTERM took 30 s in about one run in three. A browser on the login page alone, which has no
+circuit, never caused it.
+
+**Cause 1: reconnects let in during the drain.** On ApplicationStopping, SignalR closes its connections. The Blazor
+client and a provider plugin reconnect the moment that happens, and Kestrel keeps accepting connections while it
+drains. Nothing ever closed the new WebSocket, so Kestrel waited for it until the host's `ShutdownTimeout` (30 s) and
+then reset it ("request processing didn't complete within the time"). The plugin's "reconnected; its older connection
+is closed" two seconds after each restart request in the field log is the same thing.
+
+**Cause 2: the stop waited on its own caller.** `IHostApplicationLifetime.StopApplication()` runs every
+ApplicationStopping callback on the calling thread, and SignalR's waits up to 5 s for its connections to close. A stop
+or restart pressed in the web UI is called from a Blazor circuit, one of those very connections, so it always waited
+the full 5 s ("Completing batch … in 5010ms"). This was only visible once cause 1 was fixed.
+
+**Cause 3: the shutdown steps ran on the host's token.** The host hands every hosted service one shared shutdown
+token. After a 30 s drain it had already run out, so the charger pause, the energy interval write and the charging
+session close were each cancelled before they began. The pause was linked to that token on purpose ("the host's own
+deadline still wins if it is the shorter"), which after a stall meant a charging car was never paused. In the field
+test nothing was charging, so only the energy write showed up in the log.
+
+**What.**
+- `UseGleanvoltShutdownGate()`, mounted first in `UseGleanvolt`: once ApplicationStopping has fired, every new
+  request is answered 503 with `Connection: close` and `Retry-After: 5`. 503 rather than 401, because a provider
+  plugin that is told 401 forgets its pairing. The plugin, the Blazor client and `restart.js`'s poll of `/login` all
+  read 503 as "not there; try again".
+- `HostShutdown.RequestStop` and `RequestRestart` call `StopApplication()` on the thread pool, so the caller returns
+  at once.
+- `ChargingControlCoordinator.PauseOnShutdownAsync()` takes no token and runs on its own 10 s deadline only.
+  `EnergyMonitorWorker.StopAsync` writes on its own 5 s deadline. `SessionRecordingWorker.StopAsync` closes the
+  session on its own 20 s deadline, which covers the external weather provider's 15 s wait (on cancellation it returns
+  no reading rather than throwing). Worst case, all three in a row stay inside the 60 s `stop_grace_period` /
+  `TimeoutStopSec`.
+
+**Verified.** Throwaway instance with a headless Chrome on `/health`: SIGTERM 1 s in 6 of 6 runs (before: 1 s, 1 s,
+30 s), with the reconnects answered 503. Web UI Restart within 1 s in 3 of 3 (before: 30 s, and 5 s with only the gate).
+In-process restart (unsupervised, as under `dotnet run`): stopped and started again within 1 s, and the browser came
+back on `/health`. Not re-run with the charger plugin attached; the plugin's client treats a 503 as an ordinary retry.
+
+**Tests.** `ShutdownGateTests` (new), `EnergyMonitorShutdownTests` (new; a part-finished interval is written although
+the host's token has already run out), `HostShutdownTests` (a request returns while `StopApplication` is still running
+its callbacks; the fake lifetime now waits for the call, which happens off the caller's thread). `FakeEvChargerControl`
+now honours its token the way the real drivers do. Before, a pause test handed a spent token still passed. The session
+close's own deadline has no dedicated test.
+
+**Files.** `src/Gleanvolt.Hosting/GleanvoltHostingExtensions.cs`, `HostShutdown.cs`, `ChargingControlCoordinator.cs`,
+`PollingService.cs`, `Monitoring/EnergyMonitorWorker.cs`, `Sessions/SessionRecordingWorker.cs`; tests
+`ShutdownGateTests.cs`, `EnergyMonitorShutdownTests.cs`, `HostShutdownTests.cs`, `ChargingControlCoordinatorTests.cs`,
+`Fakes.cs`.
+
+---
+
 ## 2026-11-26 — External providers get their own Settings tab
 
 **What.** Settings has three tabs: Installation (`/settings`), External providers (`/settings/providers`, new page

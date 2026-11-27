@@ -39,11 +39,20 @@ internal sealed class FakeEvChargerControl : IEvChargerControl
     /// <summary>Makes every settings read fail with this exception: a charger with no plugin attached, say.</summary>
     public Exception? ReadFailure { get; set; }
 
+    // Both honour their token the way the real drivers do, so a caller that hands them a spent one
+    // finds out here rather than only on the hardware.
     public Task<EvChargerSettings> ReadSettingsAsync(CancellationToken cancellationToken = default) =>
-        ReadFailure is { } failure ? Task.FromException<EvChargerSettings>(failure) : Task.FromResult(CurrentSettings);
+        cancellationToken.IsCancellationRequested ? Task.FromCanceled<EvChargerSettings>(cancellationToken)
+        : ReadFailure is { } failure ? Task.FromException<EvChargerSettings>(failure)
+        : Task.FromResult(CurrentSettings);
 
     public Task SetCurrentAsync(int activeAmps, int targetAmps, string reason, CancellationToken cancellationToken = default)
     {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled(cancellationToken);
+        }
+
         if (CurrentWriteFailure is { } failure)
         {
             return Task.FromException(new InvalidOperationException(failure));

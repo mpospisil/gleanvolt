@@ -125,14 +125,14 @@ public class ChargingControlCoordinatorTests
     [Fact]
     public async Task PauseOnShutdown_PausesOnlyWhenCharging()
     {
-        await _coordinator.PauseOnShutdownAsync(CancellationToken.None);
+        await _coordinator.PauseOnShutdownAsync();
         Assert.Empty(_charger.CurrentWrites); // never charging -> nothing
 
         _controller.NextDecision = new(ChargingControlAction.Charge, 10, "charge");
         await Cycle();
         _charger.CurrentWrites.Clear();
 
-        await _coordinator.PauseOnShutdownAsync(CancellationToken.None);
+        await _coordinator.PauseOnShutdownAsync();
         Assert.Equal(0, _charger.LastTarget); // dropped to the pause current
     }
 
@@ -163,7 +163,7 @@ public class ChargingControlCoordinatorTests
 
         // The assertion is that this returns at all. WaitAsync rather than a bare await: a regression
         // here hangs the test run instead of failing it, which is the least useful way to find out.
-        await coordinator.PauseOnShutdownAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        await coordinator.PauseOnShutdownAsync().WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.True(charger.PauseWasAttempted); // gave up, rather than never having tried
     }

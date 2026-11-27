@@ -387,21 +387,24 @@ public sealed class ChargingControlCoordinator
     /// on a stated deadline and say so in the log, which is at least a fact an operator can act on.
     /// A charger that is answering completes this in well under a second.</para>
     /// </summary>
-    public async Task PauseOnShutdownAsync(CancellationToken cancellationToken)
+    public async Task PauseOnShutdownAsync()
     {
         if (!_charging)
         {
             return;
         }
 
-        // Linked, so the host's own shutdown deadline still wins if it is the shorter of the two.
+        // Its own deadline and nothing else -- deliberately not the host's shutdown token. The host
+        // hands every hosted service one shared token, and the web server, which stops first, can
+        // spend all of it waiting out an open connection; this pause used to be linked to it, and was
+        // then cancelled before it began, leaving the car charging under a setpoint nobody drove. The
+        // deadline alone keeps it inside the container's stop grace period.
         using var deadline = new CancellationTokenSource(_shutdownPauseTimeout, _timeProvider);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
 
         try
         {
-            var settings = await _chargerControl.ReadSettingsAsync(linked.Token).ConfigureAwait(false);
-            await _chargerControl.SetCurrentAsync(settings.ChargeCurrentAmps, _pauseCurrentAmps, "Service stopping.", linked.Token).ConfigureAwait(false);
+            var settings = await _chargerControl.ReadSettingsAsync(deadline.Token).ConfigureAwait(false);
+            await _chargerControl.SetCurrentAsync(settings.ChargeCurrentAmps, _pauseCurrentAmps, "Service stopping.", deadline.Token).ConfigureAwait(false);
             _charging = false;
             _logger.LogInformation("Paused charging on shutdown (current setpoint dropped to {Amps}A).", _pauseCurrentAmps);
         }

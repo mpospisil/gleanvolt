@@ -1163,6 +1163,8 @@ public static class GleanvoltHostingExtensions
         var web = app.Services.GetRequiredService<IOptions<WebOptions>>().Value;
         var api = app.Services.GetRequiredService<IOptions<ApiOptions>>().Value;
 
+        // First, so a request that arrives once the host is stopping reaches nothing behind it.
+        app.UseGleanvoltShutdownGate();
         app.UseGleanvoltSetupMode();
 
         if (web.Enabled)
@@ -1226,6 +1228,40 @@ public static class GleanvoltHostingExtensions
         app.MapGleanvoltApi(api, app.Logger);
 
         return app;
+    }
+
+    /// <summary>
+    /// Once the host has started to stop, answers every new request with 503 and closes its connection.
+    ///
+    /// <para>Kestrel goes on accepting connections while it drains the open ones, and it waits for each
+    /// of those to finish -- up to the host's shutdown timeout, 30 s. A Blazor page and a provider
+    /// plugin both reconnect the moment SignalR closes their connection on the way down, and a
+    /// reconnect let in then was a WebSocket nothing would ever close: every stop and every restart
+    /// from the web UI sat out the full 30 s, and the hosted services behind it were handed a
+    /// shutdown token that had already run out. Turned away instead, the reconnect never becomes a
+    /// connection to wait for.</para>
+    ///
+    /// <para>503, not 401: a provider plugin that is told 401 forgets its pairing. A 503 is read by the
+    /// plugin, the Blazor client and the restart page's own poll alike as "not there; try again".</para>
+    /// </summary>
+    public static IApplicationBuilder UseGleanvoltShutdownGate(this IApplicationBuilder app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        var stopping = app.ApplicationServices.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping;
+
+        return app.Use(async (context, next) =>
+        {
+            if (!stopping.IsCancellationRequested)
+            {
+                await next(context);
+                return;
+            }
+
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            context.Response.Headers.Connection = "close";
+            context.Response.Headers.RetryAfter = "5";
+        });
     }
 
     /// <summary>
