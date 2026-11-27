@@ -38,6 +38,10 @@ public abstract partial class ScreenshotTest : PageTest
         CultureInfo.CurrentUICulture = English;
 
         Services.AddSingleton(new ChargeControlStatusHolder());
+
+        // The layout's pairing band reads the providers on every page; nobody waits unless a test says so,
+        // and a test that registers its own replaces this one.
+        Services.AddSingleton<Gleanvolt.Core.Interfaces.IExternalProviders>(new FakeExternalProviders());
         Services.AddSingleton(Options.Create(new RequestLocalizationOptions
         {
             SupportedUICultures = [.. WebUiCultures.Shipped.Select(CultureInfo.GetCultureInfo)],

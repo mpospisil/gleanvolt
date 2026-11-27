@@ -2,8 +2,17 @@ using Gleanvolt.Providers.Client;
 using Microsoft.Extensions.Configuration;
 
 using System.Net;
+using System.Runtime.CompilerServices;
 using Gleanvolt.Chargers;
+using Gleanvolt.Chargers.Components;
+using Gleanvolt.Providers.Contracts;
+using Gleanvolt.Providers.Contracts.Charger;
 using Gleanvolt.Providers.Testing;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Gleanvolt.Providers.Tests;
 
@@ -121,10 +130,188 @@ public sealed class ChargersHostingTests
         await Assert.ThrowsAnyAsync<Exception>(() => device.UseAsync(client => client.ReadInputRegistersAsync(0x0100, 1), CancellationToken.None));
     }
 
+    [Fact]
+    public async Task APluginStartsWithoutAToken()
+    {
+        await using var plugin = await PluginApp.StartAsync();
+
+        var response = await plugin.Client.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+        var body = await response.Content.ReadAsStringAsync();
+        var status = plugin.App.Services.GetRequiredService<ProviderPairing>().Status;
+        Assert.NotEmpty(status.Code);
+        Assert.Contains(WebUtility.HtmlEncode(status.Code), body, StringComparison.Ordinal);
+        Assert.Contains("Pairing code", body, StringComparison.Ordinal);
+        Assert.Contains("""<meta http-equiv="refresh" content="10">""", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AMachineWhoseAddressesCannotBeListedShowsNone() =>
+        Assert.Empty(PluginHost.AddressesOrNone(() => throw new System.Net.NetworkInformation.NetworkInformationException()));
+
+    [Fact]
+    public async Task TheWaitingViewIsInCzechForCzech()
+    {
+        await using var plugin = await PluginApp.StartAsync();
+
+        var body = await plugin.Client.GetStringAsync($"/?{ProviderPage.CultureParameter}=cs");
+
+        Assert.Contains("Kód pro spárování", body, StringComparison.Ordinal);
+        Assert.Contains("""<html lang="cs" """, body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheWaitingViewEscapesThePluginsName()
+    {
+        await using var plugin = await PluginApp.StartAsync(name: "<script>alert(1)</script>");
+
+        var body = await plugin.Client.GetStringAsync("/");
+
+        Assert.DoesNotContain("<script>", body, StringComparison.Ordinal);
+        Assert.Contains("&lt;script&gt;", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheFramePolicyFollowsThePairedEndpoint()
+    {
+        await using var plugin = await PluginApp.StartAsync();
+        var credentials = plugin.App.Services.GetRequiredService<ProviderCredentials>();
+
+        Assert.Equal("frame-ancestors 'self' http://*:8090 https://*:8090", await PolicyAsync(plugin, "/"));
+
+        // Paired over mDNS at an IP, while the owner opens Gleanvolt at gleanvolt.local: any host on the paired port.
+        // TEST-NET-1, so the connection that starts with the token dials nothing real.
+        credentials.Save(new Uri("http://192.0.2.5:8091"), "gvp_paired");
+
+        // Every response carries it: the refusal of a request without a ticket, the page, and a static file.
+        const string Paired = "frame-ancestors 'self' http://*:8091 https://*:8091";
+        Assert.Equal(Paired, await PolicyAsync(plugin, "/"));
+        Assert.Equal(Paired, await PolicyAsync(plugin, "/?" + ProviderPage.TicketParameter + "=" + Ticket("gvp_paired")));
+        Assert.Equal(Paired, await PolicyAsync(plugin, "/app.css"));
+    }
+
+    [Fact]
+    public async Task AConfiguredEndpointIsFramedByItsOwnOriginEvenWhenPaired()
+    {
+        await using var plugin = await PluginApp.StartAsync(extra: ["--Gleanvolt:Endpoint=http://192.0.2.5:8090"]);
+
+        plugin.App.Services.GetRequiredService<ProviderCredentials>().Save(new Uri("http://192.0.2.6:8091"), "gvp_paired");
+
+        Assert.Equal("frame-ancestors 'self' http://192.0.2.5:8090", await PolicyAsync(plugin, "/"));
+    }
+
+    [Fact]
+    public async Task ConfiguredFrameAncestorsWinOverAPairedEndpoint()
+    {
+        await using var plugin = await PluginApp.StartAsync(extra: ["--Gleanvolt:FrameAncestors=http://gleanvolt.local:8090"]);
+
+        plugin.App.Services.GetRequiredService<ProviderCredentials>().Save(new Uri("http://192.0.2.5:8091"), "gvp_paired");
+
+        Assert.Equal("frame-ancestors 'self' http://gleanvolt.local:8090", await PolicyAsync(plugin, "/"));
+    }
+
+    [Fact]
+    public async Task ThePageSaysWhereTheTokenCameFrom()
+    {
+        await using var plugin = await PluginApp.StartAsync();
+        // An endpoint nothing listens on: the connection that starts with the token fails at once and keeps it.
+        plugin.App.Services.GetRequiredService<ProviderCredentials>().Save(new Uri("http://127.0.0.1:9"), "gvp_paired");
+
+        var response = await plugin.Client.GetAsync("/?" + ProviderPage.TicketParameter + "=" + Ticket("gvp_paired"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(SharedText.TokenFromPairing.En, await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    private static string Ticket(string token) =>
+        Uri.EscapeDataString(ProviderPage.CreateTicket(token, PluginApp.Id, DateTimeOffset.UtcNow.AddMinutes(2)));
+
+    private static async Task<string> PolicyAsync(PluginApp plugin, string path)
+    {
+        var response = await plugin.Client.GetAsync(path);
+        return Assert.Single(response.Headers.GetValues("Content-Security-Policy"));
+    }
+
+    // A plugin's whole app, as PluginHost builds it, on a test server with no token and nothing to find.
+    private sealed class PluginApp : IAsyncDisposable
+    {
+        public const string Id = "test-charger";
+
+        private readonly string _directory;
+
+        private PluginApp(WebApplication app, string directory)
+        {
+            App = app;
+            _directory = directory;
+            Client = app.GetTestClient();
+        }
+
+        public WebApplication App { get; }
+
+        public HttpClient Client { get; }
+
+        public static async Task<PluginApp> StartAsync(string name = "Test charger", string[]? extra = null)
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "gleanvolt-plugin-" + Guid.NewGuid().ToString("N"));
+            var plugin = new PluginInfo(Id, name, "Test", 8110, 502) { PageAssembly = typeof(TestPluginPage).Assembly };
+            // The host's own static assets stand in for the plugin's: a test project has no manifest of its own, and
+            // the host's serves its stylesheet at /app.css, from the source in Development as a plugin run from its
+            // project does.
+            var builder = PluginHost.CreateBuilder<TestCharger>(
+                [$"--DataDirectory={directory}", "--applicationName=Gleanvolt.Chargers.Hosting", "--environment=Development", .. extra ?? []], plugin);
+            builder.WebHost.UseTestServer();
+            builder.Services.AddSingleton<IGleanvoltFinder, NoGleanvolt>();
+            var app = PluginHost.Build(builder);
+            await app.StartAsync();
+            return new PluginApp(app, directory);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await App.StopAsync();
+            await App.DisposeAsync();
+            Directory.Delete(_directory, recursive: true);
+        }
+    }
+
+    private sealed class NoGleanvolt : IGleanvoltFinder
+    {
+        public async IAsyncEnumerable<Uri> CandidatesAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            yield break;
+        }
+    }
+
+    private sealed class TestCharger : PluginCharger
+    {
+        public override ChargerCapabilities Capabilities { get; } = new(6, 16, 1);
+
+        public override Task<ChargerReading> ReadAsync(CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Nothing to read.");
+
+        public override Task SetCurrentAsync(int amps, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public override Task SetChargingAllowedAsync(bool allowed, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
     // A device that answers every request with a work state.
     private sealed class Answers : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"value":"charger_free"}""") });
+    }
+}
+
+/// <summary>The test plugin's page: the shared frame and nothing of its own.</summary>
+[Route("/")]
+public sealed class TestPluginPage : ComponentBase
+{
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<PluginFrame>(0);
+        builder.CloseComponent();
     }
 }

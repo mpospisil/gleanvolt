@@ -20,14 +20,21 @@ public sealed class ExternalProviderRegistry : IExternalProviders
     private readonly List<ProviderSessions> _sessions;
     private readonly Dictionary<Type, ProviderSessions> _byHub;
 
+    // Two Accepts at once on a fresh install (Settings and the Wizard, say) would each find no token and each make
+    // one, and the first plugin would collect a token the second replaced.
+    private readonly SemaphoreSlim _tokenGate = new(1, 1);
+
     internal ExternalProviderRegistry(
         IServiceProvider services,
         ISecretStore secrets,
         TimeProvider time,
         ILoggerFactory loggers,
-        IEnumerable<ProviderKindRegistration> registrations)
+        IEnumerable<ProviderKindRegistration> registrations,
+        PairingRequests pairing)
     {
         _services = services;
+        Requests = pairing;
+        pairing.Changed += () => Changed?.Invoke();
         var list = registrations.ToList();
         Tokens = new ProviderTokens(secrets, list.Select(registration => registration.Kind.Id));
         var logger = loggers.CreateLogger("Gleanvolt.Providers");
@@ -53,6 +60,9 @@ public sealed class ExternalProviderRegistry : IExternalProviders
             sessions.Changed += () => Changed?.Invoke();
         }
     }
+
+    /// <summary>The plugins that knocked and wait for the owner.</summary>
+    internal PairingRequests Requests { get; }
 
     /// <summary>The token every kind shares (#406).</summary>
     public ProviderTokens Tokens { get; }
@@ -87,7 +97,68 @@ public sealed class ExternalProviderRegistry : IExternalProviders
     internal ProviderKind? KindAt(PathString path) =>
         _sessions.Select(sessions => sessions.Kind).FirstOrDefault(kind => path.StartsWithSegments(kind.HubPath, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>The kind whose hub is exactly <paramref name="hubPath"/>, or null; a path under it is not its hub.</summary>
+    internal ProviderKind? KindAtExactly(string hubPath) =>
+        _sessions.Select(sessions => sessions.Kind)
+            .FirstOrDefault(kind => string.Equals(kind.HubPath, hubPath, StringComparison.OrdinalIgnoreCase));
+
     public string? ReadToken() => Tokens.Read();
+
+    public IReadOnlyList<PairingRequestView> Pairing =>
+        [.. Requests.Waiting.Select(entry => new PairingRequestView(
+            entry.Id,
+            entry.Kind.Id,
+            entry.Knock.ProviderId,
+            entry.Knock.Name,
+            entry.Knock.Version,
+            entry.Source.ToString(),
+            entry.OnThisMachine,
+            entry.Code,
+            entry.Since,
+            BlockOf(entry)))];
+
+    public async Task<bool> AcceptPairingAsync(string id)
+    {
+        if (Requests.Waiting.FirstOrDefault(entry => entry.Id == id) is not { } waiting
+            || BlockOf(waiting) != PairingBlock.None)
+        {
+            return false;
+        }
+
+        // The first pairing of a fresh install makes the token the plugin is about to collect (#406).
+        string token;
+        await _tokenGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            token = Tokens.Read() ?? await CreateTokenAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _tokenGate.Release();
+        }
+
+        return Requests.Accept(id, token);
+    }
+
+    public void RejectPairing(string id) => Requests.Reject(id);
+
+    private PairingBlock BlockOf(PairingEntry entry)
+    {
+        if (Requests.IsDuplicate(entry))
+        {
+            return PairingBlock.Duplicate;
+        }
+
+        if (!IsEnabled(entry.Kind))
+        {
+            return PairingBlock.KindOff;
+        }
+
+        return _services.GetService<IRememberedProviders>()?.Find(entry.Kind.Id) is { } remembered
+            && remembered != entry.Knock.ProviderId
+                ? PairingBlock.AnotherProvider
+                : PairingBlock.None;
+    }
 
     public Task ForgetAsync(string kind) => For(kind)?.ForgetAsync() ?? Task.CompletedTask;
 

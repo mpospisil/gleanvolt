@@ -1065,6 +1065,26 @@ h1 {
     color: var(--accent-ink);
 }
 
+/* Something waits for the owner and nothing else will tell them (a plugin asking to be paired): a tinted
+   band with a button, which a glance at any page catches. */
+.alert.attention {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    background: color-mix(in srgb, var(--amber) 16%, var(--panel));
+    border-color: var(--amber);
+    border-left-width: 6px;
+}
+
+.alert.attention .button-link {
+    margin-left: 0;
+    border-color: var(--amber);
+    color: var(--ink);
+    font-weight: 600;
+}
+
 .controls {
     margin-top: var(--space-5);
     background: var(--panel);

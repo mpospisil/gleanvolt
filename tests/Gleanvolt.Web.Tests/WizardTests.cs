@@ -248,6 +248,26 @@ public class WizardTests : PageTest
     }
 
     [Fact]
+    public void The_wizard_lists_waiting_plugins()
+    {
+        _providers.Waiting.Add(new PairingRequestView("r1", "charger", "acme", "Acme Wallbox", "1.0", "127.0.0.1", true, "4821", DateTimeOffset.UnixEpoch, PairingBlock.None));
+
+        var page = Step("finish");
+
+        Assert.Contains("Acme Wallbox", page.Find("#wizard-charger #pairing-r1").TextContent);
+    }
+
+    [Fact]
+    public void The_wizard_keeps_the_token_for_connecting_by_hand()
+    {
+        _providers.Token = "gvp_" + new string('x', 43);
+
+        var page = Step("finish");
+
+        Assert.NotNull(page.Find("details#wizard-charger-by-hand #wizard-charger-token"));
+    }
+
+    [Fact]
     public void Once_everything_required_is_set_the_finish_starts_gleanvolt()
     {
         var page = Step("finish");

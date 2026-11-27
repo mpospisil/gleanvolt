@@ -2,7 +2,9 @@ using Gleanvolt.Providers.Client;
 using Gleanvolt.Providers.Client.Charger;
 using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Charger;
+using Gleanvolt.Chargers;
 using Gleanvolt.Providers.Testing;
+using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -192,6 +194,47 @@ public sealed class ChargerTestHubTests : IAsyncLifetime
         Assert.Equal("another-charger", _hub.RememberedProviderId);
     }
 
+    [Fact]
+    public async Task A_plugin_without_a_token_pairs_with_the_test_hub_and_is_read()
+    {
+        await using var harness = new PluginHarness(new PluginInfo("paired-charger", "Paired charger", "Paired", 0, 502));
+        var hub = await harness.ConnectAsync(new PairedCharger(), new ChargerLimits(6, 16, 1, 230), paired: true);
+
+        var reading = await hub.ReadAsync();
+
+        Assert.Equal(2300, reading.PowerWatts);
+        Assert.Single(hub.PairingKnocks);
+        Assert.Equal("paired-charger", hub.PairingKnocks[0].ProviderId);
+        Assert.Equal(CredentialSource.Paired, harness.Credentials!.Source);
+        Assert.Equal(hub.Token, harness.Credentials.Token);
+    }
+
+    [Fact]
+    public async Task The_hub_answers_unknown_to_a_collect_with_the_wrong_secret()
+    {
+        using var http = new HttpClient { BaseAddress = _hub.Endpoint };
+        var knock = new PairingKnock(ChargerContract.HubPath, "someone", "Someone", "1", null, PairingSecret.Hash("right"));
+        var ticket = await (await http.PostAsJsonAsync(PairingPaths.Knock, knock)).Content.ReadFromJsonAsync<PairingTicket>();
+
+        var wrong = await http.PostAsJsonAsync(PairingPaths.Collect(ticket!.RequestId), new PairingCollect("wrong"));
+        var right = await http.PostAsJsonAsync(PairingPaths.Collect(ticket.RequestId), new PairingCollect("right"));
+
+        Assert.Contains("\"unknown\"", await wrong.Content.ReadAsStringAsync());
+        Assert.Contains("\"accepted\"", await right.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task A_hub_without_pairing_answers_a_knock_with_404_as_an_older_gleanvolt_does()
+    {
+        await using var hub = await ChargerTestHub.StartAsync(new ChargerTestHubOptions { AcceptPairing = false });
+        using var http = new HttpClient { BaseAddress = hub.Endpoint };
+        var knock = new PairingKnock(ChargerContract.HubPath, "someone", "Someone", "1", null, PairingSecret.Hash("s"));
+
+        var response = await http.PostAsJsonAsync(PairingPaths.Knock, knock);
+
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private async Task<FakeCharger> StartPluginAsync(string? token = null, ChargerCapabilities? capabilities = null, string id = "fake-charger")
     {
         var builder = Host.CreateApplicationBuilder();
@@ -214,6 +257,18 @@ public sealed class ChargerTestHubTests : IAsyncLifetime
     }
 
     private ChargerProviderConnection PluginConnection() => _plugin!.Services.GetRequiredService<ChargerProviderConnection>();
+
+    private sealed class PairedCharger : PluginCharger
+    {
+        public override ChargerCapabilities Capabilities { get; } = new(6, 16, 1);
+
+        public override Task<ChargerReading> ReadAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new ChargerReading(DateTimeOffset.UtcNow, ChargerState.Charging, 2300, MaxCurrentAmps: 16));
+
+        public override Task SetCurrentAsync(int amps, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public override Task SetChargingAllowedAsync(bool allowed, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
 
     private sealed class FakeCharger : IChargerSource
     {

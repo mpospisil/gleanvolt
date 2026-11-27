@@ -349,8 +349,8 @@ public static class GleanvoltCli
 
             console.Out.WriteLine("The car, the tariff, Home Assistant and the API are set on Settings, or with setup --file.");
             console.Out.WriteLine(
-                "The charger is a plugin with its own setup page. Start it with the provider token from Settings → "
-                + "External providers; Gleanvolt uses it as soon as it connects.");
+                "The charger is a plugin with its own setup page. Start it: it asks to connect, and you accept it on "
+                + "Settings → External providers. Gleanvolt uses it as soon as it connects.");
             console.Out.WriteLine();
         }
         catch (EndOfInput)

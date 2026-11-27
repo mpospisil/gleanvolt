@@ -2,6 +2,7 @@
 @inject PluginInfo Plugin
 @inject PluginCharger Charger
 @inject Gleanvolt.Providers.Client.Charger.ChargerProviderConnection Connection
+@inject Gleanvolt.Providers.Client.ProviderCredentials Credentials
 @inject TimeProvider Time
 
 @*
@@ -39,6 +40,11 @@
     else
     {
         <p class="muted" id="not-connected">@SharedText.NotConnected</p>
+    }
+
+    @if (TokenSource is { } source)
+    {
+        <p class="muted" id="token-source">@source</p>
     }
 </section>
 
@@ -103,6 +109,14 @@
         null => SharedText.StatusWaiting.ToString(),
         { Healthy: true } => SharedText.StatusReading.ToString(),
         _ => (Charger.StatusWords ?? SharedText.StatusNotReading).ToString(),
+    };
+
+    // Whether the owner set the token by hand or accepted the plugin in Gleanvolt (#459), for when it stops connecting.
+    private Words? TokenSource => Credentials.Source switch
+    {
+        Gleanvolt.Providers.Client.CredentialSource.Configuration => SharedText.TokenFromConfiguration,
+        Gleanvolt.Providers.Client.CredentialSource.Paired => SharedText.TokenFromPairing,
+        _ => null,
     };
 
     private string? StatusClass => Charger.Status switch

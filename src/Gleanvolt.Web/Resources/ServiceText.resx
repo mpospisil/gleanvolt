@@ -741,6 +741,10 @@
     <value>the account isn't entered yet; enter it on the provider's page</value>
     <comment>An external provider's status code (#415), after "needs you:" or "cannot read the car:". Lower case, no final full stop.</comment>
   </data>
+  <data name="ProviderStatus_NotSetUpCharger" xml:space="preserve">
+    <value>the charger isn't set up yet; set it up on the plugin's page</value>
+    <comment>The not-set-up status of a charger plugin: what it lacks is the charger (its address), not an account.</comment>
+  </data>
   <data name="ProviderStatus_NeedsSignIn" xml:space="preserve">
     <value>sign in on the provider's page</value>
     <comment>An external provider's status code (#415), after "needs you:" or "cannot read the car:". Lower case, no final full stop.</comment>

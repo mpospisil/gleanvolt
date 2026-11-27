@@ -2,6 +2,7 @@ using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Tariff;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -27,8 +28,9 @@ public sealed class TariffProviderConnection : ProviderConnection<TariffWelcome>
 {
     private readonly ITariffSource _source;
 
-    public TariffProviderConnection(IOptions<ProviderOptions> options, ITariffSource source, ILogger<TariffProviderConnection> logger)
-        : base(options.Value, TariffContract.HubPath, TariffContract.Major, TariffContract.Minor, logger)
+    public TariffProviderConnection(IOptions<ProviderOptions> options, ITariffSource source, ILogger<TariffProviderConnection> logger,
+        ProviderCredentials? credentials = null)
+        : base(options.Value, TariffContract.HubPath, TariffContract.Major, TariffContract.Minor, logger, credentials)
     {
         _source = source;
     }
@@ -95,9 +97,11 @@ public static class TariffProviderServiceCollectionExtensions
         where TSource : class, ITariffSource
     {
         services.Configure(configure);
+        services.TryAddSingleton<ProviderCredentials>();
         services.AddSingleton<ITariffSource, TSource>();
         services.AddSingleton<TariffProviderConnection>();
         services.AddHostedService(provider => provider.GetRequiredService<TariffProviderConnection>());
+        services.AddGleanvoltPairing(provider => provider.GetRequiredService<TariffProviderConnection>().HubPath);
         return services;
     }
 }

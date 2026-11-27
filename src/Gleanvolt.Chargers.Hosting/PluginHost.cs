@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reflection;
 using Gleanvolt.Chargers.Components;
 using Gleanvolt.Providers.Client;
@@ -101,14 +102,16 @@ public static class PluginHost
         builder.Services.AddSingleton<GleanvoltSession>();
         builder.Services.AddTransient<RecordingHandler>();
 
-        var gleanvolt = new Uri(builder.Configuration["Gleanvolt:Endpoint"] ?? "http://localhost:8090");
-        builder.Services.AddSingleton(new PageFraming("'self' " + ProviderPageFraming.Sources(gleanvolt, builder.Configuration["Gleanvolt:FrameAncestors"])));
+        // Neither is needed (#459): without a token the plugin asks Gleanvolt to pair it, and the owner's Accept hands
+        // over the token and the address it is at. A token set here still wins, as before pairing existed.
+        var gleanvolt = builder.Configuration["Gleanvolt:Endpoint"] is { Length: > 0 } endpoint ? new Uri(endpoint) : null;
+        var frameAncestors = builder.Configuration["Gleanvolt:FrameAncestors"];
+        builder.Services.AddSingleton(provider => new PageFraming(provider.GetRequiredService<ProviderCredentials>(), frameAncestors));
 
         builder.Services.AddGleanvoltChargerProvider<TCharger>(options =>
         {
             options.Endpoint = gleanvolt;
-            options.Token = builder.Configuration["Gleanvolt:Token"]
-                ?? throw new InvalidOperationException("Set Gleanvolt:Token to the token from Gleanvolt's Settings → External providers.");
+            options.Token = builder.Configuration["Gleanvolt:Token"] ?? string.Empty;
             options.ProviderId = plugin.ProviderId;
             options.Name = plugin.Name;
             options.Version = plugin.Version;
@@ -138,6 +141,15 @@ public static class PluginHost
         var app = builder.Build();
         var plugin = app.Services.GetRequiredService<PluginInfo>();
 
+        // On every response, the waiting view and the refusals and the static files too, and read per request: pairing
+        // can change the Gleanvolt in use while the plugin runs.
+        var framing = app.Services.GetRequiredService<PageFraming>();
+        app.Use((context, next) =>
+        {
+            context.Response.Headers.ContentSecurityPolicy = "frame-ancestors " + framing.FrameAncestors();
+            return next(context);
+        });
+
         app.UseRequestLocalization(options =>
         {
             options.SetDefaultCulture("en").AddSupportedCultures("en", "cs").AddSupportedUICultures("en", "cs");
@@ -145,7 +157,13 @@ public static class PluginHost
         });
 
         // Everything after it answers only a browser Gleanvolt sent, with a ticket: the page changes what charger is driven.
-        app.UseGleanvoltProviderPage();
+        var pairing = app.Services.GetRequiredService<ProviderPairing>();
+        app.UseGleanvoltProviderPage(options => options.Unpaired = context =>
+        {
+            context.Response.ContentType = "text/html; charset=utf-8";
+            context.Response.Headers.CacheControl = "no-store";
+            return context.Response.WriteAsync(WaitingPage.Html(plugin, pairing.Status, AddressesOrNone(LanScan.OwnAddresses), CultureInfo.CurrentUICulture));
+        });
 
         app.Use((context, next) =>
         {
@@ -170,14 +188,38 @@ public static class PluginHost
                 "application/json",
                 $"{plugin.ProviderId}-recording.json"));
 
-        var framing = app.Services.GetRequiredService<PageFraming>();
+        // Null: Blazor's own policy is fixed at start-up, and the middleware above already writes one that follows the pairing.
         app.MapRazorComponents<App>()
             .AddAdditionalAssemblies(plugin.PageAssembly)
-            .AddInteractiveServerRenderMode(options => options.ContentSecurityFrameAncestorsPolicy = framing.FrameAncestors);
+            .AddInteractiveServerRenderMode(options => options.ContentSecurityFrameAncestorsPolicy = null);
 
         return app;
     }
+
+    // The waiting view is all a plugin that waits to be paired shows: a machine whose interfaces cannot be listed (a
+    // sandbox, a container without netlink) shows it without its addresses rather than answering 500.
+    internal static IReadOnlyList<System.Net.IPAddress> AddressesOrNone(Func<IReadOnlyList<System.Net.IPAddress>> read)
+    {
+        try
+        {
+            return read();
+        }
+        catch (System.Net.NetworkInformation.NetworkInformationException)
+        {
+            return [];
+        }
+    }
 }
 
-/// <summary>The page's frame-ancestors policy: Gleanvolt's own origin, and any the owner adds.</summary>
-public sealed record PageFraming(string FrameAncestors);
+/// <summary>
+/// The page's frame-ancestors policy: its own origin and Gleanvolt's, or the ones the owner configured. Gleanvolt's is
+/// the one in use, so it moves to the paired one when the owner accepts the plugin (#459); a paired one allows any host
+/// on its port, since the browser may open Gleanvolt by a name other than the address the plugin found.
+/// </summary>
+/// <param name="credentials">Where the Gleanvolt in use is.</param>
+/// <param name="configured"><c>Gleanvolt:FrameAncestors</c>, which wins when set.</param>
+public sealed class PageFraming(ProviderCredentials credentials, string? configured)
+{
+    /// <summary>The <c>frame-ancestors</c> sources now, e.g. <c>'self' http://192.168.1.5:8090</c>.</summary>
+    public string FrameAncestors() => "'self' " + ProviderPageFraming.Sources(credentials, configured);
+}

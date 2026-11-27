@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Gleanvolt.Providers.Client;
 
@@ -28,21 +29,26 @@ public abstract class ProviderConnection<TWelcome> : BackgroundService
     where TWelcome : Welcome
 {
     private readonly ProviderOptions _options;
-    private readonly string _hubPath;
+    private readonly ProviderCredentials _credentials;
     private readonly int _contractMajor;
     private readonly int _contractMinor;
     private HubConnection? _connection;
     private TWelcome? _welcome;
     private bool _goodbye;
 
-    protected ProviderConnection(ProviderOptions options, string hubPath, int contractMajor, int contractMinor, ILogger logger)
+    protected ProviderConnection(ProviderOptions options, string hubPath, int contractMajor, int contractMinor, ILogger logger,
+        ProviderCredentials? credentials = null)
     {
         _options = options;
-        _hubPath = hubPath;
+        _credentials = credentials ?? new ProviderCredentials(Options.Create(options));
+        HubPath = hubPath;
         _contractMajor = contractMajor;
         _contractMinor = contractMinor;
         Logger = logger;
     }
+
+    /// <summary>The hub path this kind connects to, added to Gleanvolt's address.</summary>
+    public string HubPath { get; }
 
     protected ILogger Logger { get; }
 
@@ -90,12 +96,23 @@ public abstract class ProviderConnection<TWelcome> : BackgroundService
 
             try
             {
+                // Without a token there is nothing to knock with: wait for the config or a pairing to bring one (#459).
+                await _credentials.WaitForTokenAsync(stoppingToken).ConfigureAwait(false);
                 wait = await RunSessionAsync(stoppingToken).ConfigureAwait(false);
                 delay = _options.InitialRetryDelay;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                && _credentials.Source == CredentialSource.Paired)
+            {
+                // The owner removed the pairing, or the token was changed: this one will never work, so forget it
+                // and wait to be paired again rather than knocking with it for ever.
+                Logger.LogWarning("Gleanvolt refused the paired token; forgetting it and waiting to be paired again.");
+                _credentials.ForgetPaired();
+                wait = delay;
             }
             catch (Exception ex)
             {
@@ -134,7 +151,7 @@ public abstract class ProviderConnection<TWelcome> : BackgroundService
         var connection = new HubConnectionBuilder()
             .WithUrl(HubUri(), options =>
             {
-                options.AccessTokenProvider = () => Task.FromResult<string?>(_options.Token);
+                options.AccessTokenProvider = () => Task.FromResult(_credentials.Token);
                 _options.ConfigureHttp?.Invoke(options);
             })
             // Enums by name, as the host writes them and as the protocol page describes them.
@@ -222,20 +239,10 @@ public abstract class ProviderConnection<TWelcome> : BackgroundService
         return true;
     }
 
-    private Uri HubUri() => new(_options.Endpoint!, _hubPath);
+    private Uri HubUri() => new(_credentials.Endpoint, HubPath);
 
     private void Validate()
     {
-        if (_options.Endpoint is null)
-        {
-            throw new InvalidOperationException("ProviderOptions.Endpoint is required: Gleanvolt's web address, e.g. http://gleanvolt.local:8090.");
-        }
-
-        if (string.IsNullOrWhiteSpace(_options.Token))
-        {
-            throw new InvalidOperationException("ProviderOptions.Token is required: generate one on Gleanvolt's Settings.");
-        }
-
         if (string.IsNullOrWhiteSpace(_options.ProviderId) || string.IsNullOrWhiteSpace(_options.Name))
         {
             throw new InvalidOperationException("ProviderOptions.ProviderId and Name are required.");

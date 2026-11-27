@@ -2,6 +2,7 @@ using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.SolarForecast;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -30,8 +31,9 @@ public sealed class SolarForecastProviderConnection : ProviderConnection<SolarFo
     private PvSite? _site;
 
     public SolarForecastProviderConnection(
-        IOptions<ProviderOptions> options, ISolarForecastSource source, ILogger<SolarForecastProviderConnection> logger)
-        : base(options.Value, SolarForecastContract.HubPath, SolarForecastContract.Major, SolarForecastContract.Minor, logger)
+        IOptions<ProviderOptions> options, ISolarForecastSource source, ILogger<SolarForecastProviderConnection> logger,
+        ProviderCredentials? credentials = null)
+        : base(options.Value, SolarForecastContract.HubPath, SolarForecastContract.Major, SolarForecastContract.Minor, logger, credentials)
     {
         _source = source;
         Welcomed += welcome => _site = welcome.Site;
@@ -112,9 +114,11 @@ public static class SolarForecastProviderServiceCollectionExtensions
         where TSource : class, ISolarForecastSource
     {
         services.Configure(configure);
+        services.TryAddSingleton<ProviderCredentials>();
         services.AddSingleton<ISolarForecastSource, TSource>();
         services.AddSingleton<SolarForecastProviderConnection>();
         services.AddHostedService(provider => provider.GetRequiredService<SolarForecastProviderConnection>());
+        services.AddGleanvoltPairing(provider => provider.GetRequiredService<SolarForecastProviderConnection>().HubPath);
         return services;
     }
 }

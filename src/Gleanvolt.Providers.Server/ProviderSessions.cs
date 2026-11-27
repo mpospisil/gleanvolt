@@ -419,6 +419,8 @@ public sealed partial class ProviderSessions
 
     private void TimedOut(PendingRequest request)
     {
+        bool ownerTold;
+
         lock (_gate)
         {
             if (_pending != request)
@@ -428,10 +430,15 @@ public sealed partial class ProviderSessions
 
             _pending = null;
             _status = _status with { Unanswered = true };
+
+            // The provider already said only the owner can fix it (a charger plugin with no address, an
+            // expired login): it can't answer until they do, and a warning per request would repeat that.
+            ownerTold = _status.NeedsOwner;
         }
 
         request.Timer?.Dispose();
-        _logger.LogWarning("The {Kind} provider did not answer the request {Request}.", Kind.Name, request.Id);
+        _logger.Log(ownerTold ? LogLevel.Debug : LogLevel.Warning,
+            "The {Kind} provider did not answer the request {Request}.", Kind.Name, request.Id);
         Changed?.Invoke();
     }
 

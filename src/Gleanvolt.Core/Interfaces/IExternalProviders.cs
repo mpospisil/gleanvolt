@@ -36,9 +36,60 @@ public interface IExternalProviders
     /// </summary>
     Task ForgetAsync(string kind) => Task.CompletedTask;
 
-    /// <summary>Raised when any kind's status changes: a session, its data, the token.</summary>
+    /// <summary>The plugins that knocked and wait for the owner to accept or reject them, oldest first.</summary>
+    IReadOnlyList<PairingRequestView> Pairing { get; }
+
+    /// <summary>
+    /// Accepts the pairing request <paramref name="id"/>: the plugin collects the provider token, which is made
+    /// first when there is none. False when the request is gone or its <see cref="PairingRequestView.Block"/> is not none.
+    /// </summary>
+    Task<bool> AcceptPairingAsync(string id);
+
+    /// <summary>Rejects the pairing request <paramref name="id"/>; its plugin is told so when it collects.</summary>
+    void RejectPairing(string id);
+
+    /// <summary>Raised when any kind's status changes: a session, its data, the token, or the pairing list.</summary>
     event Action? Changed;
 }
+
+/// <summary>Why the owner cannot accept a pairing request now.</summary>
+public enum PairingBlock
+{
+    /// <summary>Nothing: the request can be accepted.</summary>
+    None,
+
+    /// <summary>Another plugin from another address claims the same provider id; two cannot both be it.</summary>
+    Duplicate,
+
+    /// <summary>The owner has not turned the kind on.</summary>
+    KindOff,
+
+    /// <summary>The kind remembers a different provider (#440); the owner must forget it first.</summary>
+    AnotherProvider,
+}
+
+/// <summary>A plugin waiting for the owner's answer, as the owner sees it.</summary>
+/// <param name="Id">Names the request; what Accept and Reject take.</param>
+/// <param name="Kind">The kind's id the plugin knocked for.</param>
+/// <param name="ProviderId">The plugin's own id.</param>
+/// <param name="ProviderName">Its name.</param>
+/// <param name="Version">Its version.</param>
+/// <param name="Source">The address the knock came from.</param>
+/// <param name="OnThisMachine">Whether it runs on the machine Gleanvolt runs on.</param>
+/// <param name="Code">The code the owner compares with the one the plugin shows.</param>
+/// <param name="Since">When the plugin first knocked.</param>
+/// <param name="Block">Why it cannot be accepted now, or none.</param>
+public sealed record PairingRequestView(
+    string Id,
+    string Kind,
+    string ProviderId,
+    string ProviderName,
+    string Version,
+    string Source,
+    bool OnThisMachine,
+    string Code,
+    DateTimeOffset Since,
+    PairingBlock Block);
 
 /// <summary>Where a kind's session is.</summary>
 public enum ExternalProviderState
@@ -112,7 +163,7 @@ public sealed record ExternalProviderStatus(
     /// for <see cref="StatusCode"/>, then the detail in the viewer's language. The English is for the log,
     /// the API and Home Assistant. Null with nothing to say.
     /// </summary>
-    public (Phrase? Phrase, string English)? StatusSaid => ProviderStatusText.Of(StatusCode, StatusMessages, StatusMessage);
+    public (Phrase? Phrase, string English)? StatusSaid => ProviderStatusText.Of(StatusCode, StatusMessages, StatusMessage, Kind);
 
     /// <summary>
     /// Where the web UI opens the provider's page (#410): a Gleanvolt address behind the web login that

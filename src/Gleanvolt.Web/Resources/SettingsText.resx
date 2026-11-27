@@ -1149,4 +1149,37 @@
     <value>Gleanvolt drives the charger through a plugin: a program outside Gleanvolt that connects with the provider token. Which charger it is, and its settings, are on the plugin's own page.</value>
     <comment>The Charger section's tip on Settings (#457).</comment>
   </data>
+  <data name="PairingTitle" xml:space="preserve">
+    <value>Plugins asking to connect</value>
+  </data>
+  <data name="PairingIntro" xml:space="preserve">
+    <value>A plugin waits here until you accept it. Accepting gives it the provider token.</value>
+  </data>
+  <data name="PairingThisMachine" xml:space="preserve">
+    <value>This machine</value>
+  </data>
+  <data name="PairingCode" xml:space="preserve">
+    <value>Code:</value>
+  </data>
+  <data name="PairingCheckCode" xml:space="preserve">
+    <value>Open the plugin's page at its own address, or its log, and check that the code matches and that the address shown here is one the plugin's own page lists.</value>
+  </data>
+  <data name="PairingAccept" xml:space="preserve">
+    <value>Accept</value>
+  </data>
+  <data name="PairingReject" xml:space="preserve">
+    <value>Reject</value>
+  </data>
+  <data name="PairingBlockDuplicate" xml:space="preserve">
+    <value>Two plugins ask with this name. Reject the one you don't know.</value>
+  </data>
+  <data name="PairingBlockKindOff" xml:space="preserve">
+    <value>This kind of provider is turned off.</value>
+  </data>
+  <data name="PairingBlockAnotherProvider" xml:space="preserve">
+    <value>Gleanvolt already uses another charger plugin. Forget it first.</value>
+  </data>
+  <data name="PairingGone" xml:space="preserve">
+    <value>That plugin is no longer waiting, or can no longer be accepted.</value>
+  </data>
 </root>

@@ -18,15 +18,17 @@ your solar power and your home battery, but no charging mode can be started.
 
 <Steps>
 
-1. **Get the provider token.** On the wizard's **Finish** step, or under **Settings → External
-   providers**, press **Make the token** if there is none, then copy it. Every plugin connects with
-   this one token.
+1. **Start the plugin** for your charger, from
+   [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (SolaX, Huawei, go-e, Shelly TopAC), as its README says. You
+   don't need a token or an address. It can run on the same computer as Gleanvolt or on another one in
+   your home network, and it doesn't matter whether Gleanvolt or the plugin is installed first: the
+   plugin waits, finds Gleanvolt when it appears, and asks to be let in.
 
-2. **Start the plugin** for your charger, from
-   [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (SolaX, Huawei, go-e, Shelly TopAC), as its README says, with
-   Gleanvolt's address (for example
-   `http://gleanvolt.local:8090`) and the token. It can run on the same computer as Gleanvolt or on
-   another one in your home network.
+2. **Accept the plugin in Gleanvolt.** While a plugin waits, a band at the top of every page says so and
+   links to the list. Under **Settings → External providers**, or on the wizard's
+   **Finish** step, a box **Plugins asking to connect** lists it. Check the row, then press **Accept**.
+   Gleanvolt hands the plugin the provider token by itself, and creates it first if there is none. You
+   never copy it, and the plugin doesn't need a restart. See [Accepting a plugin](#accepting-a-plugin).
 
 3. **Open the plugin's page.** Once the plugin is connected, the **Charger** section on **Settings**
    shows it, with its page below. Enter your charger's address there and save. **Open in a new tab**
@@ -36,6 +38,42 @@ your solar power and your home battery, but no charging mode can be started.
    state. Start a charging mode on the **Charging plan** page.
 
 </Steps>
+
+## Accepting a plugin
+
+A plugin that runs on the same computer as Gleanvolt is marked **This machine**, and one press of
+**Accept** is enough. A plugin on another computer shows its address, and a six-digit **code**
+such as `482 193`. Open the plugin's own page at its address, or read its log: both show the same code, and
+the page lists the plugin's own addresses. Press **Accept** only if the code matches **and** the address
+Gleanvolt shows is one the plugin's page lists. Another computer on your network can pass a plugin's
+request on, with the right code, and only the address gives it away. If either doesn't match, someone else
+on your network is asking: press **Reject**. A plugin on another computer than Gleanvolt is best given
+Gleanvolt's address, as `Gleanvolt__Endpoint` (see **Gleanvolt moved** below).
+
+:::caution[Accepting needs no sign-in]
+Anyone who can open Gleanvolt can accept a waiting plugin, on **Settings** and in the wizard, with or
+without being signed in. That is so a Gleanvolt without a password can still pair. Settings still shows
+the token itself only to a signed-in owner. **Setting a password closes this**: on a network where other
+people can reach Gleanvolt, set one.
+:::
+
+Accept stays grey, with the reason beside it, when two waiting plugins claim the same name (reject the
+one you don't know), when that kind of provider is turned off, or when Gleanvolt already uses another
+charger plugin (press **Forget** beside it first). A plugin you reject asks again after an hour, or when
+it restarts. A request that nobody answers disappears after 15 minutes without the plugin asking again,
+and the plugin simply asks anew.
+
+**The token by hand.** You can still give the plugin the token yourself, as `Gleanvolt__Token` in its
+environment or `--Gleanvolt:Token=…`. It wins over pairing, and the plugin then connects to the address you
+give it, or to `http://localhost:8090` if you give none. Make the token under **Settings → External
+providers** with **Make the token**. Making a **new** token disconnects every plugin: a paired plugin
+asks again and you accept it again; one set up by hand needs the new token.
+
+**Gleanvolt moved.** A paired plugin keeps the address it was accepted at and doesn't look for Gleanvolt
+again, so if Gleanvolt gets a new address, tell the plugin: set `Gleanvolt__Endpoint` in its environment, or
+`--Gleanvolt:Endpoint=…`. That address wins over the saved one, and the plugin keeps its token. To unpair a
+plugin, delete `gleanvolt-token` and `gleanvolt-endpoint` from the plugin's data directory, or make a new
+token in Gleanvolt.
 
 ## Moving from the built-in driver
 

@@ -24,6 +24,9 @@ internal sealed class TestHost : IAsyncDisposable
 
     public MemorySecrets Secrets { get; } = new();
 
+    /// <summary>What the providers' own log said, for a test about how loudly something is told.</summary>
+    public CapturedLog Log { get; } = new();
+
     public ExternalProviderRegistry Registry => _app!.Services.GetRequiredService<ExternalProviderRegistry>();
 
     public ProviderSessions Sessions => Registry.For(EchoHub.Kind)!;
@@ -37,6 +40,8 @@ internal sealed class TestHost : IAsyncDisposable
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
         builder.Logging.ClearProviders();
+        builder.Logging.AddProvider(Log);
+        builder.Logging.SetMinimumLevel(LogLevel.Debug);
         builder.Services.AddSingleton<ISecretStore>(Secrets);
         builder.Services.AddSingleton<TimeProvider>(Time);
         builder.Services.AddSingleton(new ProviderHostInfo("1.2.3-test"));
@@ -47,6 +52,7 @@ internal sealed class TestHost : IAsyncDisposable
         _app.UseAuthorization();
         _app.MapExternalProviders();
         _app.MapExternalProviderPages();
+        _app.MapProviderPairing();
         await _app.StartAsync();
 
         Token = await Registry.CreateTokenAsync();
@@ -71,6 +77,21 @@ internal sealed class TestHost : IAsyncDisposable
         return connection;
     }
 
+    /// <summary>Posts JSON to <paramref name="path"/> as a client at <paramref name="from"/> (127.0.0.1 when not said).</summary>
+    public Task<HttpResponseMessage> PostAsync(string path, object body, IPAddress? from = null) =>
+        PostRawAsync(path, System.Text.Json.JsonSerializer.Serialize(body, System.Text.Json.JsonSerializerOptions.Web), from);
+
+    /// <summary>Posts <paramref name="json"/> as it is, for a body that is not what the contract sends.</summary>
+    public async Task<HttpResponseMessage> PostRawAsync(string path, string json, IPAddress? from = null)
+    {
+        using var client = new HttpClient(Server.CreateHandler(context => context.Connection.RemoteIpAddress = from ?? IPAddress.Loopback))
+        {
+            BaseAddress = Server.BaseAddress,
+        };
+        using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        return await client.PostAsync(path, content);
+    }
+
     public static ProviderHello Hello(string id = "echo-one", int major = 1) => new(id, "Echo " + id, "0.1", major, 0);
 
     public async ValueTask DisposeAsync()
@@ -87,6 +108,9 @@ internal sealed class MemorySecrets : ISecretStore
 {
     private readonly Dictionary<string, string> _values = [];
 
+    /// <summary>How long a write takes, so two at once overlap.</summary>
+    public TimeSpan WriteDelay { get; set; }
+
     public string? Read(string name)
     {
         lock (_values)
@@ -97,6 +121,11 @@ internal sealed class MemorySecrets : ISecretStore
 
     public bool Write(string name, string value)
     {
+        if (WriteDelay > TimeSpan.Zero)
+        {
+            Thread.Sleep(WriteDelay);
+        }
+
         lock (_values)
         {
             _values[name] = value;
@@ -125,5 +154,30 @@ internal static class Eventually
         }
 
         Assert.True(condition(), because);
+    }
+}
+
+/// <summary>Every line the "Gleanvolt.Providers" log writes, with its level.</summary>
+internal sealed class CapturedLog : ILoggerProvider
+{
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(LogLevel Level, string Message)> _lines = new();
+
+    public IReadOnlyList<(LogLevel Level, string Message)> Lines => [.. _lines];
+
+    public ILogger CreateLogger(string categoryName) =>
+        categoryName == "Gleanvolt.Providers" ? new Logger(_lines) : Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
+
+    public void Dispose()
+    {
+    }
+
+    private sealed class Logger(System.Collections.Concurrent.ConcurrentQueue<(LogLevel, string)> lines) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            lines.Enqueue((logLevel, formatter(state, exception)));
     }
 }

@@ -5,10 +5,15 @@ namespace Gleanvolt.Providers.Client;
 /// <summary>How a provider finds Gleanvolt and introduces itself.</summary>
 public sealed class ProviderOptions
 {
-    /// <summary>Gleanvolt's web address, e.g. <c>http://gleanvolt.local:8090</c>. The hub path is added to it.</summary>
+    /// <summary>
+    /// Gleanvolt's web address, e.g. <c>http://gleanvolt.local:8090</c>. The hub path is added to it. Optional: a
+    /// provider without a token tries it first when it asks to be paired, a paired provider keeps the address it
+    /// knocked on and was accepted at, and the default is <c>http://localhost:8090</c>. Set, it always wins over the
+    /// paired address: that is how a paired provider follows a Gleanvolt that moved.
+    /// </summary>
     public Uri? Endpoint { get; set; }
 
-    /// <summary>The token generated for this kind on Gleanvolt's Settings.</summary>
+    /// <summary>The token generated for this kind on Gleanvolt's Settings. Optional: empty, the provider asks to be paired and waits for the owner to accept. A token set here always wins over a paired one.</summary>
     public string Token { get; set; } = string.Empty;
 
     /// <summary>Stable across restarts: lowercase letters, digits and dashes.</summary>

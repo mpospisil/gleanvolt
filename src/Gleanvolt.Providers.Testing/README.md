@@ -33,7 +33,11 @@ Assert.True(done.Succeeded);
   options' `Limits` (`ChargerLimitsRules`), refused with `limits` when they don't fit. The first plugin
   accepted is remembered, and another id is refused with `another-provider` until **`Forget()`**.
   **`LastRefusal`** says why a hello was refused.
-- **`ChargerTestHubOptions`** sets the welcome (the charge control's limits, `DryRun`, the time zone), the
+- **Pairing** (#459): a plugin that starts with no token can pair with the hub. It answers Gleanvolt's two pairing
+  endpoints (`PairingPaths`) and accepts every knock at once, collecting with the hub's own `Token` once the
+  plugin proves the secret it knocked with. **`PairingKnocks`** lists what the plugin asked. Switch it off with
+  `AcceptPairing = false` and the endpoints answer 404, as a Gleanvolt that predates pairing does.
+- **`ChargerTestHubOptions`** sets the welcome (the charge control's limits, `DryRun`, the time zone), whether it accepts pairing, the
   token, how long to wait, and the clock the rules are checked against.
 
 **A plugin on `Gleanvolt.Chargers.Hosting`** (#443) has two more helpers:
@@ -50,6 +54,10 @@ var reading = await hub.ReadAsync();
 await hub.SetCurrentAsync(10);
 Assert.Equal(["0x0628=1000"], charger.Writes);
 ```
+
+`ConnectAsync(..., paired: true)` starts the plugin with no token and no address, finds the hub and pairs with it,
+the way a plugin installed before Gleanvolt does; afterwards `harness.Credentials` holds the paired token and
+`harness.Pairing` the pairing's status. Its poll runs on a clock a hundred times faster than the SDK's 3 s.
 
 `PluginHarness` gives the plugin its settings in a data directory of its own, the recorder and the session, and
 `FakeClients(handler)` for an HTTP charger. `FakeModbusServer` keeps every write in order.

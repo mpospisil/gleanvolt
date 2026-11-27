@@ -23,12 +23,18 @@ public static class LanScan
 
     /// <summary>This machine's own private IPv4 networks, as /24s, e.g. <c>192.168.1.0/24</c>.</summary>
     public static IReadOnlyList<string> OwnNetworks() =>
+        [.. OwnAddresses()
+            .Where(IsPrivate)
+            .Select(address => $"{address.GetAddressBytes()[0]}.{address.GetAddressBytes()[1]}.{address.GetAddressBytes()[2]}.0/24")
+            .Distinct()];
+
+    /// <summary>This machine's own IPv4 addresses on the interfaces that are up, loopback left out.</summary>
+    internal static IReadOnlyList<IPAddress> OwnAddresses() =>
         [.. NetworkInterface.GetAllNetworkInterfaces()
             .Where(card => card.OperationalStatus == OperationalStatus.Up && card.NetworkInterfaceType != NetworkInterfaceType.Loopback)
             .SelectMany(card => card.GetIPProperties().UnicastAddresses)
             .Select(unicast => unicast.Address)
-            .Where(address => address.AddressFamily == AddressFamily.InterNetwork && IsPrivate(address))
-            .Select(address => $"{address.GetAddressBytes()[0]}.{address.GetAddressBytes()[1]}.{address.GetAddressBytes()[2]}.0/24")
+            .Where(address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address))
             .Distinct()];
 
     /// <summary>The hosts of <paramref name="network"/>, or null when it is not a private network of a /22 or smaller.</summary>
