@@ -28,7 +28,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddGleanvoltTariffProvider<MyTariff>(options =>
 {
     options.Endpoint = new Uri("http://gleanvolt.local:8090");
-    options.Token = builder.Configuration["Gleanvolt:Token"]!;
+    options.Token = builder.Configuration["Gleanvolt:Token"] ?? string.Empty;   // optional: empty, the provider pairs (below)
     options.ProviderId = "my-tariff";
     options.Name = "My tariff";
 });
@@ -141,7 +141,11 @@ password to.
 Every provider connects with one token, made on Settings under **External providers** with **Make a
 token**. Gleanvolt keeps it in the secret store, like the API keys, and Settings shows it masked, with
 **Reveal** and **Copy**, to a signed-in owner. Without a web login it is never shown. A new token
-disconnects every provider until each is given the new one.
+disconnects every provider until each is given the new one, or, for a provider that was paired,
+until the owner accepts it again (see [Pairing](#pairing)).
+
+A provider need not be given the token by hand: one started without it asks Gleanvolt for it, and the
+owner presses **Accept**. Copying the token as `Gleanvolt:Token` still works and still wins.
 
 The token is separate from the web password and the API keys. The hub a provider connects to decides
 which kind's data it can publish; the token lets it connect to any of them. Before #406 each kind had
@@ -151,6 +155,101 @@ forecast's) as the shared token, so a provider already set up keeps connecting.
 The token goes in `Authorization: Bearer <token>`. A WebSocket from a browser-style client can't set
 headers, so the token is also accepted as `access_token` in the query string. A wrong or missing
 token gets `401` before any connection is made.
+
+## Pairing
+
+A provider that starts **without a token** does not stop (#459). It looks for Gleanvolt, asks to be
+paired, and gets the token while it runs, when the owner presses **Accept** in Gleanvolt. The order of
+installation does not matter, and the owner never sees or copies the token. The shared token (#406) stays
+the same; pairing only delivers it. It is in the SDK, so every kind gets it: tariff, solar forecast,
+vehicle, weather and charger.
+
+**Where the token comes from**, in order:
+
+1. `Gleanvolt:Token` in the provider's configuration (environment, command line, user secrets). It wins
+   over pairing, so a scripted install, or a provider on another device whose owner prefers to copy the
+   token, works as before. Such a provider never knocks, and with no `Gleanvolt:Endpoint` it keeps
+   connecting to `http://localhost:8090`.
+2. The token a pairing delivered, kept in the provider's secret store (`gleanvolt-token`), with the address
+   it was accepted at (`gleanvolt-endpoint`).
+3. Neither: the provider pairs.
+
+**What the provider does without a token.** It makes a pairing secret (32 random bytes, kept in its secret
+store as `gleanvolt-pairing-secret`, so it is the same after a restart) and the six-digit **code** derived
+from it, such as `482 193`. It looks for Gleanvolt at `Gleanvolt:Endpoint` if set, then
+`http://localhost:8090`, then every `_gleanvolt._tcp` service that answers an mDNS browse, and knocks on
+the first that takes the knock. It retries with a backoff of up to a minute, says so once at
+Information and then at Debug, and never exits or fills its log while Gleanvolt is away. Its own page
+shows only a read-only view while it waits (its name, where it stands, the code and its own
+addresses); every other path answers `403`, as for any page without a ticket. The code and the state are
+also in its log.
+
+**The knock.** Two plain HTTP calls on Gleanvolt, outside the provider token's authentication
+(`AllowAnonymous`). `PairingPaths`, `PairingKnock`, `PairingTicket`, `PairingCollect`, `PairingAnswer` and
+`PairingSecret` in `Gleanvolt.Providers.Contracts` describe them, and derive the code the same way on
+both sides.
+
+| Call | Body | Answer |
+| --- | --- | --- |
+| `POST /providers/pairing` | `PairingKnock`: `hubPath` (the kind's hub, e.g. `/providers/charger`), `providerId`, `name`, `version`, `pageUrl` (or null), `secretHash` | `{"requestId":"…"}`; `400` for a field that is wrong or a hub path that is no kind's; `413` over 4 KiB; `429` over the rate limit |
+| `POST /providers/pairing/{requestId}/collect` | `PairingCollect`: `secret`, the secret whose hash was knocked with | `PairingAnswer`: `state` is `waiting`, `accepted` (with `token`), `rejected` or `unknown` |
+
+The secret hash is SHA-256 of the UTF-8 secret, in base64url without padding. The code is the first four
+bytes of the hash as a big-endian number, modulo 10^6, in two groups of three digits. Only the hash
+travels in the knock, so a program that sees it cannot collect: the token goes to whoever holds the
+secret. A wrong secret gets `unknown`, the same as no such request. The answer carries the token only; the
+provider saves the address it knocked on and was accepted at.
+
+A provider collects every 3 seconds while it waits. `accepted` is given once, then the request is gone.
+`unknown` means Gleanvolt restarted (the list is in memory) or the request expired: the provider knocks
+again.
+
+**The waiting list.** Gleanvolt keeps what it was told in memory only: the kind, the id, the name, the
+version, the source address, the code and the time. It holds at most 16 entries (one more drops the
+oldest), an entry expires after 15 minutes in which the provider neither knocked nor collected, and one
+source address may knock 10 times a minute. A knock from the same provider id and the same address
+replaces the earlier one, since a container started without its data volume has a new secret each time.
+
+**Accepting.** Settings → External providers lists each waiting plugin with its name, id, address (or
+*This machine*), code, **Accept** and **Reject**. The setup Wizard's **Finish** step lists the same
+requests under the charger. Accept hands the provider the shared token: if there is none yet, Accept
+makes it, and a token in use is reused, so an owner whose plugins all pair never meets the token step.
+**Reject** drops the entry; the provider is told, shows it on its page, and asks again after an hour or
+a restart.
+
+**Accepting needs no login.** Gleanvolt's web login is optional, and the owner chose that an install
+without a password can still pair: anyone who can open Gleanvolt can accept a waiting plugin, on Settings
+and in the Wizard, signed in or not. (Settings still shows the token itself only to a signed-in owner.)
+Setting a password closes it. On a network with other people on it, set one.
+
+**Telling a real plugin from a copy.** A knock from a loopback address is a plugin on this machine: it is
+listed as *This machine* and needs no check, since nothing on the network can send a loopback knock. With
+host networking, which every documented deployment uses, plugins on the same device all knock from
+loopback. A knock from any other address shows the source address, the code and the hint to open the
+plugin's own page at its own address, or read its log, and check that the code matches. Gleanvolt never
+links to the page address a knock carries before the plugin is accepted: a copy could send its own page,
+which would confirm itself. On a bridge network the addresses will not match (Docker's gateway against a
+`172.x` address); the code is what counts.
+
+Accept is turned off, with the reason shown, for a request that:
+
+- shares its provider id with a request from another address (two plugins cannot both be that one; reject
+  the one you don't know);
+- is for a kind that is turned off;
+- is for a charger when Gleanvolt remembers another charger plugin (#440): the shared token would be
+  handed over for a session that is then refused. Forget the remembered one first.
+
+**After pairing.** The provider talks only to the address that accepted it, and does not browse mDNS again,
+so the token is never sent to whatever else answers as `_gleanvolt._tcp`. The search order is used only
+for pairing. The page's `frame-ancestors` follows the address in use.
+
+**A new token.** Making a new token closes every session. A provider whose token came from pairing and is
+refused with `401` deletes it and its saved address, and goes back to waiting: the owner accepts each
+plugin again. A provider with `Gleanvolt:Token` in its configuration does not; it logs and retries as it
+always did. **Forget** on a charger does not unpair.
+
+Pairing is exercised and documented for the charger plugins. The same code serves the other kinds, but
+the shipped sample plugins in `plugins/` still require `Gleanvolt:Token` in their own `Program.cs`.
 
 ## The session
 

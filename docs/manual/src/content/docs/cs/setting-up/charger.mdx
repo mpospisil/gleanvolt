@@ -17,13 +17,15 @@ ukazuje výkon slunce a domácí baterii, ale žádný režim nabíjení nelze s
 
 <Steps>
 
-1. **Získejte token pro zdroje dat.** V kroku průvodce **Dokončení** nebo v **Nastavení → Externí zdroje
-   dat** klikněte na **Vytvořit token**, pokud žádný není, a zkopírujte ho. Všechny pluginy se připojují
-   tímto jedním tokenem.
+1. **Spusťte plugin** pro svou nabíječku z [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (SolaX, Huawei, go-e,
+   Shelly TopAC) podle jeho README. Token ani adresu nepotřebuje. Může běžet na stejném počítači jako
+   Gleanvolt nebo na jiném v domácí síti a nezáleží na tom, co nainstalujete dřív: plugin počká, najde
+   Gleanvolt, jakmile se objeví, a požádá o povolení.
 
-2. **Spusťte plugin** pro svou nabíječku z [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (SolaX, Huawei, go-e,
-   Shelly TopAC) podle jeho README, s adresou Gleanvoltu (například `http://gleanvolt.local:8090`)
-   a tokenem. Může běžet na stejném počítači jako Gleanvolt nebo na jiném v domácí síti.
+2. **Přijměte plugin v Gleanvoltu.** V **Nastavení → Externí zdroje dat** nebo v kroku průvodce
+   **Dokončení** ho najdete v rámečku **Pluginy žádající o připojení**. Zkontrolujte řádek a klikněte na
+   **Přijmout**. Gleanvolt pluginu token předá sám, a pokud žádný není, nejdřív ho vytvoří. Nic
+   nekopírujete a plugin nemusíte restartovat. Viz [Přijetí pluginu](#přijetí-pluginu).
 
 3. **Otevřete stránku pluginu.** Jakmile se plugin připojí, ukáže ho sekce **Nabíječka** v **Nastavení**
    a pod ním jeho stránku. Zadejte tam adresu nabíječky a uložte. **Otevřít na nové kartě** otevře
@@ -33,6 +35,33 @@ ukazuje výkon slunce a domácí baterii, ale žádný režim nabíjení nelze s
    nabíječky. Režim nabíjení spustíte na stránce **Plán nabíjení**.
 
 </Steps>
+
+## Přijetí pluginu
+
+Plugin, který běží na stejném počítači jako Gleanvolt, je označený **Tento počítač** a stačí jedno kliknutí
+na **Přijmout**. Plugin na jiném počítači ukáže svou adresu a šestimístný **kód**, například `482 193`.
+Otevřete vlastní stránku pluginu na jeho adrese nebo si přečtěte jeho log: obojí ukazuje stejný kód.
+Pokud souhlasí, klikněte na **Přijmout**. Pokud ne, žádá o připojení někdo jiný ve vaší síti: klikněte na
+**Odmítnout**.
+
+:::caution[Přijetí nevyžaduje přihlášení]
+Plugin může přijmout kdokoli, kdo otevře Gleanvolt, v **Nastavení** i v průvodci, ať je přihlášený, nebo
+ne. Díky tomu lze plugin spárovat i v Gleanvoltu bez hesla. Samotný token ale Nastavení ukáže jen
+přihlášenému majiteli. **Nastavením hesla se to uzavře**: v síti, kam se k Gleanvoltu dostanou i další
+lidé, si heslo nastavte.
+:::
+
+Tlačítko Přijmout zůstane šedé a vedle něj je důvod, když dva čekající pluginy uvádějí stejný název
+(odmítněte ten, který neznáte), když je ten druh zdroje vypnutý, nebo když Gleanvolt už používá jiný plugin
+nabíječky (nejdřív vedle něj klikněte na **Zapomenout**). Plugin, který odmítnete, se zeptá znovu za hodinu
+nebo po restartu. Žádost, na kterou nikdo neodpoví, zmizí po 15 minutách, kdy se plugin neozval, a plugin se
+pak prostě zeptá znovu.
+
+**Token ručně.** Token můžete pluginu dál dát sami, jako `Gleanvolt__Token` v jeho prostředí nebo
+`--Gleanvolt:Token=…`. Má přednost před spárováním a plugin se pak připojí na adresu, kterou mu dáte,
+nebo na `http://localhost:8090`, pokud žádnou nedáte. Token vytvoříte v **Nastavení → Externí zdroje dat**
+tlačítkem **Vytvořit token**. **Nový** token odpojí všechny pluginy: spárovaný plugin se zeptá znovu a vy
+ho přijmete znovu, plugin nastavený ručně potřebuje nový token.
 
 ## Přechod ze zabudovaného ovladače
 
