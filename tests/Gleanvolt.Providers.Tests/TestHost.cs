@@ -24,6 +24,9 @@ internal sealed class TestHost : IAsyncDisposable
 
     public MemorySecrets Secrets { get; } = new();
 
+    /// <summary>What the providers' own log said, for a test about how loudly something is told.</summary>
+    public CapturedLog Log { get; } = new();
+
     public ExternalProviderRegistry Registry => _app!.Services.GetRequiredService<ExternalProviderRegistry>();
 
     public ProviderSessions Sessions => Registry.For(EchoHub.Kind)!;
@@ -37,6 +40,8 @@ internal sealed class TestHost : IAsyncDisposable
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
         builder.Logging.ClearProviders();
+        builder.Logging.AddProvider(Log);
+        builder.Logging.SetMinimumLevel(LogLevel.Debug);
         builder.Services.AddSingleton<ISecretStore>(Secrets);
         builder.Services.AddSingleton<TimeProvider>(Time);
         builder.Services.AddSingleton(new ProviderHostInfo("1.2.3-test"));
@@ -149,5 +154,30 @@ internal static class Eventually
         }
 
         Assert.True(condition(), because);
+    }
+}
+
+/// <summary>Every line the "Gleanvolt.Providers" log writes, with its level.</summary>
+internal sealed class CapturedLog : ILoggerProvider
+{
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(LogLevel Level, string Message)> _lines = new();
+
+    public IReadOnlyList<(LogLevel Level, string Message)> Lines => [.. _lines];
+
+    public ILogger CreateLogger(string categoryName) =>
+        categoryName == "Gleanvolt.Providers" ? new Logger(_lines) : Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
+
+    public void Dispose()
+    {
+    }
+
+    private sealed class Logger(System.Collections.Concurrent.ConcurrentQueue<(LogLevel, string)> lines) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            lines.Enqueue((logLevel, formatter(state, exception)));
     }
 }

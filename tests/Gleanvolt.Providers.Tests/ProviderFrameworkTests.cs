@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
 using Gleanvolt.Providers.Client;
@@ -204,6 +205,37 @@ public sealed class ProviderFrameworkTests : IAsyncLifetime
         _host.Time.Advance(TimeSpan.FromMinutes(3));
 
         await Eventually.True(() => _host.Registry.Find(EchoHub.Kind)!.Unanswered, "the request should time out");
+    }
+
+    [Fact]
+    public async Task AnUnansweredRequestIsAWarning()
+    {
+        await using var connection = await _host.ConnectAsync();
+        await connection.InvokeAsync<Welcome>("Hello", TestHost.Hello());
+
+        _host.Sessions.BeginRequest(TimeSpan.FromMinutes(2));
+        _host.Time.Advance(TimeSpan.FromMinutes(3));
+
+        await Eventually.True(() => _host.Registry.Find(EchoHub.Kind)!.Unanswered, "the request should time out");
+        Assert.Contains(_host.Log.Lines, line => line.Level == LogLevel.Warning && line.Message.Contains("did not answer"));
+    }
+
+    [Fact]
+    public async Task AProviderThatAlreadySaidTheOwnerMustActIsNotWarnedAboutEveryRequest()
+    {
+        // A charger plugin with no address says so once, and then can't answer a single read: a warning per
+        // request would repeat every ten seconds what the owner has already been told.
+        await using var connection = await _host.ConnectAsync();
+        await connection.InvokeAsync<Welcome>("Hello", TestHost.Hello());
+        await connection.InvokeAsync("ReportStatus", new ProviderStatus(false, "No address.", NeedsOwner: true, Code: ProviderStatusCodes.NotSetUp));
+        await Eventually.True(() => _host.Registry.Find(EchoHub.Kind)!.NeedsOwner, "the status should arrive");
+
+        _host.Sessions.BeginRequest(TimeSpan.FromMinutes(2));
+        _host.Time.Advance(TimeSpan.FromMinutes(3));
+
+        await Eventually.True(() => _host.Registry.Find(EchoHub.Kind)!.Unanswered, "the request should still time out");
+        Assert.DoesNotContain(_host.Log.Lines, line => line.Level == LogLevel.Warning && line.Message.Contains("did not answer"));
+        Assert.Contains(_host.Log.Lines, line => line.Level == LogLevel.Debug && line.Message.Contains("did not answer"));
     }
 
     [Fact]
