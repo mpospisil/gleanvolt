@@ -39,5 +39,8 @@
 
     public void Dispose() => Recorder.Changed -= Refresh;
 
-    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+    // The viewer's culture, for the renders an event from another thread asks for.
+    private readonly ViewerCulture _viewer = new();
+
+    private void Refresh() => _ = InvokeAsync(_viewer.Wrap(StateHasChanged));
 }

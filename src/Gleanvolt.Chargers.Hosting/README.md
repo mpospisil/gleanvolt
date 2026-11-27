@@ -138,6 +138,10 @@ section is yours to write; `SharedText` has its words in English and Czech.
   </ItemGroup>
   ```
 
+- **`ViewerCulture`**: a page that re-renders when the charger changes calls `InvokeAsync` from the poll's thread,
+  which runs in the service's culture, so the text turns English after the first reading. Keep
+  `private readonly ViewerCulture _viewer = new();` in the component and re-render with
+  `InvokeAsync(_viewer.Wrap(StateHasChanged))`.
 - **`ModbusDevice`**: a Gleanvolt.Modbus client at the current address, made anew when it changes.
 - **`LanScan`**: for a search of your own, this machine's networks, and every host of one that accepts a connection on
   a port, asked by your probe whether it is your charger. Find your charger any other way (mDNS, the vendor's
