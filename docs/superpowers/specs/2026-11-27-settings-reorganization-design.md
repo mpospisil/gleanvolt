@@ -62,14 +62,14 @@ and each tab should be one or two screens long.
 ### Tabs
 
 ```
-Settings:  Installation | External providers | Data sources | Integrations | System
+Settings:  Installation | External providers | Forecast & prices | Integrations | System
 ```
 
 | Tab | Address | Contents | Saves |
 |---|---|---|---|
 | Installation | `/settings` (also `/pv-system`) | Optional-settings checklist; installation form (PV system, battery, inverter); charger; link to the Car page | restart |
 | External providers | `/settings/providers` | unchanged (pairing requests, token, each kind's session) | on save |
-| Data sources | `/settings/data-sources` | Solar forecast (Solcast), weather, tariff | on save |
+| Forecast & prices | `/settings/forecast-prices` | Solar forecast (Solcast), weather, tariff; later the energy-price provider | on save |
 | Integrations | `/settings/integrations` | Home Assistant (MQTT), car telemetry (MQTT), REST API | restart |
 | System | `/settings/system` (also `/settings/health`, `/health`) | today's Health facts; Service (stop, restart); Change password | — |
 
@@ -124,7 +124,7 @@ that needs attention is hidden. The wizard, which shows chosen sections only, is
 - Shown on Installation only (the first tab), not on System.
 - **Solar forecast first, marked recommended**: it is what makes Forecasted and Targeted useful. The rest
   keep their order.
-- Links point at the new addresses (`/settings/data-sources#solcast-editor`, `/settings/integrations#mqtt-editor`,
+- Links point at the new addresses (`/settings/forecast-prices#solcast-editor`, `/settings/integrations#mqtt-editor`,
   …). `NotConfiguredCard` uses the same links, so Forecast and Charging plan follow.
 
 ### Restart wording
@@ -135,7 +135,7 @@ Every banner and the wizard's Finish say "restart on **System**" and link to `/s
 
 - Interactive Blazor (InteractiveServer), as today; tabs are links (`SettingsTabs`), one page component per tab.
 - Every new UI string in both `SettingsText.resx`/`SharedText.resx`/`SetupText.resx` and their `.cs.resx`. Czech
-  tab names: Instalace, Zdroje dat, Integrace, Externí poskytovatelé (unchanged), Systém.
+  tab names: Instalace, Předpověď a ceny, Integrace, Externí poskytovatelé (unchanged), Systém.
 - User manual (`docs/manual`, en and cs): `setting-up/settings.mdx` and every page that says
   "Settings → …" follow the new tabs; screenshots regenerate through `tests/Gleanvolt.Web.Screenshots`
   (`SettingsScreenshots.cs` renders `PvSystem` for every section today and must render the new pages).
