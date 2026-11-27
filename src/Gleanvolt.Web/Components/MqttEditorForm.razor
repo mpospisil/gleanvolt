@@ -1,6 +1,7 @@
 @inject IIntegrationsEditor Editor
 @inject IOptions<WebOptions> Web
 @inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
+@inject MqttDisplayOptions Mqtt
 
 @*
     The Home Assistant link: the MQTT broker Gleanvolt publishes its state and controls to. Like the
@@ -122,11 +123,85 @@
     {
         <p class="muted" id="mqtt-message">@message</p>
     }
+    @*
+        What the running link uses (#143), folded since the 2026-11-27 reorganization: the form above edits
+        the broker, so only what it does not show is here -- the client id the broker logs, the device id
+        and topic prefix everything hangs off, and the topics. Retiring is a state, so it stays in view.
+    *@
+    @if (Mqtt.HomeAssistant.Connection.Enabled)
+    {
+        <details id="ha-topics">
+            <summary>@SettingsText.TopicsInUse</summary>
+
+            <p class="muted">@SettingsText.RunningDetailsNote</p>
+
+            <dl class="facts">
+                <dt>@SharedText.MqttClientId</dt>
+                <dd><code>@Mqtt.HomeAssistant.Connection.ClientId</code></dd>
+
+                <dt>@SettingsText.DeviceId</dt>
+                <dd><code>@Mqtt.HomeAssistant.DeviceId</code></dd>
+
+                <dt>@SettingsText.TopicPrefix</dt>
+                <dd><code>@Mqtt.HomeAssistant.TopicPrefix</code></dd>
+
+                <dt>@SettingsText.StatusInterval</dt>
+                <dd>@Interval(Mqtt.HomeAssistant.StatusInterval)</dd>
+            </dl>
+
+            <table class="sessions topics">
+                <thead>
+                    <tr>
+                        <th>@SettingsText.Carries</th>
+                        <th>@SettingsText.TopicColumn</th>
+                        <th>@SettingsText.Direction</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var topic in Mqtt.HomeAssistant.Topics)
+                    {
+                        <tr>
+                            <td>@Localized.Say(topic.PurposePhrase, topic.Purpose)</td>
+                            <td class="topic"><code>@topic.Topic</code></td>
+                            <td class="flow">@(topic.Inbound ? SettingsText.In : SettingsText.Out)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <p class="muted">@Localized.Rich(SettingsText.MqttTip1, @<em>@SettingsText.MqttTip1_0</em>, @<code>/set</code>)</p>
+            <p class="muted">@Localized.Rich(SettingsText.HaTip1, @<code>unique_id</code>, @<code>unique_id</code>)</p>
+            <p class="muted">
+                @Localized.Rich(SettingsText.HaTip2, @<code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/state")</code>, @<code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/set")</code>, @<code>@($"{Mqtt.HomeAssistant.DiscoveryPrefix}/…/{Mqtt.HomeAssistant.DeviceId}/…/config")</code>, @<em>@SettingsText.HaTip2_3</em>)
+            </p>
+        </details>
+
+        @if (Mqtt.HomeAssistant.IsRetiringAnything)
+        {
+            <p class="table-note muted" id="ha-mqtt-retiring">
+                @Localized.Rich(SettingsText.Retiring, @<strong>@SettingsText.Retiring_0</strong>)
+                @if (Mqtt.HomeAssistant.RetiredDeviceIds.Count > 0)
+                {
+                    @Localized.Format(
+                        Mqtt.HomeAssistant.RetiredTopicPrefixes.Count > 0 ? SettingsText.RetiringConfigsAnd : SettingsText.RetiringConfigs,
+                        string.Join(SharedText.ListSeparator, Mqtt.HomeAssistant.RetiredDeviceIds))
+                }
+                @if (Mqtt.HomeAssistant.RetiredTopicPrefixes.Count > 0)
+                {
+                    @Localized.Format(SettingsText.RetiringState, string.Join(SharedText.ListSeparator, Mqtt.HomeAssistant.RetiredTopicPrefixes))
+                }
+                @SettingsText.RetiringNote
+            </p>
+        }
+    }
 </section>
 
 @code {
     /// <summary>Raised after a save that wrote something.</summary>
     [Parameter] public EventCallback OnSaved { get; set; }
+
+    // Intervals read in the units they were configured in; nothing at all for an unset one.
+    private static string Interval(TimeSpan value) => value <= TimeSpan.Zero ? Units.Missing : Units.Duration(value);
 
     private static (string Key, string Label, string Hint)[] Fields =>
     [

@@ -136,32 +136,11 @@
     <value>The car's settings and charging limits are on the {0} page.</value>
   </data>
   <!-- MQTT -->
-  <data name="Mqtt" xml:space="preserve">
-    <value>MQTT</value>
-  </data>
-  <data name="MqttTopic" xml:space="preserve">
-    <value>MQTT</value>
-  </data>
   <data name="MqttTip1_0" xml:space="preserve">
     <value>control</value>
   </data>
   <data name="MqttTip1" xml:space="preserve">
     <value>Home Assistant is a {0} interface: the topics ending in {1} can start and stop charging. Vehicle telemetry only listens; the worst a wrong setting there can do is leave the car card empty.</value>
-  </data>
-  <data name="MqttTip2_0" xml:space="preserve">
-    <value>up</value>
-  </data>
-  <data name="MqttTip2_1" xml:space="preserve">
-    <value>System</value>
-  </data>
-  <data name="MqttTip2" xml:space="preserve">
-    <value>The details below are what the controller read when it started; the forms above change them from the next start. They do not show whether either connection is {0}, and {1} reports the polling loop, not the broker. To check the Home Assistant link, use Test connection above, or see whether Home Assistant shows the device as unavailable.</value>
-  </data>
-  <data name="HomeAssistant" xml:space="preserve">
-    <value>Home Assistant</value>
-  </data>
-  <data name="HomeAssistantTopic" xml:space="preserve">
-    <value>Home Assistant</value>
   </data>
   <data name="HaTip1" xml:space="preserve">
     <value>The device id is the root of every entity's {0}, and it is the one value here that is costly to change: Home Assistant keys an entity to its {1}, so a new id creates new entities beside the old ones, and every graph starts again. Topics and names can be changed freely. The status interval is how often the state topic is republished — usually the answer to "why is the Home Assistant dashboard behind?".</value>
@@ -171,12 +150,6 @@
   </data>
   <data name="HaTip2" xml:space="preserve">
     <value>Every other entity — each number, select, text and button — follows the same pattern: {0} for what it reports and {1} for what it accepts. Home Assistant reads their retained discovery configs from under {2}. Anything marked {3} can change what the charger is doing.</value>
-  </data>
-  <data name="HaOff" xml:space="preserve">
-    <value>Off by default: nothing is published and no command is accepted. To turn it on, set {0} to {1}, give {2} and {3} for the broker, and set {4}. The id keeps two installations on one broker from overwriting each other's topics, so the controller refuses to start without it.</value>
-  </data>
-  <data name="DiscoveryPrefix" xml:space="preserve">
-    <value>Discovery prefix</value>
   </data>
   <data name="DeviceId" xml:space="preserve">
     <value>Device id</value>
@@ -214,9 +187,6 @@
   <data name="VehicleTelemetryTip" xml:space="preserve">
     <value>One specific topic, not a wildcard: this version tracks one car, and a {0} across several topics would silently let the newest message win, whichever car it described. Messages should be {1}, so after a restart the last reading arrives at once instead of waiting for the car's next cloud update. Note that this client id does not include the system id, so two controllers on one machine would clash on the broker.</value>
   </data>
-  <data name="VehicleMqttOff" xml:space="preserve">
-    <value>Off by default: the car's state of charge is not read, and the Overview shows only what the charger sees. Set {0} to {1} and enter the topic your publisher writes to under {2}.</value>
-  </data>
   <data name="SubscribedTo" xml:space="preserve">
     <value>Subscribed to</value>
   </data>
@@ -230,7 +200,7 @@
     <value>Retry every</value>
   </data>
   <data name="NoTopic" xml:space="preserve">
-    <value>The feed is on but has no topic, so it connects to no broker and reads nothing — on the Overview this looks the same as a car that never reports. Set {0} to the topic your publisher writes to.</value>
+    <value>The feed is on but has no topic, so it connects to no broker and reads nothing — on the Overview this looks the same as a car that never reports. Enter the topic your publisher writes to on the {0} page.</value>
   </data>
   <data name="OneBroker" xml:space="preserve">
     <value>Both connections use the same broker, {0}. They are still two connections with two client ids, and either can be pointed elsewhere without affecting the other.</value>
@@ -1187,5 +1157,14 @@
   </data>
   <data name="IntegrationsPageTitle" xml:space="preserve">
     <value>Integrations</value>
+  </data>
+  <data name="TopicsInUse" xml:space="preserve">
+    <value>Topics in use</value>
+  </data>
+  <data name="RunningDetailsNote" xml:space="preserve">
+    <value>As the running controller uses them; a change saved above applies from the next start.</value>
+  </data>
+  <data name="VehicleTelemetryOff" xml:space="preserve">
+    <value>Off: the car's state of charge is not read over MQTT. It is turned on, with the topic your publisher writes to, on the {0} page.</value>
   </data>
 </root>

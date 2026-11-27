@@ -132,32 +132,11 @@
   <data name="CarLink" xml:space="preserve">
     <value>Nastavení auta a jeho limity nabíjení jsou na stránce {0}.</value>
   </data>
-  <data name="Mqtt" xml:space="preserve">
-    <value>MQTT</value>
-  </data>
-  <data name="MqttTopic" xml:space="preserve">
-    <value>MQTT</value>
-  </data>
   <data name="MqttTip1_0" xml:space="preserve">
     <value>řídicí</value>
   </data>
   <data name="MqttTip1" xml:space="preserve">
     <value>Home Assistant je {0} rozhraní: přes témata končící na {1} lze nabíjení spustit i zastavit. Telemetrie vozidla jen poslouchá; špatné nastavení tam nanejvýš způsobí prázdnou kartu auta.</value>
-  </data>
-  <data name="MqttTip2_0" xml:space="preserve">
-    <value>funkční</value>
-  </data>
-  <data name="MqttTip2_1" xml:space="preserve">
-    <value>Systém</value>
-  </data>
-  <data name="MqttTip2" xml:space="preserve">
-    <value>Údaje níže načetl správce nabíjení při startu; formuláře výše je změní až od dalšího startu. Neukazují, zda je některé ze spojení {0}, a stránka {1} ukazuje smyčku čtení, ne broker. Spojení s Home Assistant ověříte tlačítkem Vyzkoušet připojení výše, nebo podle toho, zda Home Assistant ukazuje zařízení jako nedostupné.</value>
-  </data>
-  <data name="HomeAssistant" xml:space="preserve">
-    <value>Home Assistant</value>
-  </data>
-  <data name="HomeAssistantTopic" xml:space="preserve">
-    <value>Home Assistant</value>
   </data>
   <data name="HaTip1" xml:space="preserve">
     <value>ID zařízení je základem {0} každé entity a je to jediná hodnota tady, jejíž změna něco stojí: Home Assistant váže entitu na její {1}, takže nové ID vytvoří nové entity vedle starých a všechny grafy začnou znovu. Témata a názvy lze měnit volně. Interval stavu určuje, jak často se znovu publikuje stavové téma — to bývá odpověď na otázku, proč je přehled v Home Assistant pozadu.</value>
@@ -167,12 +146,6 @@
   </data>
   <data name="HaTip2" xml:space="preserve">
     <value>Ostatní entity — čísla, výběry, texty a tlačítka — mají stejný vzor: {0} pro to, co hlásí, a {1} pro to, co přijímají. Uchované konfigurace discovery, ze kterých je Home Assistant čte, jsou pod {2}. Cokoli označené jako {3} může změnit, co nabíječka dělá.</value>
-  </data>
-  <data name="HaOff" xml:space="preserve">
-    <value>Vypnuto (výchozí stav): nic se nepublikuje a žádné příkazy se nepřijímají. Nastavte {0} na {1}, zadejte {2} a {3} pro broker a zvolte {4}. ID odlišuje témata dvou instalací na jednom brokeru, které by se jinak navzájem přepisovaly; bez něj proto správce nabíjení nenastartuje.</value>
-  </data>
-  <data name="DiscoveryPrefix" xml:space="preserve">
-    <value>Prefix discovery</value>
   </data>
   <data name="DeviceId" xml:space="preserve">
     <value>ID zařízení</value>
@@ -210,9 +183,6 @@
   <data name="VehicleTelemetryTip" xml:space="preserve">
     <value>Jedno konkrétní téma, ne zástupný znak: aplikace zatím sleduje jen jedno auto a {0} přes několik aut by potichu nechal platit nejnovější zprávu, ať by popisovala kterékoli auto. Zprávy mají být {1}, takže po restartu se hned načte poslední údaj a nemusí se čekat na další aktualizaci auta z cloudu. Pozor: toto ID klienta neobsahuje ID systému, takže dva správci nabíjení na jednom stroji by se na brokeru střetli.</value>
   </data>
-  <data name="VehicleMqttOff" xml:space="preserve">
-    <value>Vypnuto (výchozí stav): stav nabití auta se nečte a Přehled ukazuje jen to, co vidí nabíječka. Nastavte {0} na {1} a v {2} zadejte téma, do kterého váš zdroj publikuje.</value>
-  </data>
   <data name="SubscribedTo" xml:space="preserve">
     <value>Odebírané téma</value>
   </data>
@@ -226,7 +196,7 @@
     <value>Opakovat po</value>
   </data>
   <data name="NoTopic" xml:space="preserve">
-    <value>Zdroj je zapnutý, ale nemá nastavené téma, takže se nepřipojí k žádnému brokeru a nic nečte. Na Přehledu to vypadá stejně jako auto, které nikdy nic nehlásí. Nastavte {0} na téma, do kterého váš zdroj publikuje.</value>
+    <value>Zdroj je zapnutý, ale nemá nastavené téma, takže se nepřipojí k žádnému brokeru a nic nečte. Na Přehledu to vypadá stejně jako auto, které nikdy nic nehlásí. Téma, do kterého váš zdroj publikuje, zadejte na stránce {0}.</value>
   </data>
   <data name="OneBroker" xml:space="preserve">
     <value>Obě spojení používají stejný broker {0}. Stále jsou to dvě připojení se dvěma ID klienta a každé lze nasměrovat jinam bez vlivu na druhé.</value>
@@ -1152,5 +1122,14 @@
   </data>
   <data name="IntegrationsPageTitle" xml:space="preserve">
     <value>Integrace</value>
+  </data>
+  <data name="TopicsInUse" xml:space="preserve">
+    <value>Používaná témata</value>
+  </data>
+  <data name="RunningDetailsNote" xml:space="preserve">
+    <value>Tak, jak je používá běžící správce nabíjení; změna uložená výše platí od dalšího startu.</value>
+  </data>
+  <data name="VehicleTelemetryOff" xml:space="preserve">
+    <value>Vypnuto: stav nabití auta se přes MQTT nečte. Zapíná se i s tématem, do kterého váš zdroj publikuje, na stránce {0}.</value>
   </data>
 </root>

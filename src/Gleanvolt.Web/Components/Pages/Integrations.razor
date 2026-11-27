@@ -1,7 +1,6 @@
 @page "/settings/integrations"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@inject MqttDisplayOptions Mqtt
 @inject ApiDisplayOptions Api
 @inject NavigationManager Nav
 @inject IIntegrationsEditor Editor
@@ -23,163 +22,7 @@
 
 <MqttEditorForm OnSaved="Recount" />
 
-<div class="section-head tip-head">
-    <h2>@SettingsText.Mqtt</h2>
-    <InfoTip Topic="@SettingsText.MqttTopic" Group="settings-info" Wide="true">
-        <p>
-            @Localized.Rich(SettingsText.MqttTip1, @<em>@SettingsText.MqttTip1_0</em>, @<code>/set</code>)
-        </p>
-        <p>
-            @Localized.Rich(SettingsText.MqttTip2, @<em>@SettingsText.MqttTip2_0</em>, @<a href="/settings/system">@SettingsText.MqttTip2_1</a>)
-        </p>
-    </InfoTip>
-</div>
-
-@*
-    The third and fourth things this controller is talking to (issue #143). The installation form
-    above is what it drives; this is what it talks through, and unlike a Modbus address none of it is guessable:
-    the prefix everything is published under is composed at startup from two separate settings.
-
-    Two links rather than one broker, kept apart on purpose. They are separately optional -- you can
-    publish to Home Assistant without reading the car, or the reverse -- and they may well be two
-    different brokers, so a single row saying "the broker" would be wrong on any installation that
-    took that up.
-*@
-
-<div class="section-head tip-head minor">
-    <h3>@SettingsText.HomeAssistant</h3>
-    @if (Mqtt.HomeAssistant.Connection.Enabled)
-    {
-        <InfoTip Topic="@SettingsText.HomeAssistantTopic" Group="settings-info" Wide="true">
-            <p>
-                @Localized.Rich(SettingsText.HaTip1, @<code>unique_id</code>, @<code>unique_id</code>)
-            </p>
-            <p>
-                @Localized.Rich(SettingsText.HaTip2, @<code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/state")</code>, @<code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/set")</code>, @<code>@($"{Mqtt.HomeAssistant.DiscoveryPrefix}/…/{Mqtt.HomeAssistant.DeviceId}/…/config")</code>, @<em>@SettingsText.HaTip2_3</em>)
-            </p>
-        </InfoTip>
-    }
-</div>
-
-@if (!Mqtt.HomeAssistant.Connection.Enabled)
-{
-    <p class="muted" id="ha-mqtt-off">
-        @Localized.Rich(SettingsText.HaOff, @<code>HomeAssistant__Enabled</code>, @<code>true</code>, @<code>HomeAssistant__Username</code>, @<code>HomeAssistant__Password</code>, @<code>Pv__Id</code>)
-    </p>
-}
-else
-{
-    <dl class="facts">
-        <MqttConnection Connection="Mqtt.HomeAssistant.Connection" />
-
-        <dt>@SettingsText.DiscoveryPrefix</dt>
-        <dd><code>@Mqtt.HomeAssistant.DiscoveryPrefix</code></dd>
-
-        <dt>@SettingsText.DeviceId</dt>
-        <dd><code>@Mqtt.HomeAssistant.DeviceId</code></dd>
-
-        <dt>@SettingsText.TopicPrefix</dt>
-        <dd><code>@Mqtt.HomeAssistant.TopicPrefix</code></dd>
-
-        <dt>@SettingsText.StatusInterval</dt>
-        <dd>@Interval(Mqtt.HomeAssistant.StatusInterval)</dd>
-    </dl>
-
-    <table class="sessions topics">
-        <thead>
-            <tr>
-                <th>@SettingsText.Carries</th>
-                <th>@SettingsText.TopicColumn</th>
-                <th>@SettingsText.Direction</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var topic in Mqtt.HomeAssistant.Topics)
-            {
-                <tr>
-                    <td>@Localized.Say(topic.PurposePhrase, topic.Purpose)</td>
-                    <td class="topic"><code>@topic.Topic</code></td>
-                    <td class="flow">@(topic.Inbound ? SettingsText.In : SettingsText.Out)</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-
-    @if (Mqtt.HomeAssistant.IsRetiringAnything)
-    {
-        <p class="table-note muted" id="ha-mqtt-retiring">
-            @Localized.Rich(SettingsText.Retiring, @<strong>@SettingsText.Retiring_0</strong>)
-            @if (Mqtt.HomeAssistant.RetiredDeviceIds.Count > 0)
-            {
-                @Localized.Format(
-                    Mqtt.HomeAssistant.RetiredTopicPrefixes.Count > 0 ? SettingsText.RetiringConfigsAnd : SettingsText.RetiringConfigs,
-                    string.Join(SharedText.ListSeparator, Mqtt.HomeAssistant.RetiredDeviceIds))
-            }
-            @if (Mqtt.HomeAssistant.RetiredTopicPrefixes.Count > 0)
-            {
-                @Localized.Format(SettingsText.RetiringState, string.Join(SharedText.ListSeparator, Mqtt.HomeAssistant.RetiredTopicPrefixes))
-            }
-            @SettingsText.RetiringNote
-        </p>
-    }
-}
-
-<div class="section-head tip-head minor">
-    <h3>@SettingsText.VehicleTelemetry</h3>
-    @if (Mqtt.Vehicle.Connection.Enabled)
-    {
-        <InfoTip Topic="@SettingsText.VehicleTelemetryTopic" Group="settings-info" Wide="true">
-            <p>
-                @Localized.Rich(SettingsText.VehicleTelemetryTip, @<code>+</code>, @<strong>@SettingsText.VehicleTelemetryTip_1</strong>)
-            </p>
-        </InfoTip>
-    }
-</div>
-
-@if (!Mqtt.Vehicle.Connection.Enabled)
-{
-    <p class="muted" id="vehicle-mqtt-off">
-        @Localized.Rich(SettingsText.VehicleMqttOff, @<code>Vehicle__Enabled</code>, @<code>true</code>, @<code>Ev__Vehicles__0__Telemetry__Topic</code>)
-    </p>
-}
-else
-{
-    <dl class="facts">
-        <MqttConnection Connection="Mqtt.Vehicle.Connection" />
-
-        <dt>@SettingsText.SubscribedTo</dt>
-        <dd>
-            @if (Mqtt.Vehicle.IsEnabledWithoutTopic)
-            {
-                <span class="muted">@SettingsText.Nothing</span>
-            }
-            else
-            {
-                <code>@Mqtt.Vehicle.Topic</code>
-            }
-        </dd>
-
-        <dt>@SettingsText.StaleAfter</dt>
-        <dd>@Interval(Mqtt.Vehicle.MaxAge)</dd>
-
-        <dt>@SettingsText.RetryEvery</dt>
-        <dd>@Interval(Mqtt.Vehicle.ReconnectInterval)</dd>
-    </dl>
-
-    @if (Mqtt.Vehicle.IsEnabledWithoutTopic)
-    {
-        <p class="table-note muted" id="vehicle-mqtt-no-topic">
-            @Localized.Rich(SettingsText.NoTopic, @<code>Ev__Vehicles__0__Telemetry__Topic</code>)
-        </p>
-    }
-
-    @if (Mqtt.SharesOneBroker)
-    {
-        <p class="table-note muted" id="mqtt-one-broker">
-            @Localized.Rich(SettingsText.OneBroker, @<code>@Mqtt.Vehicle.Connection.Broker</code>)
-        </p>
-    }
-}
+<VehicleTelemetrySection />
 
 <ApiEditorForm OnSaved="Recount" />
 
@@ -325,8 +168,4 @@ else
         var settings = Editor.Read();
         _pending = settings.MqttPendingCount + settings.ApiPendingCount;
     }
-
-    // Intervals here run from fifteen seconds to twelve hours, and each reads in the units it
-    // was configured in: Units.Duration keeps seconds below ten minutes and minutes below two days.
-    private static string Interval(TimeSpan value) => value <= TimeSpan.Zero ? Units.Missing : Units.Duration(value);
 }

@@ -288,13 +288,68 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Says_plainly_when_neither_link_is_configured()
     {
-        // Off is the default for both, so it has to read as a deliberate default rather than a fault --
-        // and the page has to say what turns each one on.
+        // Off is the default for both. Home Assistant's own form says it with its checkbox; car telemetry,
+        // turned on on the Car page, says where.
         var page = RenderIntegrations();
 
-        Assert.Contains("HomeAssistant__Enabled", page.Find("#ha-mqtt-off").TextContent);
-        Assert.Contains("Vehicle__Enabled", page.Find("#vehicle-mqtt-off").TextContent);
+        Assert.Empty(page.FindAll("#ha-mqtt-off"));
+        Assert.Equal("/car", page.Find("#vehicle-mqtt-off a").GetAttribute("href"));
         Assert.Empty(page.FindAll("table.topics"));
+    }
+
+    [Fact]
+    public void No_tab_tells_the_owner_to_edit_env_for_what_the_forms_do()
+    {
+        var off = RenderIntegrations().Markup;
+
+        using var on = new BunitContext();
+        var noTopic = RenderIn<Integrations>(on, mqtt: Mqtt(vehicle: Link(), vehicleTopic: "")).Markup;
+
+        foreach (var markup in new[] { off, noTopic })
+        {
+            Assert.DoesNotContain("HomeAssistant__Enabled", markup);
+            Assert.DoesNotContain("Vehicle__Enabled", markup);
+            Assert.DoesNotContain("Ev__Vehicles__0__Telemetry__Topic", markup);
+        }
+    }
+
+    [Fact]
+    public void The_broker_is_shown_once()
+    {
+        // The form edits the broker; the running details no longer repeat it.
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
+
+        Assert.DoesNotContain("mosquitto:1883", page.Find("#mqtt-editor").TextContent);
+    }
+
+    [Fact]
+    public void Topics_are_folded_until_asked_for()
+    {
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
+
+        var topics = page.Find("#ha-topics");
+        Assert.Equal("details", topics.TagName, ignoreCase: true);
+        Assert.False(topics.HasAttribute("open"));
+        Assert.NotNull(topics.QuerySelector("table.topics"));
+        Assert.NotNull(topics.Closest("#mqtt-editor"));
+    }
+
+    [Fact]
+    public void The_retiring_notice_stays_visible()
+    {
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link(), retiredDeviceIds: ["old_controller"]));
+
+        Assert.Null(page.Find("#ha-mqtt-retiring").Closest("details"));
+    }
+
+    [Fact]
+    public void Car_telemetry_is_a_section_of_its_own()
+    {
+        var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
+
+        var section = page.Find("#vehicle-telemetry");
+        Assert.Contains("gleanvolt/vehicle/id4/state", section.TextContent);
+        Assert.Contains("gleanvolt-vehicle-raspberrypi", section.TextContent);
     }
 
     [Fact]
@@ -387,8 +442,7 @@ public class PvSystemPageTests : BunitContext
         // is indistinguishable from a car that never reports.
         var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(), vehicleTopic: string.Empty));
 
-        Assert.Contains(
-            "Ev__Vehicles__0__Telemetry__Topic", page.Find("#vehicle-mqtt-no-topic").TextContent);
+        Assert.Equal("/car", page.Find("#vehicle-mqtt-no-topic a").GetAttribute("href"));
     }
 
     [Fact]
@@ -421,7 +475,8 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void A_broker_password_renders_masked_until_it_is_asked_for()
     {
-        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link(password: "broker-secret")));
+        // The car telemetry link's: Home Assistant's password is the form's, and the form never shows it.
+        var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(password: "broker-secret")));
 
         // Behind a login is not behind a closed door: a shoulder and a screenshot are a different
         // threat from the network, so it starts hidden.
@@ -438,22 +493,21 @@ public class PvSystemPageTests : BunitContext
     public void An_anonymous_broker_does_not_read_as_a_withheld_password()
     {
         var page = RenderIntegrations(mqtt: Mqtt(
-            homeAssistant: Link(username: string.Empty, password: null, hasPassword: false)));
+            vehicle: Link(username: string.Empty, password: null, hasPassword: false)));
 
-        // The MQTT section only: the edit forms around it name Web__PasswordHash for their own reason.
-        var start = page.Markup.IndexOf("<h2>MQTT</h2>", StringComparison.Ordinal);
-        var mqtt = page.Markup[start..page.Markup.IndexOf("id=\"api-editor\"", start, StringComparison.Ordinal)];
-        Assert.DoesNotContain("Web__PasswordHash", mqtt);
-        Assert.Contains("anonymous", mqtt);
+        // The car telemetry section only: the edit forms around it name Web__PasswordHash for their own reason.
+        var telemetry = page.Find("#vehicle-telemetry").InnerHtml;
+        Assert.DoesNotContain("Web__PasswordHash", telemetry);
+        Assert.Contains("anonymous", telemetry);
     }
 
     [Fact]
     public void Does_not_claim_that_a_configured_link_is_a_working_one()
     {
-        // Everything here was read at startup; nothing on this page knows whether the broker answered.
+        // The folded details were read at startup; the form's Test connection is what checks the broker.
         var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
 
-        Assert.Contains("whether either connection is", page.Markup);
+        Assert.Contains("As the running controller uses them", page.Find("#ha-topics").TextContent);
     }
 
     // -- The API (#142).

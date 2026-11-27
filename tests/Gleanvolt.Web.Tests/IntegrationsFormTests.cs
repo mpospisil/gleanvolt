@@ -22,6 +22,8 @@ public class IntegrationsFormTests : BunitContext
         Services.AddSingleton<IIntegrationsEditor>(_editor);
         Services.AddSingleton(Options.Create(new WebOptions { PasswordHash = "hash" }));
         Services.AddSingleton(new WebPasswordState("hash"));
+        Services.AddSingleton(MqttDisplayOptions.None);
+        Services.AddSingleton(ApiDisplayOptions.Off);
         JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
