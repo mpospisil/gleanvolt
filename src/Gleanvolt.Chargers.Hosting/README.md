@@ -117,6 +117,9 @@ a paired one. The page says which one it connects with.
 - **`PluginSettings`**: the address (`<Section>:Host`, or what the page saved), and `Get(name)` for your own settings
   (a model, a password), saved owner-only. **`DeviceAddress`** parses an address with an optional port. The address
 section is yours to write; `SharedText` has its words in English and Czech.
+  A plugin keeps its own texts in `Resources/PageText.resx` (English) and `PageText.cs.resx` (Czech), and the page reads
+  the generated class. A status passes `Words.From(PageText.ResourceManager, nameof(PageText.X))`, and a missing
+  translation is English.
 - **`ModbusDevice`**: a Gleanvolt.Modbus client at the current address, made anew when it changes.
 - **`LanScan`**: for a search of your own, this machine's networks, and every host of one that accepts a connection on
   a port, asked by your probe whether it is your charger. Find your charger any other way (mDNS, the vendor's

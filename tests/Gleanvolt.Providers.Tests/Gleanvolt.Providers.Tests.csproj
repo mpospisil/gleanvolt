@@ -32,4 +32,15 @@
     <ProjectReference Include="..\..\src\Gleanvolt.Infrastructure\Gleanvolt.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!-- The strongly-typed class for the test-only resx, as the plugins and Gleanvolt.Web generate theirs. -->
+  <ItemGroup>
+    <NeutralResx Include="Resources\*.resx" Exclude="Resources\*.*.resx" />
+    <EmbeddedResource Update="@(NeutralResx)">
+      <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
+      <StronglyTypedNamespace>$(RootNamespace).Resources</StronglyTypedNamespace>
+      <StronglyTypedClassName>%(Filename)</StronglyTypedClassName>
+      <StronglyTypedFileName>$(IntermediateOutputPath)%(Filename).Resources.g.cs</StronglyTypedFileName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>
