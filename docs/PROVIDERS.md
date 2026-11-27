@@ -192,7 +192,7 @@ both sides.
 | Call | Body | Answer |
 | --- | --- | --- |
 | `POST /providers/pairing` | `PairingKnock`: `hubPath` (the kind's hub, e.g. `/providers/charger`), `providerId`, `name`, `version`, `pageUrl` (or null), `secretHash` | `{"requestId":"…"}`; `400` for a field that is wrong or a hub path that is no kind's; `413` over 4 KiB; `429` over the rate limit |
-| `POST /providers/pairing/{requestId}/collect` | `PairingCollect`: `secret`, the secret whose hash was knocked with | `PairingAnswer`: `state` is `waiting`, `accepted` (with `token`), `rejected` or `unknown` |
+| `POST /providers/pairing/{requestId}/collect` | `PairingCollect`: `secret`, the secret whose hash was knocked with | `PairingAnswer`: `state` is `waiting`, `accepted` (with `token`), `rejected` or `unknown`; `400` for a body that is not JSON or a missing or overlong secret; `413` over 4 KiB |
 
 The secret hash is SHA-256 of the UTF-8 secret, in base64url without padding. The code is the first four
 bytes of the hash as a big-endian number, modulo 10^6, in two groups of three digits. Only the hash
@@ -226,10 +226,13 @@ Setting a password closes it. On a network with other people on it, set one.
 listed as *This machine* and needs no check, since nothing on the network can send a loopback knock. With
 host networking, which every documented deployment uses, plugins on the same device all knock from
 loopback. A knock from any other address shows the source address, the code and the hint to open the
-plugin's own page at its own address, or read its log, and check that the code matches. Gleanvolt never
-links to the page address a knock carries before the plugin is accepted: a copy could send its own page,
-which would confirm itself. On a bridge network the addresses will not match (Docker's gateway against a
-`172.x` address); the code is what counts.
+plugin's own page at its own address, or read its log, and check that the code matches **and** that the
+address Gleanvolt shows is one the plugin's own page lists. A LAN host that answers the mDNS browse can
+relay a knock; the code then matches and only the address tells it apart. A plugin on another device than
+Gleanvolt should set `Gleanvolt:Endpoint`. Gleanvolt never links to the page address a knock carries
+before the plugin is accepted: a copy could send its own page, which would confirm itself. On a bridge
+network the addresses will not match (Docker's gateway against a `172.x` address); only the code can be
+checked there.
 
 Accept is turned off, with the reason shown, for a request that:
 

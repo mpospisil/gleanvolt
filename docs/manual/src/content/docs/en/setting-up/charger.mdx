@@ -42,8 +42,12 @@ your solar power and your home battery, but no charging mode can be started.
 
 A plugin that runs on the same computer as Gleanvolt is marked **This machine**, and one press of
 **Accept** is enough. A plugin on another computer shows its address, and a six-digit **code**
-such as `482 193`. Open the plugin's own page at its address, or read its log: both show the same code. If
-it matches, press **Accept**. If it doesn't, someone else on your network is asking: press **Reject**.
+such as `482 193`. Open the plugin's own page at its address, or read its log: both show the same code, and
+the page lists the plugin's own addresses. Press **Accept** only if the code matches **and** the address
+Gleanvolt shows is one the plugin's page lists. Another computer on your network can pass a plugin's
+request on, with the right code, and only the address gives it away. If either doesn't match, someone else
+on your network is asking: press **Reject**. A plugin on another computer than Gleanvolt is best given
+Gleanvolt's address, as `Gleanvolt__Endpoint` (see **Gleanvolt moved** below).
 
 :::caution[Accepting needs no sign-in]
 Anyone who can open Gleanvolt can accept a waiting plugin, on **Settings** and in the wizard, with or

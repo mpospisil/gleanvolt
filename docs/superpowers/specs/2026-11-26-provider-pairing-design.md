@@ -116,7 +116,11 @@ entries expire (e.g. 15 minutes without a poll), a per-source rate limit, and si
 machine" and one click accepts it; nothing on the LAN can send a loopback knock, and a rogue program already on
 the machine is past what pairing could stop. With host networking (every documented deployment), plugins on the
 same device all knock from loopback, so the 99% case is one click. A knock from any other address shows its code
-and the hint "open the plugin's page at its own address, or its log, and check the code matches" before Accept.
+and the hint "open the plugin's page at its own address, or its log, and check that the code matches and that the
+address shown here is one the plugin's own page lists" before Accept.
+
+A LAN host that answers the mDNS browse can relay a knock; the code then matches and only the address tells it
+apart (final review, owner's ruling). A plugin on another device than Gleanvolt should set `Gleanvolt:Endpoint`.
 
 For knocks from another address:
 
@@ -137,7 +141,7 @@ own address, or reads its log.
 
 Which address each side shows (my call): Gleanvolt shows "this machine" for a loopback knock and the source address
 otherwise; the plugin's waiting view lists its own LAN addresses. On a bridge network these won't match (the Docker
-gateway against a 172.x address); the code is what counts there.
+gateway against a 172.x address); only the code can be checked there.
 
 ### Duplicates and knocks Gleanvolt would refuse (my calls)
 

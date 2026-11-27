@@ -1162,7 +1162,7 @@
     <value>Code:</value>
   </data>
   <data name="PairingCheckCode" xml:space="preserve">
-    <value>Open the plugin's page at its own address, or its log, and check that the code matches.</value>
+    <value>Open the plugin's page at its own address, or its log, and check that the code matches and that the address shown here is one the plugin's own page lists.</value>
   </data>
   <data name="PairingAccept" xml:space="preserve">
     <value>Accept</value>

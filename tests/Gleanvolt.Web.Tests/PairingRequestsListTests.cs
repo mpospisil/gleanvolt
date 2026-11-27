@@ -54,7 +54,10 @@ public class PairingRequestsListTests : PageTest
         var row = Render<PairingRequestsList>().Find("#pairing-r1");
 
         Assert.Equal("192.168.1.50", row.QuerySelector(".pairing-source")!.TextContent);
-        Assert.Contains("check that the code matches", row.QuerySelector(".pairing-hint")!.TextContent);
+        var hint = row.QuerySelector(".pairing-hint")!.TextContent;
+        Assert.Contains("check that the code matches", hint);
+        // A relay copies the code; only the address tells it apart.
+        Assert.Contains("the address shown here is one the plugin's own page lists", hint);
     }
 
     [Fact]

@@ -1127,7 +1127,7 @@
     <value>Kód:</value>
   </data>
   <data name="PairingCheckCode" xml:space="preserve">
-    <value>Otevřete stránku pluginu na jeho vlastní adrese nebo jeho log a ověřte, že kód souhlasí.</value>
+    <value>Otevřete stránku pluginu na jeho vlastní adrese nebo jeho log a ověřte, že kód souhlasí a že adresa uvedená zde je jednou z adres, které uvádí stránka pluginu.</value>
   </data>
   <data name="PairingAccept" xml:space="preserve">
     <value>Přijmout</value>
