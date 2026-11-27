@@ -1,0 +1,316 @@
+@page "/settings/integrations"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject MqttDisplayOptions Mqtt
+@inject ApiDisplayOptions Api
+@inject NavigationManager Nav
+
+@*
+    Settings: the links to other systems (2026-11-27) -- Home Assistant over MQTT, the car's telemetry
+    over MQTT, and the REST API. Each is read once at startup, so a save here is for the next start.
+*@
+
+<SiteTitle Page="@SettingsText.IntegrationsPageTitle" />
+
+<h1>@SettingsText.SettingsTitle</h1>
+
+<SettingsTabs Current="SettingsTab.Integrations" />
+
+<SetupModeBanner />
+
+<MqttEditorForm />
+
+<div class="section-head tip-head">
+    <h2>@SettingsText.Mqtt</h2>
+    <InfoTip Topic="@SettingsText.MqttTopic" Group="settings-info" Wide="true">
+        <p>
+            @Localized.Rich(SettingsText.MqttTip1, @<em>@SettingsText.MqttTip1_0</em>, @<code>/set</code>)
+        </p>
+        <p>
+            @Localized.Rich(SettingsText.MqttTip2, @<em>@SettingsText.MqttTip2_0</em>, @<a href="/settings/health">@SettingsText.MqttTip2_1</a>)
+        </p>
+    </InfoTip>
+</div>
+
+@*
+    The third and fourth things this controller is talking to (issue #143). The installation form
+    above is what it drives; this is what it talks through, and unlike a Modbus address none of it is guessable:
+    the prefix everything is published under is composed at startup from two separate settings.
+
+    Two links rather than one broker, kept apart on purpose. They are separately optional -- you can
+    publish to Home Assistant without reading the car, or the reverse -- and they may well be two
+    different brokers, so a single row saying "the broker" would be wrong on any installation that
+    took that up.
+*@
+
+<div class="section-head tip-head minor">
+    <h3>@SettingsText.HomeAssistant</h3>
+    @if (Mqtt.HomeAssistant.Connection.Enabled)
+    {
+        <InfoTip Topic="@SettingsText.HomeAssistantTopic" Group="settings-info" Wide="true">
+            <p>
+                @Localized.Rich(SettingsText.HaTip1, @<code>unique_id</code>, @<code>unique_id</code>)
+            </p>
+            <p>
+                @Localized.Rich(SettingsText.HaTip2, @<code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/state")</code>, @<code>@($"{Mqtt.HomeAssistant.TopicPrefix}/{{object_id}}/set")</code>, @<code>@($"{Mqtt.HomeAssistant.DiscoveryPrefix}/…/{Mqtt.HomeAssistant.DeviceId}/…/config")</code>, @<em>@SettingsText.HaTip2_3</em>)
+            </p>
+        </InfoTip>
+    }
+</div>
+
+@if (!Mqtt.HomeAssistant.Connection.Enabled)
+{
+    <p class="muted" id="ha-mqtt-off">
+        @Localized.Rich(SettingsText.HaOff, @<code>HomeAssistant__Enabled</code>, @<code>true</code>, @<code>HomeAssistant__Username</code>, @<code>HomeAssistant__Password</code>, @<code>Pv__Id</code>)
+    </p>
+}
+else
+{
+    <dl class="facts">
+        <MqttConnection Connection="Mqtt.HomeAssistant.Connection" />
+
+        <dt>@SettingsText.DiscoveryPrefix</dt>
+        <dd><code>@Mqtt.HomeAssistant.DiscoveryPrefix</code></dd>
+
+        <dt>@SettingsText.DeviceId</dt>
+        <dd><code>@Mqtt.HomeAssistant.DeviceId</code></dd>
+
+        <dt>@SettingsText.TopicPrefix</dt>
+        <dd><code>@Mqtt.HomeAssistant.TopicPrefix</code></dd>
+
+        <dt>@SettingsText.StatusInterval</dt>
+        <dd>@Interval(Mqtt.HomeAssistant.StatusInterval)</dd>
+    </dl>
+
+    <table class="sessions topics">
+        <thead>
+            <tr>
+                <th>@SettingsText.Carries</th>
+                <th>@SettingsText.TopicColumn</th>
+                <th>@SettingsText.Direction</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var topic in Mqtt.HomeAssistant.Topics)
+            {
+                <tr>
+                    <td>@Localized.Say(topic.PurposePhrase, topic.Purpose)</td>
+                    <td class="topic"><code>@topic.Topic</code></td>
+                    <td class="flow">@(topic.Inbound ? SettingsText.In : SettingsText.Out)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (Mqtt.HomeAssistant.IsRetiringAnything)
+    {
+        <p class="table-note muted" id="ha-mqtt-retiring">
+            @Localized.Rich(SettingsText.Retiring, @<strong>@SettingsText.Retiring_0</strong>)
+            @if (Mqtt.HomeAssistant.RetiredDeviceIds.Count > 0)
+            {
+                @Localized.Format(
+                    Mqtt.HomeAssistant.RetiredTopicPrefixes.Count > 0 ? SettingsText.RetiringConfigsAnd : SettingsText.RetiringConfigs,
+                    string.Join(SharedText.ListSeparator, Mqtt.HomeAssistant.RetiredDeviceIds))
+            }
+            @if (Mqtt.HomeAssistant.RetiredTopicPrefixes.Count > 0)
+            {
+                @Localized.Format(SettingsText.RetiringState, string.Join(SharedText.ListSeparator, Mqtt.HomeAssistant.RetiredTopicPrefixes))
+            }
+            @SettingsText.RetiringNote
+        </p>
+    }
+}
+
+<div class="section-head tip-head minor">
+    <h3>@SettingsText.VehicleTelemetry</h3>
+    @if (Mqtt.Vehicle.Connection.Enabled)
+    {
+        <InfoTip Topic="@SettingsText.VehicleTelemetryTopic" Group="settings-info" Wide="true">
+            <p>
+                @Localized.Rich(SettingsText.VehicleTelemetryTip, @<code>+</code>, @<strong>@SettingsText.VehicleTelemetryTip_1</strong>)
+            </p>
+        </InfoTip>
+    }
+</div>
+
+@if (!Mqtt.Vehicle.Connection.Enabled)
+{
+    <p class="muted" id="vehicle-mqtt-off">
+        @Localized.Rich(SettingsText.VehicleMqttOff, @<code>Vehicle__Enabled</code>, @<code>true</code>, @<code>Ev__Vehicles__0__Telemetry__Topic</code>)
+    </p>
+}
+else
+{
+    <dl class="facts">
+        <MqttConnection Connection="Mqtt.Vehicle.Connection" />
+
+        <dt>@SettingsText.SubscribedTo</dt>
+        <dd>
+            @if (Mqtt.Vehicle.IsEnabledWithoutTopic)
+            {
+                <span class="muted">@SettingsText.Nothing</span>
+            }
+            else
+            {
+                <code>@Mqtt.Vehicle.Topic</code>
+            }
+        </dd>
+
+        <dt>@SettingsText.StaleAfter</dt>
+        <dd>@Interval(Mqtt.Vehicle.MaxAge)</dd>
+
+        <dt>@SettingsText.RetryEvery</dt>
+        <dd>@Interval(Mqtt.Vehicle.ReconnectInterval)</dd>
+    </dl>
+
+    @if (Mqtt.Vehicle.IsEnabledWithoutTopic)
+    {
+        <p class="table-note muted" id="vehicle-mqtt-no-topic">
+            @Localized.Rich(SettingsText.NoTopic, @<code>Ev__Vehicles__0__Telemetry__Topic</code>)
+        </p>
+    }
+
+    @if (Mqtt.SharesOneBroker)
+    {
+        <p class="table-note muted" id="mqtt-one-broker">
+            @Localized.Rich(SettingsText.OneBroker, @<code>@Mqtt.Vehicle.Connection.Broker</code>)
+        </p>
+    }
+}
+
+<ApiEditorForm />
+
+<div class="section-head tip-head">
+    <h2>@SettingsText.Api</h2>
+    @if (Api.Enabled)
+    {
+        <InfoTip Topic="@SettingsText.ApiTopic" Group="settings-info" Wide="true">
+            <p>
+                @Localized.Rich(SettingsText.ApiTip, @<code>Web:Port</code>)
+            </p>
+        </InfoTip>
+    }
+</div>
+
+@*
+    The third control surface (issue #142), and the one whose whole configuration lives in a file on
+    the Pi. Turning it on is a line in .env and a key from `openssl rand -hex 32`; after that the only
+    confirmation it worked is a line in the startup log, and the only place the key exists is that
+    file. Anyone pointing an MCP server, a script or a dashboard at this installation needs exactly two
+    things -- the base URL and a key -- and used to get them by ssh'ing to the Pi and grepping .env.
+
+    Read-only for the same reason as everything above: ApiOptions is bound once at startup, the
+    keyless-API check has already refused what could not be honoured, and the routes are mapped -- or
+    not mapped -- from it. A control that generated a key here would be editing a copy of a settled
+    decision.
+*@
+
+@if (!Api.Enabled)
+{
+    <p class="muted" id="api-off">
+        @Localized.Rich(SettingsText.ApiOff, @<code>Api__Enabled=true</code>, @<code>Api__Keys__&lt;name&gt;=$(openssl rand -hex 32)</code>)
+    </p>
+}
+else
+{
+    <dl class="facts">
+        <dt>@SettingsText.BaseUrl</dt>
+        <dd>
+            <code>@_api.BaseUrl</code>
+            @if (_api.PortIsImplicit)
+            {
+                <span class="muted">
+                    @Localized.Rich(SettingsText.DefaultPort, @<code>host:@Api.Port</code>)
+                </span>
+            }
+        </dd>
+
+        <dt>@SettingsText.Index</dt>
+        <dd><a href="@_api.BaseUrl">@Api.BasePath</a></dd>
+
+        <dt>@SettingsText.OpenApiDocument</dt>
+        <dd><a href="@_api.DocumentUrl">@Api.DocumentPath</a></dd>
+    </dl>
+
+    <div class="section-head tip-head minor">
+        <h3>@SettingsText.Keys</h3>
+        <InfoTip Topic="@SettingsText.ApiKeysTopic" Group="settings-info" Wide="true">
+            <p>
+                @SettingsText.ApiKeysTip
+            </p>
+        </InfoTip>
+    </div>
+
+    <table class="sessions">
+        <thead>
+            <tr>
+                <th>@SettingsText.Name</th>
+                <th>@SettingsText.Key</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var key in Api.Keys)
+            {
+                <tr>
+                    <td><code>@key.Name</code></td>
+                    <td>
+                        @if (key.Secret is { } secret)
+                        {
+                            <Secret Value="@secret" />
+                        }
+                        else
+                        {
+                            <span class="muted">@SettingsText.Configured</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (Api.SecretsWithheld)
+    {
+        <p class="table-note muted" id="api-keys-withheld">
+            @Localized.Rich(SettingsText.KeysWithheld, @<code>Web__PasswordHash</code>, @<code>hash-password</code>)
+        </p>
+    }
+
+    <div class="section-head tip-head minor">
+        <h3>@SettingsText.CallingIt</h3>
+        <InfoTip Topic="@SettingsText.CallingTopic" Group="settings-info" Wide="true">
+            <p>
+                @SettingsText.CallingTip
+            </p>
+        </InfoTip>
+    </div>
+
+    <p class="code-line">
+        @if (Api.Keys[0].Secret is { } example)
+        {
+            <Secret Value="@example" Before="@CurlPrefix" After="@CurlSuffix" />
+        }
+        else
+        {
+            <code>@CurlPrefix&lt;@SettingsText.KeyPlaceholder&gt;@CurlSuffix</code>
+        }
+    </p>
+
+}
+
+@code {
+    // The example call the section exists to serve, split around the key so the secret can be masked
+    // inside it while Copy still hands over the whole command.
+    private const string CurlPrefix = "curl -H \"Authorization: Bearer ";
+
+    private string CurlSuffix => $"\" {_api.BaseUrl}/status";
+
+    // Where the API is, as seen from the browser that fetched this page -- resolved once, since the
+    // address cannot change under a rendered page.
+    private ApiAddressDisplay _api = new(string.Empty, string.Empty, PortIsImplicit: true);
+
+    protected override void OnInitialized() => _api = Api.AddressFrom(Nav.BaseUri);
+
+    // Intervals here run from fifteen seconds to twelve hours, and each reads in the units it
+    // was configured in: Units.Duration keeps seconds below ten minutes and minutes below two days.
+    private static string Interval(TimeSpan value) => value <= TimeSpan.Zero ? Units.Missing : Units.Duration(value);
+}

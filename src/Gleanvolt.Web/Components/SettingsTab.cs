@@ -1,9 +1,11 @@
 namespace Gleanvolt.Web.Components;
 
-/// <summary>The tabs of the Settings page, as <see cref="SettingsTabs"/> marks them.</summary>
+/// <summary>The tabs of the Settings page, as <see cref="SettingsTabs"/> marks them, in the order of setup.</summary>
 public enum SettingsTab
 {
     Installation,
     ExternalProviders,
-    Health,
+    ForecastPrices,
+    Integrations,
+    System,
 }

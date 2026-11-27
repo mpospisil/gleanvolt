@@ -192,9 +192,6 @@
   <data name="SettingsExternalProviders" xml:space="preserve">
     <value>Externí zdroje dat</value>
   </data>
-  <data name="SettingsHealth" xml:space="preserve">
-    <value>Stav</value>
-  </data>
   <data name="SignInTitle" xml:space="preserve">
     <value>Přihlášení — Gleanvolt</value>
   </data>
@@ -564,5 +561,14 @@
   </data>
   <data name="PairingAlertReview" xml:space="preserve">
     <value>Otevřít Nastavení → Externí zdroje dat</value>
+  </data>
+  <data name="SettingsForecastPrices" xml:space="preserve">
+    <value>Předpověď a ceny</value>
+  </data>
+  <data name="SettingsIntegrations" xml:space="preserve">
+    <value>Integrace</value>
+  </data>
+  <data name="SettingsSystem" xml:space="preserve">
+    <value>Systém</value>
   </data>
 </root>

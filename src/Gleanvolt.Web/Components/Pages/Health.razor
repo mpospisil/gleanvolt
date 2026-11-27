@@ -1,3 +1,4 @@
+@page "/settings/system"
 @page "/settings/health"
 @page "/health"
 @attribute [Authorize]
@@ -22,11 +23,11 @@
     the poll loop has stopped while the web host is fine.
 *@
 
-<SiteTitle Page="@SettingsText.HealthPageTitle" />
+<SiteTitle Page="@SettingsText.SystemPageTitle" />
 
 <h1>@SettingsText.SettingsTitle</h1>
 
-<SettingsTabs Current="SettingsTab.Health" />
+<SettingsTabs Current="SettingsTab.System" />
 
 <SetupModeBanner />
 
@@ -191,6 +192,9 @@
         </div>
     }
 </section>
+
+@* The password moved here from the Installation tab (2026-11-27): it is the controller's own, like the service. *@
+<ChangePassword />
 
 @code {
     // The viewer's culture, for the renders the poll and other threads ask for (#290).

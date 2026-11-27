@@ -213,9 +213,6 @@
   <data name="SettingsExternalProviders" xml:space="preserve">
     <value>External providers</value>
   </data>
-  <data name="SettingsHealth" xml:space="preserve">
-    <value>Health</value>
-  </data>
   <!-- Sign-in and setup -->
   <data name="SignInTitle" xml:space="preserve">
     <value>Sign in — Gleanvolt</value>
@@ -611,5 +608,14 @@
   </data>
   <data name="PairingAlertReview" xml:space="preserve">
     <value>Open Settings → External providers</value>
+  </data>
+  <data name="SettingsForecastPrices" xml:space="preserve">
+    <value>Forecast &amp; prices</value>
+  </data>
+  <data name="SettingsIntegrations" xml:space="preserve">
+    <value>Integrations</value>
+  </data>
+  <data name="SettingsSystem" xml:space="preserve">
+    <value>System</value>
   </data>
 </root>

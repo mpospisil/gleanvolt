@@ -24,8 +24,8 @@
   <data name="SignInsSinceStartExpiring" xml:space="preserve">
     <value>({0} přihlášení od startu — relace vypršují)</value>
   </data>
-  <data name="HealthPageTitle" xml:space="preserve">
-    <value>Stav</value>
+  <data name="SystemPageTitle" xml:space="preserve">
+    <value>Systém</value>
   </data>
   <data name="ExternalProvidersPageTitle" xml:space="preserve">
     <value>Externí zdroje dat</value>
@@ -1146,5 +1146,11 @@
   </data>
   <data name="PairingGone" xml:space="preserve">
     <value>Tento plugin už nečeká nebo ho už nelze přijmout.</value>
+  </data>
+  <data name="ForecastPricesPageTitle" xml:space="preserve">
+    <value>Předpověď a ceny</value>
+  </data>
+  <data name="IntegrationsPageTitle" xml:space="preserve">
+    <value>Integrace</value>
   </data>
 </root>

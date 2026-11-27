@@ -112,13 +112,14 @@ public class PvSystemPageTests : BunitContext
     /// Renders the page into a given context. Static and context-taking because bUnit registers
     /// services once per context, so a test that compares two configurations needs two of them.
     /// </summary>
-    private static IRenderedComponent<PvSystem> RenderIn(
+    private static IRenderedComponent<TPage> RenderIn<TPage>(
         BunitContext context,
         PvSystemInfo? site = null,
         EvInfo? car = null,
         MqttDisplayOptions? mqtt = null,
         ApiDisplayOptions? api = null,
         IExternalProviders? providers = null)
+        where TPage : Microsoft.AspNetCore.Components.IComponent
     {
         context.Services.AddSingleton(site ?? Site());
 
@@ -157,7 +158,7 @@ public class PvSystemPageTests : BunitContext
         context.Services.AddSingleton<TimeProvider>(
             new FixedTimeProvider(new DateTimeOffset(2026, 10, 21, 10, 0, 0, TimeSpan.Zero), TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague")));
 
-        return context.Render<PvSystem>();
+        return context.Render<TPage>();
     }
 
     private IRenderedComponent<PvSystem> Render(
@@ -165,7 +166,47 @@ public class PvSystemPageTests : BunitContext
         EvInfo? car = null,
         MqttDisplayOptions? mqtt = null,
         ApiDisplayOptions? api = null) =>
-        RenderIn(this, site, car, mqtt, api);
+        RenderIn<PvSystem>(this, site, car, mqtt, api);
+
+    // The MQTT and API sections live on Settings → Integrations since the 2026-11-27 reorganization.
+    private IRenderedComponent<Integrations> RenderIntegrations(
+        MqttDisplayOptions? mqtt = null,
+        ApiDisplayOptions? api = null) =>
+        RenderIn<Integrations>(this, mqtt: mqtt, api: api);
+
+    [Fact]
+    public void The_installation_tab_holds_only_the_installation()
+    {
+        var page = Render();
+
+        // The charger section shows with a charger kind registered: see the test below.
+        Assert.NotEmpty(page.FindAll("#pv-editor"));
+        foreach (var moved in new[] { "#solcast-editor", "#weather-editor", "#tariff-editor", "#mqtt-editor", "#api-editor" })
+        {
+            Assert.Empty(page.FindAll(moved));
+        }
+    }
+
+    [Fact]
+    public void Forecast_and_prices_holds_the_forecast_the_weather_and_the_tariff()
+    {
+        var page = RenderIn<ForecastPrices>(this);
+
+        Assert.NotEmpty(page.FindAll("#solcast-editor"));
+        Assert.NotEmpty(page.FindAll("#weather-editor"));
+        Assert.NotEmpty(page.FindAll("#tariff-editor"));
+        Assert.Empty(page.FindAll("#pv-editor"));
+    }
+
+    [Fact]
+    public void Integrations_holds_home_assistant_and_the_api()
+    {
+        var page = RenderIntegrations();
+
+        Assert.NotEmpty(page.FindAll("#mqtt-editor"));
+        Assert.NotEmpty(page.FindAll("#api-editor"));
+        Assert.Empty(page.FindAll("#pv-editor"));
+    }
 
     [Fact]
     public void External_providers_are_a_tab_of_their_own_and_the_charger_has_its_own_section()
@@ -177,7 +218,7 @@ public class PvSystemPageTests : BunitContext
             ProviderId: "shelly-topac", ProviderName: "Shelly TopAC", ProviderVersion: "1.0",
             Since: new DateTimeOffset(2026, 10, 21, 8, 0, 0, TimeSpan.Zero), PageUrl: new Uri("http://localhost:8097/")));
 
-        var page = RenderIn(this, providers: providers);
+        var page = RenderIn<PvSystem>(this, providers: providers);
 
         Assert.Empty(page.FindAll("#external-providers"));
 
@@ -219,7 +260,7 @@ public class PvSystemPageTests : BunitContext
     {
         // Off is the default for both, so it has to read as a deliberate default rather than a fault --
         // and the page has to say what turns each one on.
-        var page = Render();
+        var page = RenderIntegrations();
 
         Assert.Contains("HomeAssistant__Enabled", page.Find("#ha-mqtt-off").TextContent);
         Assert.Contains("Vehicle__Enabled", page.Find("#vehicle-mqtt-off").TextContent);
@@ -231,7 +272,7 @@ public class PvSystemPageTests : BunitContext
     {
         // The one string nothing else prints: it is composed at startup from BaseTopic and Pv:Id, so it
         // is not guessable from either setting on its own.
-        var page = Render(mqtt: Mqtt(homeAssistant: Link()));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
 
         Assert.Contains("gleanvolt/home-roof", page.Markup);
         Assert.Contains("gleanvolt/home-roof/availability", page.Markup);
@@ -244,7 +285,7 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Marks_the_topics_that_can_change_what_the_charger_is_doing()
     {
-        var page = Render(mqtt: Mqtt(homeAssistant: Link()));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
 
         var rows = page.FindAll("table.topics tbody tr");
         var state = rows.Single(row => row.TextContent.Contains("gleanvolt/home-roof/state"));
@@ -257,11 +298,11 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Lists_the_battery_hold_topics_only_when_the_feature_is_on()
     {
-        Assert.DoesNotContain("battery_hold", Render(mqtt: Mqtt(homeAssistant: Link())).Markup);
+        Assert.DoesNotContain("battery_hold", RenderIntegrations(mqtt: Mqtt(homeAssistant: Link())).Markup);
 
         // A fresh context per render: bUnit registers services once.
         using var withHold = new BunitContext();
-        var withHoldPage = RenderIn(withHold, mqtt: Mqtt(homeAssistant: Link(), batteryHold: true));
+        var withHoldPage = RenderIn<Integrations>(withHold, mqtt: Mqtt(homeAssistant: Link(), batteryHold: true));
 
         Assert.Contains("gleanvolt/home-roof/battery_hold/set", withHoldPage.Markup);
     }
@@ -269,7 +310,7 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Warns_what_changing_the_device_id_costs()
     {
-        var page = Render(mqtt: Mqtt(homeAssistant: Link()));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
 
         Assert.Contains("solax_controller", page.Markup);
         Assert.Contains("every graph starts again", page.Markup);
@@ -280,7 +321,7 @@ public class PvSystemPageTests : BunitContext
     {
         // What the broker's connection log and its ACL file call us -- the string to search for when
         // the broker is the suspect.
-        var page = Render(mqtt: Mqtt(
+        var page = RenderIntegrations(mqtt: Mqtt(
             homeAssistant: Link(),
             vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
 
@@ -291,10 +332,10 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Shows_the_retirement_lists_only_when_an_installation_carries_one()
     {
-        Assert.Empty(Render(mqtt: Mqtt(homeAssistant: Link())).FindAll("#ha-mqtt-retiring"));
+        Assert.Empty(RenderIntegrations(mqtt: Mqtt(homeAssistant: Link())).FindAll("#ha-mqtt-retiring"));
 
         using var retiring = new BunitContext();
-        var retiringPage = RenderIn(retiring, mqtt: Mqtt(homeAssistant: Link(), retiredDeviceIds: ["old_controller"]));
+        var retiringPage = RenderIn<Integrations>(retiring, mqtt: Mqtt(homeAssistant: Link(), retiredDeviceIds: ["old_controller"]));
 
         Assert.Contains("old_controller", retiringPage.Find("#ha-mqtt-retiring").TextContent);
     }
@@ -302,7 +343,7 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Shows_the_topic_the_vehicle_feed_actually_subscribed_to()
     {
-        var page = Render(car: Car(), mqtt: Mqtt(vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
+        var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
 
         Assert.Contains("gleanvolt/vehicle/id4/state", page.Markup);
         Assert.Contains("12 h", page.Markup);
@@ -314,7 +355,7 @@ public class PvSystemPageTests : BunitContext
     {
         // The exact case the worker warns about once and then does nothing -- which from the dashboard
         // is indistinguishable from a car that never reports.
-        var page = Render(mqtt: Mqtt(vehicle: Link(), vehicleTopic: string.Empty));
+        var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(), vehicleTopic: string.Empty));
 
         Assert.Contains(
             "Ev__Vehicles__0__Telemetry__Topic", page.Find("#vehicle-mqtt-no-topic").TextContent);
@@ -323,12 +364,12 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Says_when_the_two_links_share_one_broker_and_stays_quiet_when_they_do_not()
     {
-        var page = Render(mqtt: Mqtt(homeAssistant: Link(), vehicle: Link()));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link(), vehicle: Link()));
 
         Assert.Contains("mosquitto:1883", page.Find("#mqtt-one-broker").TextContent);
 
         using var separate = new BunitContext();
-        var separatePage = RenderIn(separate, mqtt: Mqtt(homeAssistant: Link(), vehicle: Link(host: "192.168.2.4")));
+        var separatePage = RenderIn<Integrations>(separate, mqtt: Mqtt(homeAssistant: Link(), vehicle: Link(host: "192.168.2.4")));
 
         Assert.Empty(separatePage.FindAll("#mqtt-one-broker"));
         Assert.Contains("192.168.2.4:1883", separatePage.Markup);
@@ -340,7 +381,7 @@ public class PvSystemPageTests : BunitContext
         // The structural half of the guarantee is the host's: with no login enforced it hands over a
         // null. This is the other half -- that a null renders as an explanation rather than as blank,
         // and that nothing secret is in the markup to be revealed by a view-source.
-        var page = Render(mqtt: Mqtt(homeAssistant: Link(password: null), vehicle: Link(password: null)));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link(password: null), vehicle: Link(password: null)));
 
         Assert.DoesNotContain("broker-secret", page.Markup);
         Assert.Contains("Web__PasswordHash", page.Markup);
@@ -350,7 +391,7 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void A_broker_password_renders_masked_until_it_is_asked_for()
     {
-        var page = Render(mqtt: Mqtt(homeAssistant: Link(password: "broker-secret")));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link(password: "broker-secret")));
 
         // Behind a login is not behind a closed door: a shoulder and a screenshot are a different
         // threat from the network, so it starts hidden.
@@ -366,7 +407,7 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void An_anonymous_broker_does_not_read_as_a_withheld_password()
     {
-        var page = Render(mqtt: Mqtt(
+        var page = RenderIntegrations(mqtt: Mqtt(
             homeAssistant: Link(username: string.Empty, password: null, hasPassword: false)));
 
         // The MQTT section only: the edit forms around it name Web__PasswordHash for their own reason.
@@ -380,7 +421,7 @@ public class PvSystemPageTests : BunitContext
     public void Does_not_claim_that_a_configured_link_is_a_working_one()
     {
         // Everything here was read at startup; nothing on this page knows whether the broker answered.
-        var page = Render(mqtt: Mqtt(homeAssistant: Link()));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
 
         Assert.Contains("whether either connection is", page.Markup);
     }
@@ -392,7 +433,7 @@ public class PvSystemPageTests : BunitContext
     {
         // Off is the default, so it must read as a deliberate one -- and say what turns it on, keys
         // included, since enabled without a key does not start at all.
-        var page = Render();
+        var page = RenderIntegrations();
 
         var off = page.Find("#api-off").TextContent;
         Assert.Contains("Api__Enabled=true", off);
@@ -406,7 +447,7 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Shows_where_the_api_is_and_links_to_what_answers_without_a_key()
     {
-        var page = Render(api: Api(new ApiKeyDisplay("client", null)));
+        var page = RenderIntegrations(api: Api(new ApiKeyDisplay("client", null)));
 
         // Absolute, built from the address the browser used -- bUnit's is http://localhost/.
         Assert.Contains("http://localhost/api/v1", page.Markup);
@@ -421,7 +462,7 @@ public class PvSystemPageTests : BunitContext
     {
         // A proxy answering on 80 leaves no port in the URL, and the direct LAN address is still
         // host:8090. bUnit's base URI has no port, which is exactly that case.
-        var page = Render(api: Api(new ApiKeyDisplay("client", null)));
+        var page = RenderIntegrations(api: Api(new ApiKeyDisplay("client", null)));
 
         Assert.Contains("host:8090", page.Markup);
     }
@@ -431,7 +472,7 @@ public class PvSystemPageTests : BunitContext
     {
         // The name is the column that earns its place: it is what the log and the recorded session
         // attribute an action to.
-        var page = Render(api: Api(
+        var page = RenderIntegrations(api: Api(
             new ApiKeyDisplay("claude-mcp", null),
             new ApiKeyDisplay("dashboard", null)));
 
@@ -444,7 +485,7 @@ public class PvSystemPageTests : BunitContext
     {
         // The host withholds the secret when no login is enforced. Nothing secret may be in the markup
         // at all -- not masked, not in an attribute, not in the example call.
-        var page = Render(api: Api(new ApiKeyDisplay("client", null)));
+        var page = RenderIntegrations(api: Api(new ApiKeyDisplay("client", null)));
 
         Assert.DoesNotContain("a-real-key", page.Markup);
         Assert.Contains("Web__PasswordHash", page.Find("#api-keys-withheld").TextContent);
@@ -457,7 +498,7 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void An_api_key_renders_masked_until_it_is_asked_for()
     {
-        var page = Render(api: Api(new ApiKeyDisplay("client", "a-real-key")));
+        var page = RenderIntegrations(api: Api(new ApiKeyDisplay("client", "a-real-key")));
 
         Assert.DoesNotContain("a-real-key", page.Markup);
         Assert.Contains("•", page.Markup);
@@ -473,7 +514,7 @@ public class PvSystemPageTests : BunitContext
     {
         // The task the section exists to serve: a line that can be pasted into a terminal on another
         // machine and work, rather than one with placeholders to fill in.
-        var page = Render(api: Api(new ApiKeyDisplay("client", "a-real-key")));
+        var page = RenderIntegrations(api: Api(new ApiKeyDisplay("client", "a-real-key")));
 
         var call = page.Find("p.code-line").TextContent;
         Assert.Contains("curl -H \"Authorization: Bearer", call);
@@ -484,9 +525,27 @@ public class PvSystemPageTests : BunitContext
     }
 
     [Fact]
-    public void Every_string_on_the_settings_page_comes_from_a_resource()
+    public void Every_string_on_the_installation_page_comes_from_a_resource()
     {
-        var page = PseudoLocale.Render(() => Render(
+        var page = PseudoLocale.Render(() => Render());
+
+        PseudoLocale.AssertTranslated(
+            page.Markup,
+            "SolaX Acme", "SolaX Wallco"); // the brands in the inverter and charger drop-downs: names, never translated
+    }
+
+    [Fact]
+    public void Every_string_on_the_forecast_and_prices_page_comes_from_a_resource()
+    {
+        var page = PseudoLocale.Render(() => RenderIn<ForecastPrices>(this));
+
+        PseudoLocale.AssertTranslated(page.Markup);
+    }
+
+    [Fact]
+    public void Every_string_on_the_integrations_page_comes_from_a_resource()
+    {
+        var page = PseudoLocale.Render(() => RenderIntegrations(
             mqtt: Mqtt(homeAssistant: Link(), vehicle: Link(), batteryHold: true, retiredDeviceIds: ["solax_old"]),
             api: Api(new ApiKeyDisplay("home-assistant", null))));
 
@@ -494,7 +553,6 @@ public class PvSystemPageTests : BunitContext
         PseudoLocale.AssertTranslated(
             page.Markup,
             "mosquitto solax gleanvolt controller home roof homeassistant solax_controller solax_old vehicle id4 state",
-            "curl Authorization Bearer http localhost status api openapi json home assistant availability set",
-            "SolaX Acme", "SolaX Wallco"); // the brands in the inverter and charger drop-downs: names, never translated
+            "curl Authorization Bearer http localhost status api openapi json home assistant availability set");
     }
 }

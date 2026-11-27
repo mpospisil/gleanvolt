@@ -1,21 +1,28 @@
 @*
-    The Settings page's tabs (#255's navigation): the installation -- the PV system, the charger,
-    the integrations --, the external providers (the plugins' token and sessions, a tab of their own
-    since it crowded the top of both others), and the controller's own health. Pages behind one header
-    link rather than one component, because they render differently: Health follows the poll live, the
-    installation is a form. Links, like the Charging plan tabs, so each half is a real URL. The old /pv-system and
-    /health addresses still answer, for bookmarks.
+    The Settings page's tabs, one per kind of thing and in the order an installation is set up (2026-11-27):
+    the installation itself, the plugins that connect to it, the forecast and the prices that make the plans
+    better, the links to other systems, and the controller's own state with its restart. Links rather than
+    one component, so each tab is a real URL the manual can point at. The old /pv-system, /settings/health
+    and /health addresses still answer, for bookmarks.
 *@
 <nav class="tabs settings-tabs" aria-label="@SharedText.SettingsTabsLabel">
-    <a class="tab @(Current == SettingsTab.Installation ? "active" : null)" href="/settings"
-       aria-current="@(Current == SettingsTab.Installation ? "page" : null)">@SharedText.SettingsInstallation</a>
-    <a class="tab @(Current == SettingsTab.ExternalProviders ? "active" : null)" href="/settings/providers"
-       aria-current="@(Current == SettingsTab.ExternalProviders ? "page" : null)">@SharedText.SettingsExternalProviders</a>
-    <a class="tab @(Current == SettingsTab.Health ? "active" : null)" href="/settings/health"
-       aria-current="@(Current == SettingsTab.Health ? "page" : null)">@SharedText.SettingsHealth</a>
+    @foreach (var (tab, href, label) in Tabs)
+    {
+        <a class="tab @(Current == tab ? "active" : null)" href="@href"
+           aria-current="@(Current == tab ? "page" : null)">@label</a>
+    }
 </nav>
 
 @code {
     /// <summary>Which tab is open.</summary>
     [Parameter, EditorRequired] public SettingsTab Current { get; set; }
+
+    private static (SettingsTab Tab, string Href, string Label)[] Tabs =>
+    [
+        (SettingsTab.Installation, "/settings", SharedText.SettingsInstallation),
+        (SettingsTab.ExternalProviders, "/settings/providers", SharedText.SettingsExternalProviders),
+        (SettingsTab.ForecastPrices, "/settings/forecast-prices", SharedText.SettingsForecastPrices),
+        (SettingsTab.Integrations, "/settings/integrations", SharedText.SettingsIntegrations),
+        (SettingsTab.System, "/settings/system", SharedText.SettingsSystem),
+    ];
 }

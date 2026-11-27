@@ -25,8 +25,8 @@
   <data name="SignInsSinceStartExpiring" xml:space="preserve">
     <value>({0} sign-ins since start — sessions are expiring)</value>
   </data>
-  <data name="HealthPageTitle" xml:space="preserve">
-    <value>Health</value>
+  <data name="SystemPageTitle" xml:space="preserve">
+    <value>System</value>
   </data>
   <data name="ExternalProvidersPageTitle" xml:space="preserve">
     <value>External providers</value>
@@ -1181,5 +1181,11 @@
   </data>
   <data name="PairingGone" xml:space="preserve">
     <value>That plugin is no longer waiting, or can no longer be accepted.</value>
+  </data>
+  <data name="ForecastPricesPageTitle" xml:space="preserve">
+    <value>Forecast &amp; prices</value>
+  </data>
+  <data name="IntegrationsPageTitle" xml:space="preserve">
+    <value>Integrations</value>
   </data>
 </root>
