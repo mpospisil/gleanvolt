@@ -151,12 +151,41 @@ public sealed class ChargersHostingTests
     public void AMachineWhoseAddressesCannotBeListedShowsNone() =>
         Assert.Empty(PluginHost.AddressesOrNone(() => throw new System.Net.NetworkInformation.NetworkInformationException()));
 
-    [Fact]
-    public async Task TheWaitingViewIsInCzechForCzech()
+    [Theory]
+    [InlineData("cs")]
+    [InlineData("cs-CZ")]
+    public async Task TheWaitingViewIsInCzechForCzech(string culture)
     {
         await using var plugin = await PluginApp.StartAsync();
 
-        var body = await plugin.Client.GetStringAsync($"/?{ProviderPage.CultureParameter}=cs");
+        var body = await plugin.Client.GetStringAsync($"/?{ProviderPage.CultureParameter}={culture}");
+
+        Assert.Contains("Kód pro spárování", body, StringComparison.Ordinal);
+        Assert.Contains("""<html lang="cs" """, body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnUnknownLanguageInTheQueryIsEnglishNotTheCookies()
+    {
+        await using var plugin = await PluginApp.StartAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/?{ProviderPage.CultureParameter}=de");
+        request.Headers.Add("Cookie", ".AspNetCore.Culture=c%3Dcs%7Cuic%3Dcs");
+
+        var body = await (await plugin.Client.SendAsync(request)).Content.ReadAsStringAsync();
+
+        Assert.Contains("Pairing code", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Kód pro spárování", body, StringComparison.Ordinal);
+        Assert.Contains("""<html lang="en" """, body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WithoutAQueryTheCookiesLanguageHolds()
+    {
+        await using var plugin = await PluginApp.StartAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/");
+        request.Headers.Add("Cookie", ".AspNetCore.Culture=c%3Dcs%7Cuic%3Dcs");
+
+        var body = await (await plugin.Client.SendAsync(request)).Content.ReadAsStringAsync();
 
         Assert.Contains("Kód pro spárování", body, StringComparison.Ordinal);
         Assert.Contains("""<html lang="cs" """, body, StringComparison.Ordinal);
