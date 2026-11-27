@@ -4,6 +4,7 @@
 @inject MqttDisplayOptions Mqtt
 @inject ApiDisplayOptions Api
 @inject NavigationManager Nav
+@inject IIntegrationsEditor Editor
 
 @*
     Settings: the links to other systems (2026-11-27) -- Home Assistant over MQTT, the car's telemetry
@@ -18,7 +19,9 @@
 
 <SetupModeBanner />
 
-<MqttEditorForm />
+<RestartPendingBanner Count="_pending" Id="integrations-pending" />
+
+<MqttEditorForm OnSaved="Recount" />
 
 <div class="section-head tip-head">
     <h2>@SettingsText.Mqtt</h2>
@@ -178,7 +181,7 @@ else
     }
 }
 
-<ApiEditorForm />
+<ApiEditorForm OnSaved="Recount" />
 
 <div class="section-head tip-head">
     <h2>@SettingsText.Api</h2>
@@ -308,7 +311,20 @@ else
     // address cannot change under a rendered page.
     private ApiAddressDisplay _api = new(string.Empty, string.Empty, PortIsImplicit: true);
 
-    protected override void OnInitialized() => _api = Api.AddressFrom(Nav.BaseUri);
+    // Saved changes of both forms the running process does not have yet: one banner for the tab.
+    private int _pending;
+
+    protected override void OnInitialized()
+    {
+        _api = Api.AddressFrom(Nav.BaseUri);
+        Recount();
+    }
+
+    private void Recount()
+    {
+        var settings = Editor.Read();
+        _pending = settings.MqttPendingCount + settings.ApiPendingCount;
+    }
 
     // Intervals here run from fifteen seconds to twelve hours, and each reads in the units it
     // was configured in: Units.Duration keeps seconds below ten minutes and minutes below two days.

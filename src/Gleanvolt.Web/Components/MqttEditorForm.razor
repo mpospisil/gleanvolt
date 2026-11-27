@@ -19,17 +19,6 @@
 
     <p class="muted">@SettingsText.MqttEditorIntro</p>
 
-    @if (Pending > 0)
-    {
-        <div class="restart-banner" id="mqtt-pending" role="status">
-            <span>
-                <strong>@Localized.Format(Localized.Plural(Pending, SettingsText.ChangesSaved_One, SettingsText.ChangesSaved_Few, SettingsText.ChangesSaved_Other), Pending)</strong>
-                @SettingsText.NotRunningUntilRestart
-            </span>
-            <a class="button-link" href="/settings/system">@SettingsText.RestartOnSystem</a>
-        </div>
-    }
-
     @if (_settings.Unavailable is { } unavailable)
     {
         <p class="error" id="mqtt-unavailable">@unavailable</p>
@@ -163,8 +152,7 @@
 
     private bool Editable => !ReadOnly && _settings.Unavailable is null;
 
-    private int Pending =>
-        _settings.PendingCount(IntegrationSettingKeys.Mqtt) + (_settings.MqttPassword.IsPending ? 1 : 0);
+    private int Pending => _settings.MqttPendingCount;
 
     private bool HasEdits => Edits().Count > 0 || _password.Length > 0;
 
@@ -284,7 +272,7 @@
         }
     }
 
-    private void Revert(string key)
+    private async Task Revert(string key)
     {
         Touch();
         var result = Editor.Revert(key);
@@ -296,6 +284,7 @@
         }
 
         Reload();
+        await OnSaved.InvokeAsync();
     }
 
     private void Discard()

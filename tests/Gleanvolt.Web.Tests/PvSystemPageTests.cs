@@ -118,7 +118,9 @@ public class PvSystemPageTests : BunitContext
         EvInfo? car = null,
         MqttDisplayOptions? mqtt = null,
         ApiDisplayOptions? api = null,
-        IExternalProviders? providers = null)
+        IExternalProviders? providers = null,
+        FakeIntegrationsEditor? integrations = null,
+        bool signedIn = false)
         where TPage : Microsoft.AspNetCore.Components.IComponent
     {
         context.Services.AddSingleton(site ?? Site());
@@ -137,8 +139,8 @@ public class PvSystemPageTests : BunitContext
         // The edit form's dependencies, in the UI's default state: no login, so the form is read-only.
         context.Services.AddSingleton<IPvSystemEditor>(new FakePvSystemEditor());
         context.Services.AddSingleton<IDeviceSnapshot>(new FakeDeviceSnapshot());
-        context.Services.AddSingleton(Options.Create(new WebOptions()));
-        context.Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(null));
+        context.Services.AddSingleton(Options.Create(signedIn ? new WebOptions { PasswordHash = "hash" } : new WebOptions()));
+        context.Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(signedIn ? "hash" : null));
         context.Services.AddSingleton<IServiceShutdown>(new FakeServiceShutdown());
         context.Services.AddSingleton<ISetupState>(new NoSetupState());
         context.Services.AddSingleton(provider => new Gleanvolt.Web.Auth.WebPasswordService(
@@ -150,7 +152,7 @@ public class PvSystemPageTests : BunitContext
         // The Solcast account's, with none configured.
         context.Services.AddSingleton<ISolcastAccountEditor>(new FakeSolcastAccountEditor());
         context.Services.AddSingleton(providers ?? new FakeExternalProviders());
-        context.Services.AddSingleton<IIntegrationsEditor>(new FakeIntegrationsEditor());
+        context.Services.AddSingleton<IIntegrationsEditor>(integrations ?? new FakeIntegrationsEditor());
 
         // The tariff form's, with no tariff set up.
         context.Services.AddSingleton<ITariffEditor>(new FakeTariffEditor());
@@ -196,6 +198,34 @@ public class PvSystemPageTests : BunitContext
         Assert.NotEmpty(page.FindAll("#weather-editor"));
         Assert.NotEmpty(page.FindAll("#tariff-editor"));
         Assert.Empty(page.FindAll("#pv-editor"));
+    }
+
+    [Fact]
+    public void Integrations_has_one_restart_banner_for_both_forms()
+    {
+        var editor = new FakeIntegrationsEditor();
+        editor.Stored[IntegrationSettingKeys.MqttBrokerHost] = "192.168.1.5";
+        editor.Keys.Add(new ApiKeyEntry("claude", "abc", SettingSource.SecretStore, IsPending: true));
+
+        var page = RenderIn<Integrations>(this, integrations: editor);
+
+        Assert.Contains("2", page.Find("#integrations-pending").TextContent);
+        Assert.Empty(page.FindAll("#mqtt-pending"));
+        Assert.Empty(page.FindAll("#api-pending"));
+    }
+
+    [Fact]
+    public void A_change_saved_in_a_form_shows_in_the_banner_at_once()
+    {
+        var editor = new FakeIntegrationsEditor();
+        editor.Keys.Add(new ApiKeyEntry("claude", "abc", SettingSource.SecretStore, IsPending: true));
+        var page = RenderIn<Integrations>(this, integrations: editor, signedIn: true);
+        Assert.Contains("1", page.Find("#integrations-pending").TextContent);
+
+        editor.Stored[IntegrationSettingKeys.MqttBrokerHost] = "192.168.1.5";
+        page.Find("#api-enabled").Change(true);
+
+        Assert.Contains("3", page.Find("#integrations-pending").TextContent);
     }
 
     [Fact]

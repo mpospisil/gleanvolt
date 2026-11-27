@@ -20,17 +20,6 @@
 
     <p class="muted">@SettingsText.ApiEditorIntro</p>
 
-    @if (Pending > 0)
-    {
-        <div class="restart-banner" id="api-pending" role="status">
-            <span>
-                <strong>@Localized.Format(Localized.Plural(Pending, SettingsText.ChangesSaved_One, SettingsText.ChangesSaved_Few, SettingsText.ChangesSaved_Other), Pending)</strong>
-                @SettingsText.NotRunningUntilRestart
-            </span>
-            <a class="button-link" href="/settings/system">@SettingsText.RestartOnSystem</a>
-        </div>
-    }
-
     @if (_settings.Unavailable is { } unavailable)
     {
         <p class="error" id="api-unavailable">@unavailable</p>
@@ -153,8 +142,10 @@
 
     private bool Editable => !ReadOnly && _settings.Unavailable is null;
 
-    private int Pending =>
-        _settings.PendingCount([IntegrationSettingKeys.ApiEnabled]) + _settings.ApiKeys.Count(key => key.IsPending);
+    private int Pending => _settings.ApiPendingCount;
+
+    /// <summary>Raised after every change saved, so the page's restart banner can count it.</summary>
+    [Parameter] public EventCallback OnSaved { get; set; }
 
     protected override void OnInitialized() => Reload();
 
@@ -172,7 +163,7 @@
 
     // The checkbox saves at once: it is the whole of the plain setting, and a separate Save would be one
     // more thing to forget before the restart.
-    private void Toggle(ChangeEventArgs e)
+    private async Task Toggle(ChangeEventArgs e)
     {
         Touch();
         var on = e.Value is true;
@@ -187,9 +178,10 @@
 
         Reload();
         _message = Pending > 0 ? SettingsText.SavedRestart : SettingsText.SavedRunning;
+        await OnSaved.InvokeAsync();
     }
 
-    private void Create()
+    private async Task Create()
     {
         Touch();
         var name = _name.Trim();
@@ -204,9 +196,10 @@
         _name = string.Empty;
         Reload();
         _message = Localized.Format(SettingsText.KeyCreated, name);
+        await OnSaved.InvokeAsync();
     }
 
-    private void Remove(string name)
+    private async Task Remove(string name)
     {
         Touch();
         var result = Editor.RemoveApiKey(name);
@@ -219,9 +212,10 @@
 
         Reload();
         _message = Localized.Format(SettingsText.KeyRemoved, name);
+        await OnSaved.InvokeAsync();
     }
 
-    private void Revert(string key)
+    private async Task Revert(string key)
     {
         Touch();
         var result = Editor.Revert(key);
@@ -233,5 +227,6 @@
         }
 
         Reload();
+        await OnSaved.InvokeAsync();
     }
 }

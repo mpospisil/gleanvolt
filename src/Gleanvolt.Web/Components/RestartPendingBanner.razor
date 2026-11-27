@@ -1,0 +1,24 @@
+@*
+    "N changes saved, not running until a restart", with the way to the restart (2026-11-27). One per
+    restart-to-apply tab of Settings -- the installation's form, and the Integrations page for both its
+    forms -- where each form used to carry a copy of its own.
+*@
+
+@if (Count > 0)
+{
+    <div class="restart-banner" id="@Id" role="status">
+        <span>
+            <strong>@Localized.Format(Localized.Plural(Count, SettingsText.ChangesSaved_One, SettingsText.ChangesSaved_Few, SettingsText.ChangesSaved_Other), Count)</strong>
+            @SettingsText.NotRunningUntilRestart
+        </span>
+        <a class="button-link" href="/settings/system">@SettingsText.RestartOnSystem</a>
+    </div>
+}
+
+@code {
+    /// <summary>How many saved changes the running process does not have yet.</summary>
+    [Parameter, EditorRequired] public int Count { get; set; }
+
+    /// <summary>The banner's element id.</summary>
+    [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
+}

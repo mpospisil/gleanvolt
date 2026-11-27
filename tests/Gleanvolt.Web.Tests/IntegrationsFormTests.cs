@@ -43,7 +43,8 @@ public class IntegrationsFormTests : BunitContext
 
         // Pending, as the fake's running side has none of it: a restart applies it.
         Assert.Contains("Restart", form.Find("#mqtt-message").TextContent);
-        Assert.NotNull(form.Find("#mqtt-pending"));
+        // The banner is the Integrations page's, one for both forms (2026-11-27).
+        Assert.Empty(form.FindAll("#mqtt-pending"));
         Assert.Equal("", form.Find("#mqtt-password").GetAttribute("value") ?? "");
     }
 
@@ -85,7 +86,7 @@ public class IntegrationsFormTests : BunitContext
         form.Find("#api-enabled").Change(true);
 
         Assert.Equal("true", Assert.Single(_editor.Saves).Values[IntegrationSettingKeys.ApiEnabled]);
-        Assert.NotNull(form.Find("#api-pending"));
+        Assert.Empty(form.FindAll("#api-pending"));
     }
 
     [Fact]
