@@ -77,13 +77,13 @@
 <p>With the <strong>Gleanvolt integration</strong>, Home Assistant shows what Gleanvolt measures and plans, and you can
 pick a charge mode, set what that mode needs, and start and stop charging. You don’t need an MQTT
 broker. It needs Gleanvolt 1.2.0 or later.</p>
-<aside aria-label="Use one way to connect, not both" class="starlight-aside starlight-aside--caution"><p class="starlight-aside__title" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="starlight-aside__icon"><path d="M12 16a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm10.67 1.47-8.05-14a3 3 0 0 0-5.24 0l-8 14A3 3 0 0 0 3.94 22h16.12a3 3 0 0 0 2.61-4.53Zm-1.73 2a1 1 0 0 1-.88.51H3.94a1 1 0 0 1-.88-.51 1 1 0 0 1 0-1l8-14a1 1 0 0 1 1.78 0l8.05 14a1 1 0 0 1 .05 1.02v-.02ZM12 8a1 1 0 0 0-1 1v4a1 1 0 0 0 2 0V9a1 1 0 0 0-1-1Z"/></svg>Use one way to connect, not both</p><div class="starlight-aside__content"><p>Gleanvolt can also connect to Home Assistant over MQTT (<strong>Settings → Home Assistant (MQTT)</strong>). That way
+<aside aria-label="Use one way to connect, not both" class="starlight-aside starlight-aside--caution"><p class="starlight-aside__title" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="starlight-aside__icon"><path d="M12 16a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm10.67 1.47-8.05-14a3 3 0 0 0-5.24 0l-8 14A3 3 0 0 0 3.94 22h16.12a3 3 0 0 0 2.61-4.53Zm-1.73 2a1 1 0 0 1-.88.51H3.94a1 1 0 0 1-.88-.51 1 1 0 0 1 0-1l8-14a1 1 0 0 1 1.78 0l8.05 14a1 1 0 0 1 .05 1.02v-.02ZM12 8a1 1 0 0 0-1 1v4a1 1 0 0 0 2 0V9a1 1 0 0 0-1-1Z"/></svg>Use one way to connect, not both</p><div class="starlight-aside__content"><p>Gleanvolt can also connect to Home Assistant over MQTT (<strong>Settings → Integrations → Home Assistant (MQTT)</strong>). That way
 suits a home that already runs a broker. If both are on, Gleanvolt shows up in Home Assistant twice. So
 if you set up the integration, leave <strong>Home Assistant (MQTT)</strong> off.</p></div></aside>
 <div class="sl-heading-wrapper level-h2"><h2 id="make-a-key-for-home-assistant">Make a key for Home Assistant</h2><a class="sl-anchor-link" href="#make-a-key-for-home-assistant"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Make a key for Home Assistant”</span></a></div>
 <ol role="list" class="sl-steps">
 <li>
-<p>In Gleanvolt, open <strong>Settings</strong> and find <strong>API access</strong>. (Or the setup wizard’s <strong>Extras</strong> step.)</p>
+<p>In Gleanvolt, open <strong>Settings → Integrations</strong> and find <strong>API access</strong>.</p>
 </li>
 <li>
 <p>Tick <strong>Turn the API on</strong>.</p>
@@ -93,10 +93,10 @@ if you set up the integration, leave <strong>Home Assistant (MQTT)</strong> off.
 and each charge’s history show as the source of anything Home Assistant starts.</p>
 </li>
 <li>
-<p>Press <strong>Restart</strong> on <strong>Settings → Health</strong>.</p>
+<p>Press <strong>Restart</strong> on <strong>Settings → System</strong>.</p>
 </li>
 </ol>
-<p><img src="/gleanvolt/next/_astro/settings-api.CSloTTa__Z65me0.webp" alt="The API access section, switched on, with a key named home-assistant." loading="lazy" decoding="async" width="712" height="505"></p>
+<p><img src="/gleanvolt/next/_astro/settings-api.CqDhtXoy_Z21IqGv.webp" alt="The API access section, switched on, with a key named home-assistant." loading="lazy" decoding="async" width="712" height="707"></p>
 <p><strong>Copy</strong> next to the key puts it on the clipboard for the next steps. Treat it like a password: with it,
 Home Assistant can start and stop the charger.</p>
 <div class="sl-heading-wrapper level-h2"><h2 id="install-the-integration">Install the integration</h2><a class="sl-anchor-link" href="#install-the-integration"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Install the integration”</span></a></div>
