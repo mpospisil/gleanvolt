@@ -62,16 +62,19 @@ and each tab should be one or two screens long.
 ### Tabs
 
 ```
-Settings:  Installation | Data sources | Integrations | External providers | System
+Settings:  Installation | External providers | Data sources | Integrations | System
 ```
 
 | Tab | Address | Contents | Saves |
 |---|---|---|---|
 | Installation | `/settings` (also `/pv-system`) | Optional-settings checklist; installation form (PV system, battery, inverter); charger; link to the Car page | restart |
+| External providers | `/settings/providers` | unchanged (pairing requests, token, each kind's session) | on save |
 | Data sources | `/settings/data-sources` | Solar forecast (Solcast), weather, tariff | on save |
 | Integrations | `/settings/integrations` | Home Assistant (MQTT), car telemetry (MQTT), REST API | restart |
-| External providers | `/settings/providers` | unchanged (pairing requests, token, each kind's session) | on save |
 | System | `/settings/system` (also `/settings/health`, `/health`) | today's Health facts; Service (stop, restart); Change password | — |
+
+The order is the order of setup: the installation, then the plugins that connect to it (the charger's first),
+then the data that makes planning better, then the links to other systems, then the controller itself.
 
 The charger stays on Installation: it is part of the installation, even though its panel is an external
 provider's.
