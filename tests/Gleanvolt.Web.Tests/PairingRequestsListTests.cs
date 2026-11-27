@@ -159,4 +159,18 @@ public class PairingRequestsListTests : PageTest
 
         page.WaitForAssertion(() => Assert.Empty(page.FindAll("#pairing-r1")));
     }
+
+    [Fact]
+    public void The_too_late_message_shows_when_the_request_is_gone_and_nobody_else_waits()
+    {
+        _providers.Waiting.Add(Request());
+        _providers.AcceptResult = false;
+        var page = Render<PairingRequestsList>();
+
+        _providers.Waiting.Clear();
+        page.Find("#pairing-r1 .pairing-accept").Click();
+
+        Assert.Contains("no longer waiting", page.Find(".pairing-message").TextContent);
+        Assert.Empty(page.FindAll("#pairing-r1"));
+    }
 }

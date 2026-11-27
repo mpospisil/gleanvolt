@@ -16,16 +16,17 @@
     again every few seconds.
 *@
 
+@* Outside the list: the likeliest failure is a request that expired, which leaves the list empty. *@
+@if (_message is { } message)
+{
+    <p class="error pairing-message">@message</p>
+}
+
 @if (_requests.Count > 0)
 {
     <div id="pairing-requests" class="pairing-requests">
         <h3>@SettingsText.PairingTitle</h3>
         <p class="muted">@SettingsText.PairingIntro</p>
-
-        @if (_message is { } message)
-        {
-            <p class="error pairing-message">@message</p>
-        }
 
         @foreach (var request in _requests)
         {
