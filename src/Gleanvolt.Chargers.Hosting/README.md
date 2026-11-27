@@ -117,9 +117,27 @@ a paired one. The page says which one it connects with.
 - **`PluginSettings`**: the address (`<Section>:Host`, or what the page saved), and `Get(name)` for your own settings
   (a model, a password), saved owner-only. **`DeviceAddress`** parses an address with an optional port. The address
 section is yours to write; `SharedText` has its words in English and Czech.
-  A plugin keeps its own texts in `Resources/PageText.resx` (English) and `PageText.cs.resx` (Czech), and the page reads
-  the generated class. A status passes `Words.From(PageText.ResourceManager, nameof(PageText.X))`, and a missing
-  translation is English.
+- **Plugin texts in resx**: keep them in `Resources/PageText.resx` (English) and `PageText.cs.resx` (Czech); the page
+  reads the generated class, and a status passes `Words.From(PageText.ResourceManager, nameof(PageText.X))`. A missing
+  translation is English. The SDK does not generate `PageText` for you; put this in your csproj or a
+  `Directory.Build.targets` (a `.targets` file, because an `Update` in the props runs before the SDK's default
+  `EmbeddedResource` glob and matches nothing):
+
+  ```xml
+  <PropertyGroup>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+  <ItemGroup>
+    <NeutralResx Include="Resources\*.resx" Exclude="Resources\*.*.resx" />
+    <EmbeddedResource Update="@(NeutralResx)">
+      <StronglyTypedLanguage>CSharp</StronglyTypedLanguage>
+      <StronglyTypedNamespace>$(RootNamespace).Resources</StronglyTypedNamespace>
+      <StronglyTypedClassName>%(Filename)</StronglyTypedClassName>
+      <StronglyTypedFileName>$(IntermediateOutputPath)%(Filename).Resources.g.cs</StronglyTypedFileName>
+    </EmbeddedResource>
+  </ItemGroup>
+  ```
+
 - **`ModbusDevice`**: a Gleanvolt.Modbus client at the current address, made anew when it changes.
 - **`LanScan`**: for a search of your own, this machine's networks, and every host of one that accepts a connection on
   a port, asked by your probe whether it is your charger. Find your charger any other way (mDNS, the vendor's

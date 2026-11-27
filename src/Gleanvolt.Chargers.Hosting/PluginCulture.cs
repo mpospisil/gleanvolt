@@ -34,6 +34,7 @@ internal static partial class PluginCulture
         ArgumentNullException.ThrowIfNull(app);
         return app.Use((context, next) =>
         {
+            // A repeated parameter (a,b) is not a culture Gleanvolt sends, so it reads as unusable and gives English.
             string? query = context.Request.Query.TryGetValue(ProviderPage.CultureParameter, out var values) ? values.ToString() : null;
             context.Request.Cookies.TryGetValue(CookieRequestCultureProvider.DefaultCookieName, out var cookie);
 

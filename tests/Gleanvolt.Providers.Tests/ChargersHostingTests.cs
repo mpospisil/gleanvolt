@@ -179,6 +179,19 @@ public sealed class ChargersHostingTests
     }
 
     [Fact]
+    public async Task WithoutAQueryTheCookiesLanguageHolds()
+    {
+        await using var plugin = await PluginApp.StartAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/");
+        request.Headers.Add("Cookie", ".AspNetCore.Culture=c%3Dcs%7Cuic%3Dcs");
+
+        var body = await (await plugin.Client.SendAsync(request)).Content.ReadAsStringAsync();
+
+        Assert.Contains("Kód pro spárování", body, StringComparison.Ordinal);
+        Assert.Contains("""<html lang="cs" """, body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task TheWaitingViewEscapesThePluginsName()
     {
         await using var plugin = await PluginApp.StartAsync(name: "<script>alert(1)</script>");
