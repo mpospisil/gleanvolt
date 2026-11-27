@@ -82,6 +82,9 @@ else
                 @string.Join(" ", OverviewNarrative.Describe(_status, Time.LocalTimeZone))
             </p>
 
+            @* What a charger Gleanvolt can't control means, and how to fix it (#470): under the headline that says so. *@
+            <PluginHelpTip Help="@PluginHelp.ForCharger(_status.Charger)" Id="overview-charger-help" />
+
             @* Read on every render, which is every poll: the schedule is cached until midnight or a save,
                so a tariff saved on Settings shows here by the next poll. *@
             @if (TariffNarrative.Describe(Tariff.Timeline, Tariff.Unavailable is { } unavailable ? Localized.Say(Tariff.UnavailablePhrase, unavailable) : null, Tariff.Currency, Time.GetUtcNow(), Time.LocalTimeZone, TariffProviderGone) is { } tariff)

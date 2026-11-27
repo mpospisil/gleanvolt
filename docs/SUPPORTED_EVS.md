@@ -199,7 +199,7 @@ some other way than Route C, if MyŠkoda's API doesn't suit.
 | | |
 |---|---|
 | **Choose it** | On the **Car** page: *An external provider*, save, restart |
-| **Connects with** | The token under **Settings → External providers**, at `/providers/vehicle` |
+| **Connects with** | The token under **Settings → Plugins**, at `/providers/vehicle` |
 | **Freshness** | Whatever the provider publishes; Gleanvolt doesn't poll it |
 | **Gives** | Whatever the provider sends: SOC, range, time to full, charge state, plug state |
 | **Owner action** | The provider reports an expired login as *needs owner*, and the Overview asks you to act |

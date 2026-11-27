@@ -190,7 +190,7 @@
     <value>Instalace</value>
   </data>
   <data name="SettingsExternalProviders" xml:space="preserve">
-    <value>Externí zdroje dat</value>
+    <value>Pluginy</value>
   </data>
   <data name="SignInTitle" xml:space="preserve">
     <value>Přihlášení — Gleanvolt</value>
@@ -560,7 +560,7 @@
     <value>tento počítač</value>
   </data>
   <data name="PairingAlertReview" xml:space="preserve">
-    <value>Otevřít Nastavení → Externí zdroje dat</value>
+    <value>Otevřít Nastavení → Pluginy</value>
   </data>
   <data name="SettingsForecastPrices" xml:space="preserve">
     <value>Předpověď a ceny</value>
@@ -570,5 +570,38 @@
   </data>
   <data name="SettingsSystem" xml:space="preserve">
     <value>Systém</value>
+  </data>
+  <data name="PluginHelpTopic" xml:space="preserve">
+    <value>plugin</value>
+  </data>
+  <data name="PluginHelpNoPluginTip" xml:space="preserve">
+    <value>Gleanvolt s nabíječkou nekomunikuje sám. Dělá to plugin: malý program pro značku vaší nabíječky, a zatím žádný není připojený. Spusťte ten pro svou nabíječku a pak ho přijměte v Nastavení → Pluginy.</value>
+  </data>
+  <data name="PluginHelpNoPluginLink" xml:space="preserve">
+    <value>Jak přidat nabíječku</value>
+  </data>
+  <data name="PluginHelpRefusedTip" xml:space="preserve">
+    <value>Plugin nabíječky běží, ale Gleanvolt ho odmítl: buď nabíječka neumí to, co žádá nastavení auta, nebo Gleanvolt už používá jiný plugin nabíječky. Který z důvodů to je, uvádí Nastavení → Pluginy.</value>
+  </data>
+  <data name="PluginHelpRefusedLink" xml:space="preserve">
+    <value>Co s tím</value>
+  </data>
+  <data name="PluginHelpProblemTip" xml:space="preserve">
+    <value>Plugin nabíječky je připojený, ale na nabíječku se nedostane nebo hlásí problém. Zkontrolujte adresu nabíječky na stránce pluginu.</value>
+  </data>
+  <data name="PluginHelpProblemLink" xml:space="preserve">
+    <value>Otevřít stránku pluginu</value>
+  </data>
+  <data name="PluginHelpWaitingTip" xml:space="preserve">
+    <value>Tato data dodává plugin: malý program, který běží vedle Gleanvoltu. Zatím žádný není připojený. Spusťte ho a pak ho přijměte v Nastavení → Pluginy, až požádá o připojení.</value>
+  </data>
+  <data name="PluginHelpDisconnectedTip" xml:space="preserve">
+    <value>Plugin byl připojený, ale přestal běžet. Zkontrolujte, že běží: jakmile poběží, připojí se znovu sám.</value>
+  </data>
+  <data name="PluginHelpStartLink" xml:space="preserve">
+    <value>Jak spustit plugin</value>
+  </data>
+  <data name="PluginHelpMoreLink" xml:space="preserve">
+    <value>Více o pluginech</value>
   </data>
 </root>

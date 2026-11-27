@@ -38,7 +38,7 @@ Its page shows the plugin's status, the site Gleanvolt gave it, the last reading
 | Key | Default | |
 | --- | --- | --- |
 | `Gleanvolt:Endpoint` | `http://localhost:8090` | Gleanvolt's web address |
-| `Gleanvolt:Token` | | The token from Gleanvolt's **Settings → External providers**. Required |
+| `Gleanvolt:Token` | | Optional: the token from Gleanvolt's **Settings → Plugins**. Without it the plugin asks to be paired, and you accept it there |
 | `Urls` | `http://localhost:8096` | Where the page listens. In a container, `http://0.0.0.0:8096` |
 | `Gleanvolt:PageUrl` | `Urls`, with `0.0.0.0` read as `localhost` | The page's address **as the owner's browser reaches it**, e.g. `http://192.168.2.7:8096/` |
 | `Gleanvolt:FrameAncestors` | `Gleanvolt:Endpoint`'s origin | Who may show the page in a frame (CSP `frame-ancestors`), when the browser reaches Gleanvolt by another name than the endpoint |
@@ -92,14 +92,14 @@ Gleanvolt's frame, so a reload inside the frame may answer 403: open Settings ag
 
 ## Run it from a release
 
-Choose **External** under **Weather** on Gleanvolt's Settings, and have the token from **Settings →
-External providers** at hand. On the same machine as Gleanvolt, the token is all it needs: it connects to
-`http://localhost:8090`, says its page is `http://localhost:8096/`, and Gleanvolt sends the browser there
+Choose **A plugin** under **Weather** on Gleanvolt's Settings. Start the plugin with no token: it asks to
+be paired, and you accept it under **Settings → Plugins**; the token it is given is kept in `data/`. On the
+same machine as Gleanvolt, that is all it needs: it connects to `http://localhost:8090`, says its page is `http://localhost:8096/`, and Gleanvolt sends the browser there
 under the name the browser opened Gleanvolt at (#426). On another machine, set `Gleanvolt:Endpoint`,
 `Gleanvolt:PageUrl` and `Gleanvolt:FrameAncestors` as in [Run it while developing](#run-it-while-developing).
 
-**The Pi, with the deploy scripts.** `GLEANVOLT_PLUGINS=openweather` and `GLEANVOLT_PROVIDER_TOKEN` in
-`/opt/gleanvolt/.env`, then deploy: see
+**The Pi, with the deploy scripts.** `GLEANVOLT_PLUGINS=openweather` in `/opt/gleanvolt/.env`, then
+deploy, and accept the plugin: see
 [Shipped plugins](../../deploy/README.md#shipped-plugins). The compose service is
 `gleanvolt-plugin-openweather` under the `openweather` profile, its data in `plugins/openweather`.
 
@@ -111,7 +111,6 @@ sudo chown 1654:1654 /opt/gleanvolt/plugins/openweather && sudo chmod 700 /opt/g
 
 docker run -d --name gleanvolt-plugin-openweather --restart unless-stopped --init \
   --network host \
-  -e Gleanvolt__Token=gvp_... \
   -v /opt/gleanvolt/plugins/openweather:/data \
   ghcr.io/mpospisil/gleanvolt-plugin-openweather:latest
 ```
@@ -125,7 +124,7 @@ above, since the plugin no longer shares Gleanvolt's `localhost`.
 from the release, unzip it, and start it in its folder, which then holds `data/`:
 
 ```powershell
-.\Gleanvolt.Plugin.OpenWeather.exe --Gleanvolt:Token=gvp_...
+.\Gleanvolt.Plugin.OpenWeather.exe
 ```
 
 It listens on `localhost` only, so its page opens in a browser on that machine. For another device, add

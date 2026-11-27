@@ -1,0 +1,15 @@
+@* The link a PluginHelp points to (#470): a manual page in a new tab, or a page of Gleanvolt's own. *@
+@if (Help.ManualPage is { } manualPage)
+{
+    <ManualLink Page="@manualPage" Class="@Class">@Help.LinkText</ManualLink>
+}
+else if (Help.LocalHref is { } href)
+{
+    <a href="@href" class="@Class">@Help.LinkText</a>
+}
+
+@code {
+    [Parameter, EditorRequired] public PluginHelp Help { get; set; } = null!;
+
+    [Parameter] public string? Class { get; set; }
+}

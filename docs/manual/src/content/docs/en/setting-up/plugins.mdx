@@ -1,0 +1,81 @@
+---
+title: Plugins
+description: What a plugin is, how to start one and let it in, and what to do when one disconnects.
+---
+
+A **plugin** is a small program that runs beside Gleanvolt and does one job for it:
+
+- **The charger.** Gleanvolt drives every EV charger through the plugin for its brand. See
+  [Your charger](../charger/).
+- **The weather.** The OpenWeather plugin comes with each Gleanvolt release. See [Weather](../weather/).
+- **The car, the tariff or the solar forecast**, from a program somebody else writes, in place of
+  Gleanvolt's own source. See [Your car](../car/), [Grid tariff](../grid-tariff/) and
+  [Solar forecast](../solar-forecast/).
+
+A plugin runs on the same computer as Gleanvolt, or on another one in your home network. Many have a page of
+their own, for their settings, which Gleanvolt shows inside its own pages.
+
+## Starting a plugin
+
+How depends on the plugin and on how you installed Gleanvolt. Each plugin's page in this manual, or its
+own notes, says how. A plugin needs no token and no address: it finds Gleanvolt, and asks to be let in. It
+doesn't matter which of the two starts first. For the car, the tariff and the solar forecast, choose
+**A plugin** in that section first, and save.
+
+## Accepting a plugin
+
+While a plugin waits, a band at the top of every page says so and links to the list. Under **Settings →
+Plugins**, or on the wizard's **Finish** step, **Plugins asking to connect** lists it. Press **Accept**.
+Gleanvolt gives the plugin its token by itself, so you never copy it, and the plugin doesn't need a restart.
+
+A plugin on the same computer as Gleanvolt is marked **This machine**, and **Accept** is all it needs. A
+plugin on another computer shows its address and a six-digit **code**, such as `482 193`. Open the
+plugin's own page at its address, or read its log: both show the same code, and the page lists the
+plugin's own addresses. Press **Accept** only if the code matches **and** the address Gleanvolt shows is
+one the plugin's page lists. Another computer on your network can pass a plugin's request on, with the
+right code, and only the address gives it away. If either doesn't match, press **Reject**.
+
+:::caution[Accepting needs no sign-in]
+Anyone who can open Gleanvolt can accept a waiting plugin, on **Settings** and in the wizard, with or
+without being signed in. That is so a Gleanvolt without a password can still let a plugin in. **Setting a
+password closes this**: on a network where other people can reach Gleanvolt, set one.
+:::
+
+**Accept** stays grey, with the reason beside it, when two waiting plugins claim the same name (reject
+the one you don't know), when that kind of plugin is turned off, or when Gleanvolt already uses another
+charger plugin. A plugin you reject asks again after an hour, or when it restarts. A request nobody
+answers disappears after 15 minutes, and the plugin asks anew.
+
+## The Plugins tab
+
+**Settings → Plugins** has a row for each kind of data: whether a plugin is connected, and an **Open**
+link to its page. The kind's name leads to the section where it is used. The **Charger** row also shows
+the plugin Gleanvolt remembers, with **Forget**, and why a plugin was last turned away. Each section that
+takes its data from a plugin shows it too, with its page below. The (i) beside each explains it.
+
+## When a plugin disconnects
+
+The section says when it was last connected. Check that the plugin still runs: on Windows, that its window
+is open. Once it runs again, it connects by itself, without being accepted again. What Gleanvolt does in
+the meantime depends on the kind: a charging mode is suspended without the charger, a charge is recorded
+without the weather, the car's last reading stays, and the last tariff and forecast stay in use.
+
+## Only one charger plugin
+
+Gleanvolt lets in only the first charger plugin it accepted, so a second one started by mistake can't take
+over your charger. To change plugins, stop the old one and press **Forget** beside the **Charger** row on
+**Settings → Plugins**. See [If the charger plugin is turned away](../charger-refused/).
+
+## The token by hand
+
+You can still give a plugin the token yourself, as `Gleanvolt__Token` in its environment or
+`--Gleanvolt:Token=…`. It wins over being accepted, and the plugin then connects to the address you give
+it, or to `http://localhost:8090` if you give none. The token is under **Settings → Plugins**, with
+**Make a token**. Making a **new** token disconnects every plugin: one you accepted asks again and you
+accept it again; one set up by hand needs the new token.
+
+**Gleanvolt moved.** An accepted plugin keeps the address it was accepted at and doesn't look for
+Gleanvolt again. If Gleanvolt gets a new address, tell the plugin: set `Gleanvolt__Endpoint` in its
+environment, or `--Gleanvolt:Endpoint=…`. That address wins over the saved one, and the plugin keeps its
+token. To make a plugin ask again from scratch, delete `gleanvolt-token` and `gleanvolt-endpoint` from
+its data folder, or make a new token in Gleanvolt.

@@ -255,7 +255,7 @@ public class SolcastAccountFormTests : BunitContext
         form.Find("#forecast-source-save").Click();
 
         Assert.Equal([SolarForecastSourceIds.External], sources.Chosen);
-        Assert.Equal("Saved. Forecast source: External.", form.Find("#solcast-message").TextContent.Trim());
+        Assert.Equal("Saved. Forecast source: A plugin.", form.Find("#solcast-message").TextContent.Trim());
         Assert.Empty(form.FindAll("#forecast-source-save"));
     }
 

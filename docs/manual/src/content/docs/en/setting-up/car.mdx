@@ -127,28 +127,26 @@ Sign in to the portal in a browser, deal with it there, and restart Gleanvolt.
 <TabItem label="Through another program">
 
 Any car can be read by a program outside Gleanvolt that reads it however it can: through its own app or
-cloud, over Bluetooth, or from a dongle in the car. This is **An external provider**. Somebody has to
+cloud, over Bluetooth, or from a dongle in the car. On the **Car** page this is **A plugin**. Somebody has to
 write or install that program; Gleanvolt does not come with one. Developers can find how to write one
 in [the provider guide](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md#the-vehicle-kind).
 
 <Steps>
 
-1. On the **Car** page, choose **An external provider** under **What reads this car**. Press **Save**,
+1. On the **Car** page, choose **A plugin** under **What reads this car**. Press **Save**,
    then **Restart**.
 
-   ![The Car page with An external provider chosen, then the car's own fields.](../../../../assets/screenshots/car-external.png)
+   ![The Car page with A plugin chosen, then the car's own fields.](../../../../assets/screenshots/car-external.png)
 
-2. Open **Settings → External providers** and press **Make a token**, then **Copy**. If a token is
-   already there because another program uses it, copy that one: every program uses the same token.
+2. Start the program. It asks to connect: accept it under **Settings → Plugins**. See
+   [Plugins](../plugins/).
 
-3. Give the program the **Gleanvolt address** and the token.
-
-4. Back on the **Car** page, **External provider** says when the program connected and when its last
+3. Back on the **Car** page, **Plugin** says when the program connected and when its last
    reading arrived. The Overview's car card names it too.
 
-   ![The Car page's External provider section: the hub the program connects to, and the Vehicle sample program connected.](../../../../assets/screenshots/car-external-provider.png)
+   ![The Car page's Plugin section: the hub the program connects to, and the Vehicle sample program connected.](../../../../assets/screenshots/car-external-provider.png)
 
-5. If the program has a page of its own, the **Car** page shows it under **External provider**, inside
+4. If the program has a page of its own, the **Car** page shows it under **Plugin**, inside
    Gleanvolt. That is where you sign in to the car's account and enter a code Volkswagen or another
    maker emails you. The page comes from the program, not from Gleanvolt, and only someone signed in to
    Gleanvolt can open it. If it stays blank, press **Open in a new tab**.

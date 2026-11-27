@@ -68,9 +68,10 @@
         @* No mode can start while the charger can't be controlled (#441); Off still works. *@
         @if (_status?.Charger is { Available: false, Reason: { } reason } charger)
         {
-            <p class="warning" id="charger-unavailable">
-                @Localized.Format(PlanText.ChargerUnavailable, Localized.Say(charger.ReasonPhrase, reason, Time.LocalTimeZone))
-            </p>
+            <div class="warning plugin-warning" id="charger-unavailable">
+                <p>@Localized.Format(PlanText.ChargerUnavailable, Localized.Say(charger.ReasonPhrase, reason, Time.LocalTimeZone))</p>
+                <PluginHelpTip Help="@PluginHelp.ForCharger(charger)" Id="plan-charger-help" />
+            </div>
         }
     </div>
 

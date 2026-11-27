@@ -4,6 +4,35 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-28 — Owners see "plugin"; pairing is the only path the owner docs describe (#470)
+
+**Found.** Since 1.4 the charger is always a plugin and the wizard ends without one, so a new owner's first
+Gleanvolt cannot charge, and the only clue was "No charger plugin is connected." The UI called the same thing
+"External providers" and "provider token" while the manual and the plugins said "plugin". After pairing (#464) the
+owner docs, the deploy script and the OpenWeather plugin still required a token copied by hand: the deploy refused to
+start a plugin without `GLEANVOLT_PROVIDER_TOKEN`, and the repo's own plugins threw at start without one, so they
+could not pair at all.
+
+**Decided.**
+- **One word for owners: plugin.** The Settings tab, headings, bands, messages and the "External" choices (now
+  "A plugin") say plugin. "Provider" stays the developer's word: config keys, `/settings/providers`, API routes,
+  contracts, the SDK and `PROVIDERS.md` keep it.
+- **A warning, a tip and a link.** A warning says what is wrong, an (i) beside it says what that means, and the link
+  at the end of the tip says how to fix it (`PluginHelp`). The charger's reason picks the target: no plugin → the
+  manual's charger page (and the link shown beside the warning too: the first-run state), refused → a page of its
+  own, a plugin that can't reach the charger → the plugin's page on Settings. Install steps stay in the manual.
+- **Links go to whole pages, never anchors**, because Starlight builds anchors from heading text and the Czech
+  anchors differ. A test checks every linked page exists in each manual language.
+- **Pairing is the path; the token by hand is an aside.** The deploy script only notes a missing token, and every
+  plugin in this repo starts without one.
+
+**Consequences.** A `<details>` (the InfoTip) must not sit inside a `<p>`: the HTML parser moves it out on prerender,
+so the help is a block beside the warning. The charger plugins in gleanvolt-chargers say "Settings → External
+providers" until they are next released against an SDK with the new wording; their READMEs change when this
+Gleanvolt release is out, so they never name a tab the owner's Gleanvolt doesn't have yet.
+
+---
+
 ## 2026-11-27 — Shutdown work runs on its own deadline; the host's shutdown token is not a budget
 
 **Found.** The host hands every hosted service's `StopAsync` one shared token, cancelled `ShutdownTimeout` (30 s)

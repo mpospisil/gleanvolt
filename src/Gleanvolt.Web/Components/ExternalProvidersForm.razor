@@ -106,6 +106,10 @@
                                             title="@SettingsText.ExternalForgetHint" disabled="@_busy" @onclick="() => ForgetAsync(status.Kind)">
                                         @SettingsText.ExternalForget
                                     </button>
+                                    <InfoTip Topic="@SettingsText.ExternalForgetTopic" Group="settings-info" End="true">
+                                        <p>@SettingsText.ExternalForgetTip</p>
+                                        <p><ManualLink Page="@PluginHelp.PluginsPage">@SharedText.PluginHelpMoreLink</ManualLink></p>
+                                    </InfoTip>
                                 }
                             }
                         </td>

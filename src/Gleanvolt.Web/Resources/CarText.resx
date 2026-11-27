@@ -627,26 +627,26 @@
     <value>Temporary failure</value>
   </data>
   <data name="FeedExternal" xml:space="preserve">
-    <value>An external provider</value>
+    <value>A plugin</value>
   </data>
   <data name="FreshExternal" xml:space="preserve">
-    <value>as often as the provider publishes</value>
+    <value>as often as the plugin publishes</value>
   </data>
   <data name="NoteExternal" xml:space="preserve">
-    <value>A program outside Gleanvolt reads the car and publishes what it says: any car, through its own app, cloud or dongle. Gleanvolt does not poll it; the provider publishes whenever the car has something new. The address and token it connects with are under Settings → External providers.</value>
+    <value>A plugin, a program outside Gleanvolt, reads the car and publishes what it says: any car, through its own app, cloud or dongle. Gleanvolt does not poll it; the plugin publishes whenever the car has something new. Start it and accept it on Settings → Plugins.</value>
   </data>
   <data name="AccountExternal" xml:space="preserve">
-    <value>Nothing signs in here: the provider signs in to the car's account itself, and Gleanvolt keeps no account for it. When its login expires, the provider says so and the Overview asks you to act. A provider with a page of its own shows it below, under External provider: that is where you sign in.</value>
+    <value>Nothing signs in here: the plugin signs in to the car's account itself, and Gleanvolt keeps no account for it. When its login expires, the plugin says so and the Overview asks you to act. A plugin with a page of its own shows it below, under Plugin: that is where you sign in.</value>
   </data>
   <data name="ExternalAskIntro" xml:space="preserve">
-    <value>Asks {0} for {1} once, now. The provider has a minute to answer, and its reading reaches the dashboard card. It also publishes on its own whenever the car has something new, so there is usually no need to ask.</value>
+    <value>Asks {0} for {1} once, now. The plugin has a minute to answer, and its reading reaches the dashboard card. It also publishes on its own whenever the car has something new, so there is usually no need to ask.</value>
     <comment>{0} the provider's name, {1} the car's name.</comment>
   </data>
   <data name="ExternalProvider" xml:space="preserve">
-    <value>External provider</value>
+    <value>Plugin</value>
   </data>
   <data name="ExternalPageIntro" xml:space="preserve">
-    <value>{0} has a page of its own, shown here: sign in to the car's account there, and enter a code if one is emailed. It comes from the provider itself, not from Gleanvolt.</value>
+    <value>{0} has a page of its own, shown here: sign in to the car's account there, and enter a code if one is emailed. It comes from the plugin itself, not from Gleanvolt.</value>
     <comment>{0} the provider's name.</comment>
   </data>
   <data name="ExternalPageNewTab" xml:space="preserve">

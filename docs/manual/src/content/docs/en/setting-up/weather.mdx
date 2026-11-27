@@ -17,8 +17,9 @@ the setup wizard's **Site** step asks for.
 Open **Settings → Forecast & prices** and find **Weather**. Under **Source**, choose:
 
 - **Not provided**: no weather is recorded.
-- **External**: a separate program sends the weather to Gleanvolt. The OpenWeather plugin, which comes
-  with Gleanvolt, is the ready-made one: it reads the weather from OpenWeatherMap.
+- **A plugin**: a separate program sends the weather to Gleanvolt. The OpenWeather plugin, which comes
+  with Gleanvolt, is the ready-made one: it reads the weather from OpenWeatherMap. See
+  [Plugins](../plugins/).
 
 Press **Save**. There is no need to restart.
 
@@ -43,12 +44,13 @@ created it, the key is still saved, and starts working on its own.
 
 <Steps>
 
-1. Under **Weather**, choose **External** and press **Save**.
+1. Under **Weather**, choose **A plugin** and press **Save**.
 
-2. Start the plugin with the provider token from **Settings → External providers**: see
-   [Run the OpenWeather plugin](#run-the-openweather-plugin) below.
+2. Start the plugin: see [Run the OpenWeather plugin](#run-the-openweather-plugin) below.
 
-3. Once it connects, its own page appears under **Weather**. Enter the OpenWeatherMap key there and
+3. Accept it under **Settings → Plugins**, when it asks to connect.
+
+4. Once it connects, its own page appears under **Weather**. Enter the OpenWeatherMap key there and
    press **Save and check**.
 
 </Steps>
@@ -63,7 +65,7 @@ within 15 seconds, that charge is recorded without the weather. Nothing else is 
 
 Gleanvolt used to ask OpenWeatherMap itself, with the key entered under **Weather**. That is gone: the
 weather from OpenWeatherMap now comes only through the OpenWeather plugin. After the update, Gleanvolt
-chooses **External** for you and says so under **Weather**, until the plugin connects:
+chooses **A plugin** for you and says so under **Weather**, until the plugin connects:
 
 ![The weather section on Settings after the update, saying that the weather now comes from the OpenWeather plugin.](../../../../assets/screenshots/settings-weather.png)
 
@@ -73,24 +75,14 @@ page. Until then, charges are recorded without the weather.
 ## Run the OpenWeather plugin
 
 The OpenWeather plugin comes with each Gleanvolt release, as a container and as a download. Use the same
-version as your Gleanvolt. Each way starts with the token:
-
-<Steps>
-
-1. Open **Settings → External providers** and press **Make a token**. Copy the token, which starts with
-   `gvp_`.
-
-2. Start the plugin, as shown for your installation below.
-
-3. Under **Weather**, choose **External** and press **Save**. The plugin's page appears there once it
-   connects.
-
-</Steps>
+version as your Gleanvolt. Start it as shown for your installation below. It needs no token: it asks to
+connect, and you accept it under **Settings → Plugins**. Under **Weather**, choose **A plugin** and press
+**Save**; the plugin's page appears there once it connects.
 
 <Tabs syncKey="install">
 <TabItem label="Docker">
 
-Make the plugin's folder, then start it next to Gleanvolt. Put your token in place of `gvp_...`:
+Make the plugin's folder, then start it next to Gleanvolt:
 
 ```bash
 sudo mkdir -p /opt/gleanvolt/plugins/openweather
@@ -99,12 +91,11 @@ sudo chmod 700 /opt/gleanvolt/plugins/openweather
 
 docker run -d --name gleanvolt-plugin-openweather --restart unless-stopped --init \
   --network host \
-  -e Gleanvolt__Token=gvp_... \
   -v /opt/gleanvolt/plugins/openweather:/data \
   ghcr.io/mpospisil/gleanvolt-plugin-openweather:latest
 ```
 
-The folder keeps the OpenWeatherMap key, and only the plugin can read it. If Gleanvolt isn't on port
+The folder keeps the OpenWeatherMap key and the plugin's token, and only the plugin can read it. If Gleanvolt isn't on port
 8090, add `-e Gleanvolt__Endpoint=http://localhost:<its port>`.
 
 </TabItem>
@@ -113,10 +104,8 @@ The folder keeps the OpenWeatherMap key, and only the plugin can read it. If Gle
 The file you pasted from [NAS](../../installation/nas/) already has the plugin, switched off. In your
 NAS's container app, edit the project's file:
 
-1. Find `${GLEANVOLT_PROVIDER_TOKEN:-}` and put your token after `:-`, so it reads
-   `${GLEANVOLT_PROVIDER_TOKEN:-gvp_...}`.
-2. Delete the line `profiles: ["openweather"]`.
-3. Save, and start the project again.
+1. Delete the line `profiles: ["openweather"]`.
+2. Save, and start the project again.
 
 </TabItem>
 <TabItem label="Windows">
@@ -126,10 +115,10 @@ NAS's container app, edit the project's file:
 1. From the [releases page](https://github.com/mpospisil/gleanvolt/releases), download
    `gleanvolt-plugin-openweather-<version>-win-x64.zip` for your Gleanvolt's version, and unzip it.
 
-2. In a new terminal, go to the `gleanvolt-plugin-openweather` folder and start it with your token:
+2. In a new terminal, go to the `gleanvolt-plugin-openweather` folder and start it:
 
    ```powershell
-   .\Gleanvolt.Plugin.OpenWeather.exe --Gleanvolt:Token=gvp_...
+   .\Gleanvolt.Plugin.OpenWeather.exe
    ```
 
 </Steps>
@@ -146,7 +135,7 @@ With the `.deb`, Docker is the simplest way: see the **Docker** tab. Or download
 folder:
 
 ```bash
-./Gleanvolt.Plugin.OpenWeather --Gleanvolt:Token=gvp_... --Urls=http://0.0.0.0:8096
+./Gleanvolt.Plugin.OpenWeather --Urls=http://0.0.0.0:8096
 ```
 
 It runs until you stop it, and doesn't start with the computer.
@@ -157,5 +146,5 @@ It runs until you stop it, and doesn't start with the computer.
 The plugin's page uses port 8096 on the same computer as Gleanvolt. Gleanvolt opens it under the same
 name you opened Gleanvolt at, so `gleanvolt.local` and the address both work.
 
-If you make a new token, the plugin disconnects until you start it with the new one.
+If you make a new token, the plugin disconnects and asks to connect again: accept it again.
 

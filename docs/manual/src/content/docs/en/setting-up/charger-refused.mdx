@@ -1,0 +1,29 @@
+---
+title: If the charger plugin is turned away
+description: Why Gleanvolt refuses a charger plugin that runs, and what to change.
+---
+
+The charger's plugin runs and asks to connect, but Gleanvolt doesn't let it in. Until it does, no charging
+mode can be started. The **Charger** section on **Settings**, and the **Charger** row on **Settings →
+Plugins**, say which of these two it is.
+
+## The charger can't do what Gleanvolt asks
+
+When it connects, the plugin says what its charger can do: its lowest and highest current, and its
+phases. If **Maximum current (A)** or **Phases** on the [Car](../car/) page asks for more, Gleanvolt refuses
+it. For example, three phases on a single-phase charger, or 32 A on a charger that takes 16 A.
+
+1. Lower that setting on the **Car** page, and press **Save**.
+2. Restart Gleanvolt, under **Settings → System**.
+
+The plugin tries again within 5 minutes, and connects.
+
+## Gleanvolt already uses another charger plugin
+
+Gleanvolt lets in only the first charger plugin it accepted, so a second one started by mistake can't take
+over your charger. To change plugins, for example after replacing the charger:
+
+1. Stop the old plugin.
+2. Under **Settings → Plugins**, press **Forget** beside the **Charger** row.
+
+The next charger plugin to connect is remembered instead.

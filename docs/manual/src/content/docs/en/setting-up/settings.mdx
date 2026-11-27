@@ -4,7 +4,7 @@ description: What is on each Settings tab, how saving works, and when a change n
 ---
 
 Everything the setup wizard asked for is also on **Settings**, with the same fields and the same checks.
-It has five tabs, in the order you set things up: **Installation**, **External providers**, **Forecast &
+It has five tabs, in the order you set things up: **Installation**, **Plugins**, **Forecast &
 prices**, **Integrations** and **System**. The car is on its own **Car** page.
 
 ## Saving, and when to restart
@@ -16,7 +16,7 @@ Some tabs apply a change at once. Others are read only when Gleanvolt starts:
 
 | Applies at once | Needs a restart |
 |---|---|
-| External providers, Forecast & prices, the password on System | Installation, Integrations, Car |
+| Plugins, Forecast & prices, the password on System | Installation, Integrations, Car |
 
 When a change needs a restart, the top of the tab says how many changes are saved but not yet running,
 with a link to **Restart** on the **System** tab. Restarting takes about half a minute. It pauses a charge
@@ -45,13 +45,14 @@ Your home and your devices.
 - **Charger**: the charger plugin, whether it is connected, and its page, where the charger's address
   and settings are. See [Your charger](../charger/).
 
-## External providers
+## Plugins
 
-For when this Gleanvolt takes data from other programs (plugins). It holds the one token every plugin
-connects with, Gleanvolt's address, and a row for each kind of data: its hub, whether a plugin is
+For the small programs that run beside Gleanvolt: the charger's plugin, and any that supply data. See
+[Plugins](../plugins/). Plugins asking to connect wait here for **Accept**. The tab holds the token
+plugins get when you accept them, Gleanvolt's address, and a row for each kind of data: its hub, whether a plugin is
 connected, and an **Open** link to the plugin's page. The kind's name leads to its section. The
 **Charger** row shows the plugin Gleanvolt remembers, with **Forget**, and why a plugin was last turned
-away. See the External steps in [Grid tariff](../grid-tariff/) and [Solar forecast](../solar-forecast/),
+away. See the plugin steps in [Grid tariff](../grid-tariff/) and [Solar forecast](../solar-forecast/),
 [Your charger](../charger/), and *Through another program* in [Your car](../car/).
 
 Each section that takes its data from a plugin shows the plugin and whether it is connected first, then

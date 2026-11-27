@@ -90,7 +90,7 @@ installation's maximum could never charge, so it is **refused at startup**, nami
 | **volkswagen.de** | Volkswagen | ~20 s; plug state; live while charging | [`Vehicle:Website`](#volkswagende-vehiclewebsite) |
 | **MyŠkoda Public API** | Škoda | 5–15 min; plug state | [`Vehicle:Skoda`](#myškoda-vehicleskoda) |
 | **EU Data Act portal** | Audi, SEAT, Cupra, Bentley, VW commercial (and any VW Group car) | hours behind; no plug state | [`Vehicle:DataAct`](#eu-data-act-portal-vehicledataact) |
-| **An external provider** | any car a program can read | whenever the provider publishes | [`Vehicle:External`](#an-external-provider-vehicleexternal) |
+| **A plugin** | any car a program can read | whenever the plugin publishes | [`Vehicle:External`](#a-plugin-vehicleexternal) |
 | **Your own MQTT topic** | any car Home Assistant can see | whatever publishes it | [`Vehicle`](#your-own-feed-over-mqtt-the-vehicle-section) |
 | **None** | any car | — | targets in kWh only |
 
@@ -209,21 +209,22 @@ credentials are set and proves them; reading the portal on a clock waits for `En
   a timeout, an expired session, a delivery not filled yet — are *Degraded* and back off (to at most an
   hour) and clear themselves.
 
-### An external provider (`Vehicle:External`)
+### A plugin (`Vehicle:External`)
 
 For any car a program outside Gleanvolt can read: a Tesla over Bluetooth, another manufacturer's cloud,
 an OBD dongle. The program is an [external provider](PROVIDERS.md#the-vehicle-kind): it connects to
 Gleanvolt's web port at `/providers/vehicle` and publishes what the car says.
 
-1. On the **Car** page choose *An external provider*, save and restart.
-2. Give the provider Gleanvolt's address and the token from **Settings → External providers**.
+1. On the **Car** page choose *A plugin*, save and restart.
+2. Start the provider: it asks to be paired, and you accept it on **Settings → Plugins**. (Or give it
+   Gleanvolt's address and the token from that tab.)
 
 The Car page then shows the provider's session, when it last published and anything Gleanvolt
 refused. The provider learns the car (id, name, make, model, pack size) from Gleanvolt; the pack stays
 in the `Ev` section.
 
 **Its own page.** A provider that needs you (to sign in, enter an emailed code, pair a device) can
-serve a page of its own. The Car page shows it in a frame under *External provider*, with *Open in a
+serve a page of its own. The Car page shows it in a frame under *Plugin*, with *Open in a
 new tab* beside it, and only to someone signed in to Gleanvolt: the frame goes through Gleanvolt, which
 adds a short-lived ticket the provider checks. How a provider does it is in
 [PROVIDERS.md](PROVIDERS.md#the-providers-own-page).
@@ -231,7 +232,7 @@ adds a short-lived ticket the provider checks. How a provider does it is in
 **Volkswagen as a plugin.** [`plugins/Gleanvolt.Plugin.Volkswagen`](../plugins/Gleanvolt.Plugin.Volkswagen)
 is the volkswagen.de feed below, copied into an external provider with its own page for the account,
 the sign-in and the code (#410). It is a test of moving car feeds out of Gleanvolt, not part of the
-image or the release: run it only with *An external provider* chosen, so it and `Vehicle:Website` never
+image or the release: run it only with *A plugin* chosen, so it and `Vehicle:Website` never
 use the VW account at the same time. Its README says how to run it and what differs from the built-in.
 
 | Key | Default | |

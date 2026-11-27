@@ -151,13 +151,13 @@
     <value>Vaše nabíječka</value>
   </data>
   <data name="ChargerPlugin" xml:space="preserve">
-    <value>Gleanvolt řídí nabíječku elektromobilu přes plugin: malý program pro značku vaší nabíječky s vlastní stránkou, kde zadáte adresu nabíječky. Spusťte plugin: požádá o připojení a vy ho přijmete tady, nebo později v Nastavení → Externí zdroje dat. Gleanvolt začne nabíječku používat, jakmile se plugin připojí. Do té doby nelze spustit žádný režim nabíjení.</value>
+    <value>Gleanvolt řídí nabíječku elektromobilu přes plugin: malý program pro značku vaší nabíječky s vlastní stránkou, kde zadáte adresu nabíječky. Spusťte plugin: požádá o připojení a vy ho přijmete tady, nebo později v Nastavení → Pluginy. Gleanvolt začne nabíječku používat, jakmile se plugin připojí. Do té doby nelze spustit žádný režim nabíjení.</value>
   </data>
   <data name="ChargerToken" xml:space="preserve">
     <value>Token, kterým se připojují všechny pluginy:</value>
   </data>
   <data name="ChargerNoToken" xml:space="preserve">
-    <value>Pluginy se připojují tokenem pro zdroje dat. Zatím žádný není.</value>
+    <value>Pluginy se připojují tokenem. Zatím žádný není.</value>
   </data>
   <data name="ChargerMakeToken" xml:space="preserve">
     <value>Vytvořit token</value>

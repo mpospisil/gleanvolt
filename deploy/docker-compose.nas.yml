@@ -86,10 +86,10 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # The OpenWeather plugin (#424, #426): the weather, with "External" chosen under Settings -> Weather.
+  # The OpenWeather plugin (#424, #426): the weather, with "A plugin" chosen under Settings -> Weather.
   # Opt-in: it starts only with the `openweather` profile (`docker compose --profile openweather up -d`,
-  # or COMPOSE_PROFILES=openweather where the NAS UI takes environment variables) and with
-  # GLEANVOLT_PROVIDER_TOKEN set to the token from Settings -> External providers. docs/NAS.md has it.
+  # or COMPOSE_PROFILES=openweather where the NAS UI takes environment variables). It asks to be paired:
+  # accept it on Settings -> Plugins, or set GLEANVOLT_PROVIDER_TOKEN to the token from there. docs/NAS.md has it.
   gleanvolt-plugin-openweather:
     image: ghcr.io/mpospisil/gleanvolt-plugin-openweather:${IMAGE_TAG:-latest}
     container_name: gleanvolt-plugin-openweather

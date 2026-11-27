@@ -28,7 +28,7 @@ after a refusal. Every refusal and every problem Gleanvolt finds in the data is 
 `options.Token` is optional. A provider with no token does not stop: it finds Gleanvolt (the
 configured `Endpoint`, then `http://localhost:8090`, then an mDNS browse for `_gleanvolt._tcp`), asks to be
 paired, shows a six-digit code on its page and in its log, and gets the token while it runs when the owner
-presses **Accept** in Gleanvolt, on Settings → External providers or in the setup Wizard. No restart, and
+presses **Accept** in Gleanvolt, on Settings → Plugins or in the setup Wizard. No restart, and
 the owner never copies the token. The paired token and the address that accepted it are kept in
 `IProviderSecretStore` (register it with `AddGleanvoltProviderSecrets`; without it the pairing lasts until
 the provider restarts). A token in `options.Token` always wins and the provider never knocks; with no

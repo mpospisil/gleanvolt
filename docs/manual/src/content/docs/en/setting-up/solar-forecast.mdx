@@ -69,30 +69,28 @@ time it starts. So:
 ## Or let another program supply it
 
 A program outside Gleanvolt can supply the forecast instead of Solcast, for example one that reads
-another forecast service. This is the **External** source. Somebody has to write or install that
+another forecast service. On **Settings** this is **A plugin**. Somebody has to write or install that
 program; Gleanvolt does not come with one. Developers can find how to write one in
 [the provider guide](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md).
 
 <Steps>
 
-1. Open **Settings → Forecast & prices**, find **Solar forecast**, choose **External** under **Source**, and press
+1. Open **Settings → Forecast & prices**, find **Solar forecast**, choose **A plugin** under **Source**, and press
    **Save**.
 
-2. Open the **External providers** tab, press **Make a token**, then **Copy**. If a token is
-   already there because another program uses it, copy that one: every program uses the same token. **Reveal** shows it, now or any time later.
+2. Start the program. It asks to connect: accept it under **Settings → Plugins**. See
+   [Plugins](../plugins/).
 
-   ![The External providers section: the Gleanvolt address, the token, and each kind of data with its hub and status.](../../../../assets/screenshots/settings-external-providers.png)
+   ![The Plugins tab: the Gleanvolt address, the token, and each kind of data with its hub and status.](../../../../assets/screenshots/settings-external-providers.png)
 
-3. Give the program the **Gleanvolt address** and the token.
-
-4. When the program connects, **Status** names it, and **Last data received** says when its forecast
+3. When the program connects, **Status** names it, and **Last data received** says when its forecast
    arrived. The line under the Overview's forecast table names it too.
 
 </Steps>
 
-![The solar forecast section with External chosen: the address the program connects to, where the token is, and the Solar forecast sample program connected.](../../../../assets/screenshots/settings-solar-forecast-external.png)
+![The solar forecast section with A plugin chosen: the address the program connects to, where the token is, and the Solar forecast sample program connected.](../../../../assets/screenshots/settings-solar-forecast-external.png)
 
-- **Solcast is not called while External is chosen.** Your Solcast account stays saved, so choosing
+- **Solcast is not called while A plugin is chosen.** Your Solcast account stays saved, so choosing
   **Solcast** again needs nothing else.
 - **If the program disconnects**, Gleanvolt keeps planning on the forecast it last sent, and the
   Overview says it is from a disconnected program. It does not go back to Solcast by itself.
@@ -100,7 +98,7 @@ program; Gleanvolt does not come with one. Developers can find how to write one 
   soon as it reconnects.
 - **Starting order doesn't matter.** The program keeps trying until Gleanvolt answers, and it
   reconnects by itself after Gleanvolt restarts or is updated.
-- **If the token leaks**, press **Make a new token** under **External providers**. Every program is
-  disconnected until you give it the new token.
+- **If the token leaks**, press **Make a new token** under **Settings → Plugins**. Every program is
+  disconnected, and asks to connect again: accept it again.
 - **Choosing Solcast** disconnects the program, and it can't connect again until you choose
-  **External**.
+  **A plugin**.

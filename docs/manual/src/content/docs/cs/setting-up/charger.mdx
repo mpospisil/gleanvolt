@@ -1,107 +1,145 @@
 ---
 title: Vaše nabíječka
-description: Přidejte nabíječku elektromobilu do Gleanvoltu přes její plugin, kdykoli po nastavení.
+description: Přidejte nabíječku elektromobilu do Gleanvoltu spuštěním pluginu pro její značku, kdykoli po nastavení.
 ---
 
-import { Steps } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
-Gleanvolt řídí nabíječku elektromobilu přes **plugin**: malý program pro značku vaší nabíječky, například
-plugin pro Shelly TopAC. Plugin komunikuje s nabíječkou a Gleanvolt říká pluginu, co má dělat. Plugin má
-vlastní stránku, kde zadáte adresu nabíječky a cokoli dalšího, co potřebuje.
+Gleanvolt s nabíječkou elektromobilu nekomunikuje sám. Dělá to **plugin**: malý program pro značku vaší
+nabíječky, který běží vedle Gleanvoltu. Plugin komunikuje s nabíječkou a Gleanvolt říká pluginu, co má
+dělat. Plugin má vlastní stránku, kde zadáte adresu nabíječky.
 
-Nabíječku nenastavujete v průvodci Gleanvoltu. Plugin spusťte, kdy chcete, během nastavení nebo
-o měsíce později, a Gleanvolt začne nabíječku používat, jakmile se plugin připojí. Do té doby Gleanvolt
-ukazuje výkon slunce a domácí baterii, ale žádný režim nabíjení nelze spustit.
+Nabíječku nenastavujete v průvodci. Plugin spusťte, kdy chcete, během nastavení nebo o měsíce později. Než
+se připojí, Gleanvolt ukazuje výkon slunce a domácí baterii, ale žádný režim nabíjení nelze spustit
+a Přehled odkazuje sem:
 
-## Přidání nabíječky
+![Přehled, než se připojí plugin nabíječky: hlavní věta říká, že žádný plugin nabíječky není připojený, a pod ní je odkaz „How to add your charger“.](../../../../assets/screenshots/overview-no-charger.png)
+
+## Který plugin
+
+| Vaše nabíječka | Plugin | Jeho stránka |
+|---|---|---|
+| SolaX X1/X3-HAC, X1/X3-EVC | `solax` | port 8098 |
+| Huawei SCharger-7KS-S0, SCharger-22KT-S0 | `huawei` | port 8099 |
+| go-e Charger (Gemini, HOMEfix, HOME+; hardware V3 nebo novější) | `goe` | port 8100 |
+| Shelly TopAC Portable EV Charger | `shelly` | port 8097 |
+
+Jiná nabíječka zatím plugin nemá. Poznámky ke každému pluginu, například co v nabíječce nejdřív zapnout,
+najdete v [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers). Viz také
+[Příprava zařízení](../../installation/preparing-devices/). Spusťte jen jeden plugin nabíječky.
+
+## Spuštění pluginu
+
+Spusťte ho stejným způsobem, jakým jste nainstalovali Gleanvolt. Níže `solax` zastupuje název vašeho
+pluginu z tabulky: dosaďte svůj, a `Solax` v názvu souboru se změní na `Huawei`, `GoE` nebo `Shelly`.
+
+<Tabs syncKey="install">
+<TabItem label="Docker">
+
+Vytvořte složku pluginu a spusťte ho vedle Gleanvoltu:
+
+```bash
+sudo mkdir -p /opt/gleanvolt/plugins/solax
+sudo chown 1654:1654 /opt/gleanvolt/plugins/solax
+sudo chmod 700 /opt/gleanvolt/plugins/solax
+
+docker run -d --name gleanvolt-plugin-solax --restart unless-stopped --init \
+  --network host \
+  -v /opt/gleanvolt/plugins/solax:/data \
+  ghcr.io/mpospisil/gleanvolt-plugin-solax:latest
+```
+
+Složka uchovává adresu nabíječky a token pluginu. Pokud Gleanvolt neběží na portu 8090, přidejte
+`-e Gleanvolt__Endpoint=http://localhost:<jeho port>`.
+
+</TabItem>
+<TabItem label="NAS">
+
+Soubor, který jste vložili podle stránky [NAS](../../installation/nas/), už obsahuje všechny pluginy
+nabíječek, vypnuté. V aplikaci pro kontejnery na NAS upravte soubor projektu:
+
+1. Najděte službu `gleanvolt-plugin-solax` a smažte její řádek `profiles: ["solax"]`.
+2. Uložte a projekt spusťte znovu.
+
+</TabItem>
+<TabItem label="Windows">
 
 <Steps>
 
-1. **Spusťte plugin** pro svou nabíječku z [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (SolaX, Huawei, go-e,
-   Shelly TopAC) podle jeho README. Token ani adresu nepotřebuje. Může běžet na stejném počítači jako
-   Gleanvolt nebo na jiném v domácí síti a nezáleží na tom, co nainstalujete dřív: plugin počká, najde
-   Gleanvolt, jakmile se objeví, a požádá o povolení.
+1. Z [vydání gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers/releases) stáhněte
+   `gleanvolt-plugin-solax-<verze>-win-x64.zip` a rozbalte ho.
 
-2. **Přijměte plugin v Gleanvoltu.** Dokud plugin čeká, říká to pruh nahoře na každé stránce a odkazuje
-   na seznam. V **Nastavení → Externí zdroje dat** nebo v kroku průvodce
-   **Dokončení** ho najdete v rámečku **Pluginy žádající o připojení**. Zkontrolujte řádek a klikněte na
-   **Přijmout**. Gleanvolt pluginu token předá sám, a pokud žádný není, nejdřív ho vytvoří. Nic
-   nekopírujete a plugin nemusíte restartovat. Viz [Přijetí pluginu](#přijetí-pluginu).
+2. V novém terminálu přejděte do rozbalené složky a spusťte ho:
 
-3. **Otevřete stránku pluginu.** Jakmile se plugin připojí, ukáže ho sekce **Nabíječka** v **Nastavení**
-   a pod ním jeho stránku. Zadejte tam adresu nabíječky a uložte. **Otevřít na nové kartě** otevře
-   stránku samostatně.
-
-4. **Zkontrolujte to.** Sekce **Nabíječka** říká, že je plugin připojený, a Přehled ukazuje stav
-   nabíječky. Režim nabíjení spustíte na stránce **Plán nabíjení**.
+   ```powershell
+   .\Gleanvolt.Plugin.Solax.exe
+   ```
 
 </Steps>
 
-## Přijetí pluginu
+Stejně jako Gleanvolt se zastaví, když zavřete jeho okno, takže ho po restartu Windows spusťte znovu.
+Nastavení si ukládá do složky `data` vedle sebe. Jeho stránka se otevře jen v prohlížeči na tomto počítači.
+Chcete-li ji otevírat i z telefonu, přidejte `--Urls=http://0.0.0.0:8098` (port vašeho pluginu) a povolte
+ho ve firewallu pro soukromé sítě.
 
-Plugin, který běží na stejném počítači jako Gleanvolt, je označený **Tento počítač** a stačí jedno kliknutí
-na **Přijmout**. Plugin na jiném počítači ukáže svou adresu a šestimístný **kód**, například `482 193`.
-Otevřete vlastní stránku pluginu na jeho adrese nebo si přečtěte jeho log: obojí ukazuje stejný kód
-a stránka navíc uvádí vlastní adresy pluginu. Klikněte na **Přijmout**, jen když kód souhlasí **a** adresa,
-kterou ukazuje Gleanvolt, je jednou z adres na stránce pluginu. Jiný počítač ve vaší síti může žádost
-pluginu přeposlat i se správným kódem a prozradí ho jen adresa. Pokud něco nesouhlasí, žádá o připojení
-někdo jiný ve vaší síti: klikněte na **Odmítnout**. Pluginu na jiném počítači než Gleanvolt je nejlepší
-dát adresu Gleanvoltu jako `Gleanvolt__Endpoint` (viz **Gleanvolt se přestěhoval** níže).
+</TabItem>
+<TabItem label="Linux">
 
-:::caution[Přijetí nevyžaduje přihlášení]
-Plugin může přijmout kdokoli, kdo otevře Gleanvolt, v **Nastavení** i v průvodci, ať je přihlášený, nebo
-ne. Díky tomu lze plugin spárovat i v Gleanvoltu bez hesla. Samotný token ale Nastavení ukáže jen
-přihlášenému majiteli. **Nastavením hesla se to uzavře**: v síti, kam se k Gleanvoltu dostanou i další
-lidé, si heslo nastavte.
+S balíčkem `.deb` je nejjednodušší Docker: viz záložku **Docker**. Nebo z
+[vydání gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers/releases) stáhněte
+`gleanvolt-plugin-solax-<verze>-linux-arm64.zip` (na PC `linux-x64`), rozbalte ho a v jeho složce spusťte:
+
+```bash
+./Gleanvolt.Plugin.Solax --Urls=http://0.0.0.0:8098
+```
+
+Použijte port svého pluginu z tabulky.
+
+</TabItem>
+</Tabs>
+
+Plugin nepotřebuje token ani adresu Gleanvoltu: najde Gleanvolt na tomto počítači nebo v domácí síti
+a požádá o vpuštění. Nezáleží na tom, co se spustí dřív.
+
+:::note[Raspberry Pi s nasazovacími skripty]
+Přidejte plugin do `GLEANVOLT_PLUGINS` v `/opt/gleanvolt/.env` (`GLEANVOLT_PLUGINS=solax`) a nasaďte.
+`EV_CHARGER_HOST` tam je adresa nabíječky, dokud neuložíte jinou na stránce pluginu.
 :::
 
-Tlačítko Přijmout zůstane šedé a vedle něj je důvod, když dva čekající pluginy uvádějí stejný název
-(odmítněte ten, který neznáte), když je ten druh zdroje vypnutý, nebo když Gleanvolt už používá jiný plugin
-nabíječky (nejdřív vedle něj klikněte na **Zapomenout**). Plugin, který odmítnete, se zeptá znovu za hodinu
-nebo po restartu. Žádost, na kterou nikdo neodpoví, zmizí po 15 minutách, kdy se plugin neozval, a plugin se
-pak prostě zeptá znovu.
+## Přijetí a nastavení
 
-**Token ručně.** Token můžete pluginu dál dát sami, jako `Gleanvolt__Token` v jeho prostředí nebo
-`--Gleanvolt:Token=…`. Má přednost před spárováním a plugin se pak připojí na adresu, kterou mu dáte,
-nebo na `http://localhost:8090`, pokud žádnou nedáte. Token vytvoříte v **Nastavení → Externí zdroje dat**
-tlačítkem **Vytvořit token**. **Nový** token odpojí všechny pluginy: spárovaný plugin se zeptá znovu a vy
-ho přijmete znovu, plugin nastavený ručně potřebuje nový token.
+<Steps>
 
-**Gleanvolt se přestěhoval.** Spárovaný plugin si pamatuje adresu, na které ho přijali, a Gleanvolt už znovu
-nehledá. Když Gleanvolt dostane novou adresu, řekněte ji pluginu: nastavte `Gleanvolt__Endpoint` v jeho
-prostředí nebo `--Gleanvolt:Endpoint=…`. Ta adresa má přednost před uloženou a plugin si token ponechá.
-Chcete-li plugin odpárovat, smažte z jeho datového adresáře soubory `gleanvolt-token` a `gleanvolt-endpoint`,
-nebo v Gleanvoltu vytvořte nový token.
+1. **Přijměte plugin.** Dokud čeká, říká to pruh nahoře na každé stránce. V **Nastavení → Pluginy** nebo
+   v kroku průvodce **Dokončení** ho najdete v seznamu **Pluginy žádající o připojení**: klikněte na
+   **Přijmout**. Plugin na jiném počítači ukáže kód, který je potřeba nejdřív zkontrolovat: viz
+   [Přijetí pluginu](../plugins/#přijetí-pluginu).
+
+2. **Zadejte adresu nabíječky.** Sekce **Nabíječka** v **Nastavení** teď ukazuje připojený plugin a pod
+   ním jeho stránku. Zadejte tam adresu nabíječky, nebo ji nechte stránku vyhledat, a uložte. **Otevřít na
+   nové kartě** otevře stránku samostatně.
+
+3. **Zkontrolujte to.** Přehled ukazuje stav nabíječky. Režim nabíjení spustíte na stránce **Plán
+   nabíjení**.
+
+</Steps>
+
+Pokud Gleanvolt plugin odmítne, sekce **Nabíječka** napíše proč: viz
+[Když je plugin nabíječky odmítnut](../charger-refused/).
+
+## Když Gleanvolt nabíječku ztratí
+
+Pokud se plugin zastaví nebo hlásí, že se k nabíječce nedostane, déle než 2 minuty, běžící režim
+nabíjení se **přeruší**: Gleanvolt nic neposílá a uvolní blokaci vybíjení baterie. Nabíječka se pak řídí
+svým vlastním nastavením. Až bude plugin zpět, režim sám pokračuje. Přehled i **Plán nabíjení** napíšou, co
+je špatně, a jejich (i) řekne, kam se podívat. Viz [Plán nabíjení](../../using/charging-plan/).
 
 ## Přechod ze zabudovaného ovladače
 
 Do verze 1.3 řídil Gleanvolt nabíječky SolaX, Huawei a go-e sám. Verze 1.4 tyto zabudované ovladače
 odstranila: každá nabíječka má teď plugin a Gleanvolt se k nabíječce sám nikdy nepřipojuje.
 
-Na Raspberry Pi s nasazovacími skripty nemusíte dělat nic. Při nasazení verze 1.4 skript najde adresu
-nabíječky (`EV_CHARGER_HOST`) v `/opt/gleanvolt/.env`, spustí plugin pro značku vaší nabíječky a řekne
-který. Potřebuje token pro zdroje dat (`GLEANVOLT_PROVIDER_TOKEN`, viz krok 1 výše), a pokud není
-nastavený, zastaví se a řekne vám to. Aby hlášení zmizelo, přidejte plugin do `GLEANVOLT_PLUGINS`,
-například `GLEANVOLT_PLUGINS=solax`, nebo `openweather,solax` s počasím.
-
-Jinde spusťte plugin sami, jako v části [Přidání nabíječky](#přidání-nabíječky). Dokud staré nastavení
-nabíječky nezmizí, zapíše Gleanvolt při každém spuštění do logu varování, které plugin jmenuje.
-
-## Když je plugin odmítnut
-
-**Nastavení → Externí zdroje dat** napíše pod řádek **Nabíječka**, proč:
-
-- **Nabíječka neumí to, co Gleanvolt chce.** Plugin sdělí, co jeho nabíječka umí: nejnižší a nejvyšší
-  proud a počet fází. Pokud **Maximální proud (A)** nebo **Fáze** na stránce [Auto](../car/) chtějí víc,
-  například tři fáze u jednofázové nabíječky, nastavení snižte, uložte a Gleanvolt restartujte. Plugin to
-  do 5 minut zkusí znovu.
-- **Gleanvolt si pamatuje jiný plugin.** Gleanvolt pustí jen první plugin nabíječky, který přijal, aby
-  nabíječku nepřevzal druhý, omylem spuštěný. Chcete-li plugin vyměnit, zastavte starý a klikněte vedle
-  něj na **Zapomenout**. Zapamatován bude plugin, který se připojí jako další.
-
-## Když Gleanvolt nabíječku ztratí
-
-Pokud se plugin zastaví nebo hlásí, že se k nabíječce nedostane, déle než 2 minuty, běžící režim
-nabíjení se **přeruší**: Gleanvolt nic neposílá a uvolní blokaci vybíjení baterie. Nabíječka se pak řídí
-svým vlastním nastavením. Až bude plugin zpět, režim sám pokračuje. Viz
-[Plán nabíjení](../../using/charging-plan/).
+Spusťte plugin pro svou nabíječku jako výše a přijměte ho. Dokud staré nastavení nabíječky nezmizí, zapíše
+Gleanvolt při každém spuštění do logu varování, které plugin jmenuje. Na Raspberry Pi s nasazovacími
+skripty spustí plugin nasazení samo, podle `EV_CHARGER_HOST` v `/opt/gleanvolt/.env`, a řekne který; aby
+hlášení zmizelo, přidejte ho do `GLEANVOLT_PLUGINS`.

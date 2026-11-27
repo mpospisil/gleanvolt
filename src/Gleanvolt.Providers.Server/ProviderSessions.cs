@@ -109,8 +109,8 @@ public sealed partial class ProviderSessions
             if (remembered is not null && !string.Equals(remembered, hello.ProviderId, StringComparison.Ordinal))
             {
                 return (RefusalCodes.AnotherProvider,
-                    $"Gleanvolt remembers the provider {remembered} for this kind and lets in no other until the owner presses "
-                    + "Forget on Settings → External providers.",
+                    $"Gleanvolt remembers the plugin {remembered} for this kind and lets in no other until the owner presses "
+                    + "Forget on Settings → Plugins.",
                     Phrase.Of("Provider.Remembered", new PhraseArg.Text(remembered)));
             }
 

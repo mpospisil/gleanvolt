@@ -25,7 +25,7 @@ It is not part of the container image or the release packages.
 
 1. In Gleanvolt, open the **Car** page, choose **An external provider** under *What reads this car*,
    save and restart.
-2. Under **Settings → External providers**, make a token and copy it, or copy the one already
+2. Under **Settings → Plugins**, make a token and copy it, or copy the one already
    there: every plugin uses the same token.
 3. Run the sample:
 

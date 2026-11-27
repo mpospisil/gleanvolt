@@ -7,8 +7,8 @@
     kind's Settings section hosts it; the kind decides elsewhere what turns it on (for the tariff,
     choosing External and saving).
 
-    Where providers connect, each kind's hub and the one token (#406) are in ExternalProvidersForm at
-    the top of Settings (#457); this panel only points there, as a warning while there is no token.
+    Where providers connect, each kind's hub and the one token (#406) are in ExternalProvidersForm on
+    Settings' Plugins tab (#457, #470); this panel only points there.
 *@
 
 @if (Providers.Find(Kind) is { } status)
@@ -20,18 +20,27 @@
             <p id="external-@(status.Kind)-state" class="@(status.State == ExternalProviderState.Connected ? null : "warning")">
                 @State(status)
             </p>
-            <InfoTip Topic="@SettingsText.ExternalProviderTopic" Group="settings-info" End="true">
-                <p>@SettingsText.ExternalProviderIntro</p>
-                <p>@Localized.Rich(SettingsText.ExternalTokenShared, @<a href="/settings/providers">@SettingsText.ExternalProviders</a>)</p>
-            </InfoTip>
+            @* While no plugin is connected, the tip says what that means and links to how to start one (#470).
+               No token is no warning any more: accepting a plugin makes one (#464). *@
+            @if (PluginHelp.ForKind(status) is { } help)
+            {
+                @if (help.Prominent)
+                {
+                    <HelpLink Help="help" Class="plugin-help-link" />
+                }
+                <InfoTip Topic="@SettingsText.ExternalProviderTopic" Group="settings-info" End="true">
+                    <p>@help.Tip</p>
+                    <p><HelpLink Help="help" Class="plugin-help-tip-link" /></p>
+                </InfoTip>
+            }
+            else
+            {
+                <InfoTip Topic="@SettingsText.ExternalProviderTopic" Group="settings-info" End="true">
+                    <p>@SettingsText.ExternalProviderIntro</p>
+                    <p>@Localized.Rich(SettingsText.ExternalTokenShared, @<a href="/settings/providers">@SettingsText.ExternalProviders</a>)</p>
+                </InfoTip>
+            }
         </div>
-
-        @if (!status.HasToken)
-        {
-            <p class="warning" id="external-@(status.Kind)-token-state">
-                @Localized.Rich(SettingsText.ExternalTokenSharedMissing, @<a href="/settings/providers">@SettingsText.ExternalProviders</a>)
-            </p>
-        }
 
         <p class="muted" id="external-@(status.Kind)-data">
             @(status.LastDataAt is { } at ? Localized.Format(SettingsText.ExternalLastData, When(at)) : SettingsText.ExternalNoDataYet)

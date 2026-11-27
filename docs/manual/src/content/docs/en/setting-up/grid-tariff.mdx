@@ -52,34 +52,32 @@ It applies straight away; there is no need to restart.
 ## Or let another program supply it
 
 If your tariff changes in ways a table cannot hold, such as day-ahead spot prices, a program outside
-Gleanvolt can supply it instead. This is the **External** provider. Somebody has to write or install
+Gleanvolt can supply it instead. On **Settings** this is **A plugin**. Somebody has to write or install
 that program; Gleanvolt does not come with one. Developers can find how to write one in
 [the provider guide](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md).
 
 <Steps>
 
-1. Open **Settings → Forecast & prices**, find **Tariff**, choose **External** under **Provider**, and press **Save**.
+1. Open **Settings → Forecast & prices**, find **Tariff**, choose **A plugin** under **Provider**, and press **Save**.
 
-2. Open the **External providers** tab, press **Make a token**, then **Copy**. If a token is
-   already there because another program uses it, copy that one: every program uses the same token. **Reveal** shows it, now or any time later.
+2. Start the program. It asks to connect: accept it under **Settings → Plugins**. See
+   [Plugins](../plugins/).
 
-   ![The External providers section: the Gleanvolt address, the token, and each kind of data with its hub and status.](../../../../assets/screenshots/settings-external-providers.png)
+   ![The Plugins tab: the Gleanvolt address, the token, and each kind of data with its hub and status.](../../../../assets/screenshots/settings-external-providers.png)
 
-3. Give the program the **Gleanvolt address** and the token.
-
-4. When the program connects, **Status** names it, and **Last data received** says when its tariff
+3. When the program connects, **Status** names it, and **Last data received** says when its tariff
    arrived. The Overview's tariff line names it too.
 
 </Steps>
 
-![The tariff section with External chosen: the address the program connects to, where the token is, and a program called Spot prices connected.](../../../../assets/screenshots/settings-tariff-external.png)
+![The tariff section with A plugin chosen: the address the program connects to, where the token is, and a program called Spot prices connected.](../../../../assets/screenshots/settings-tariff-external.png)
 
 - **If the program disconnects, or Gleanvolt restarts**, Gleanvolt keeps using the tariff the program
   last sent, until its last time slot ends. After that there is no tariff restriction until the
   program is back.
 - **Starting order doesn't matter.** The program keeps trying until Gleanvolt answers, so it can be
   started before Gleanvolt, and it reconnects by itself after Gleanvolt restarts or is updated.
-- **If the token leaks**, press **Make a new token** under **External providers**. Every program is
-  disconnected until you give it the new token.
+- **If the token leaks**, press **Make a new token** under **Settings → Plugins**. Every program is
+  disconnected, and asks to connect again: accept it again.
 - **Choosing Table or None** disconnects the program, and it can't connect again until you choose
-  **External**.
+  **A plugin**.

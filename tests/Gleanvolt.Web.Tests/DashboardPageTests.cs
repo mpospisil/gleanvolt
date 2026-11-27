@@ -106,6 +106,37 @@ public class DashboardPageTests : PageTest
         System.Text.RegularExpressions.Regex.Replace(page.Markup, @"\s+", " ");
 
     [Fact]
+    public void A_missing_charger_plugin_links_to_adding_the_charger_from_the_headline()
+    {
+        // #470: the first-run state, so the link is shown, not only in the (i).
+        _holder.Set(Statuses.Sample(_time.Now) with
+        {
+            Charger = new ChargerAvailability(ChargerAvailabilityState.NoPlugin, "No charger plugin is connected.",
+                Phrase.Of("Charger.NoPlugin"), _time.Now.AddMinutes(-5)),
+        });
+
+        var help = Render<Dashboard>().Find("#overview-charger-help");
+
+        Assert.Equal("How to add your charger", help.QuerySelector("a.plugin-help-link")!.TextContent);
+        Assert.EndsWith("/en/setting-up/charger/", help.QuerySelector("a.plugin-help-link")!.GetAttribute("href"));
+    }
+
+    [Fact]
+    public void A_refused_charger_plugin_links_to_what_to_do_in_the_tip()
+    {
+        _holder.Set(Statuses.Sample(_time.Now) with
+        {
+            Charger = new ChargerAvailability(ChargerAvailabilityState.NeedsOwner, "Gleanvolt refused the charger plugin Shelly: limits",
+                Phrase.Of("Charger.PluginRefused", new PhraseArg.Text("Shelly"), new PhraseArg.Said(null, "limits")), _time.Now.AddMinutes(-5)),
+        });
+
+        var help = Render<Dashboard>().Find("#overview-charger-help");
+
+        Assert.Empty(help.QuerySelectorAll("a.plugin-help-link"));
+        Assert.EndsWith("/en/setting-up/charger-refused/", help.QuerySelector("a.plugin-help-tip-link")!.GetAttribute("href"));
+    }
+
+    [Fact]
     public void Shows_the_car_and_its_pack_with_no_feed_configured_and_says_nothing_is_wrong()
     {
         // State one of four (#140): the car is configuration, so the card shows it because it is
@@ -802,7 +833,7 @@ public class DashboardPageTests : PageTest
 
         var line = Render<Dashboard>().Find("#overview-forecast-origin");
 
-        Assert.StartsWith("The external forecast provider Solar forecast sample is disconnected.", line.TextContent);
+        Assert.StartsWith("The forecast plugin Solar forecast sample is disconnected.", line.TextContent);
         Assert.Contains("warning", line.ClassList);
     }
 

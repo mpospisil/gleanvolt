@@ -211,7 +211,7 @@
     <value>Installation</value>
   </data>
   <data name="SettingsExternalProviders" xml:space="preserve">
-    <value>External providers</value>
+    <value>Plugins</value>
   </data>
   <!-- Sign-in and setup -->
   <data name="SignInTitle" xml:space="preserve">
@@ -607,7 +607,7 @@
     <value>this machine</value>
   </data>
   <data name="PairingAlertReview" xml:space="preserve">
-    <value>Open Settings → External providers</value>
+    <value>Open Settings → Plugins</value>
   </data>
   <data name="SettingsForecastPrices" xml:space="preserve">
     <value>Forecast &amp; prices</value>
@@ -617,5 +617,38 @@
   </data>
   <data name="SettingsSystem" xml:space="preserve">
     <value>System</value>
+  </data>
+  <data name="PluginHelpTopic" xml:space="preserve">
+    <value>the plugin</value>
+  </data>
+  <data name="PluginHelpNoPluginTip" xml:space="preserve">
+    <value>Gleanvolt doesn't talk to the charger itself. A plugin does: a small program for your charger's brand, and none is connected yet. Start the one for your charger, then accept it on Settings → Plugins.</value>
+  </data>
+  <data name="PluginHelpNoPluginLink" xml:space="preserve">
+    <value>How to add your charger</value>
+  </data>
+  <data name="PluginHelpRefusedTip" xml:space="preserve">
+    <value>The charger's plugin runs, but Gleanvolt turned it away: either the charger can't do what the car's settings ask, or Gleanvolt already uses another charger plugin. Settings → Plugins says which.</value>
+  </data>
+  <data name="PluginHelpRefusedLink" xml:space="preserve">
+    <value>What to do</value>
+  </data>
+  <data name="PluginHelpProblemTip" xml:space="preserve">
+    <value>The charger's plugin is connected, but it can't reach the charger or reports a problem. Check the charger's address on the plugin's page.</value>
+  </data>
+  <data name="PluginHelpProblemLink" xml:space="preserve">
+    <value>Open the plugin's page</value>
+  </data>
+  <data name="PluginHelpWaitingTip" xml:space="preserve">
+    <value>This data comes from a plugin: a small program that runs beside Gleanvolt. None is connected yet. Start it, then accept it on Settings → Plugins when it asks to connect.</value>
+  </data>
+  <data name="PluginHelpDisconnectedTip" xml:space="preserve">
+    <value>The plugin was connected, but it has stopped. Check that it still runs: it connects again by itself once it does.</value>
+  </data>
+  <data name="PluginHelpStartLink" xml:space="preserve">
+    <value>How to start a plugin</value>
+  </data>
+  <data name="PluginHelpMoreLink" xml:space="preserve">
+    <value>More about plugins</value>
   </data>
 </root>

@@ -130,7 +130,7 @@ public enum VehicleFeed
 
     /// <summary>
     /// An external provider (<c>Vehicle:External</c>, #408): any car, read by a program outside
-    /// Gleanvolt. Its address and token are on Settings → External providers.
+    /// Gleanvolt. Its address and token are on Settings → Plugins.
     /// </summary>
     External,
 }

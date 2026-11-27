@@ -4,7 +4,7 @@ description: Co je na které záložce Nastavení, jak funguje ukládání a kdy
 ---
 
 Vše, na co se ptal průvodce nastavením, je i v **Nastavení**, se stejnými poli a stejnými kontrolami.
-Má pět záložek v pořadí, v jakém věci nastavujete: **Instalace**, **Externí zdroje dat**, **Předpověď a
+Má pět záložek v pořadí, v jakém věci nastavujete: **Instalace**, **Pluginy**, **Předpověď a
 ceny**, **Integrace** a **Systém**. Auto má vlastní stránku **Auto**.
 
 ## Ukládání a kdy restartovat
@@ -16,7 +16,7 @@ Na některých záložkách změna platí hned. Jiné se načítají, jen když 
 
 | Platí hned | Potřebuje restart |
 |---|---|
-| Externí zdroje dat, Předpověď a ceny, heslo na záložce Systém | Instalace, Integrace, Auto |
+| Pluginy, Předpověď a ceny, heslo na záložce Systém | Instalace, Integrace, Auto |
 
 Když změna potřebuje restart, nahoře na záložce je napsáno, kolik změn je uložených, ale ještě neplatí,
 s odkazem na **Restartovat** na záložce **Systém**. Restart trvá asi půl minuty. Pozastaví probíhající
@@ -44,13 +44,14 @@ Váš dům a vaše zařízení.
 - **Nabíječka**: plugin nabíječky, zda je připojený, a jeho stránka, kde je adresa a nastavení
   nabíječky. Viz [Vaše nabíječka](../charger/).
 
-## Externí zdroje dat
+## Pluginy
 
-Pro případ, že Gleanvolt bere data od jiných programů (pluginů). Obsahuje jeden token, kterým se
-připojují všechny pluginy, adresu Gleanvoltu a řádek pro každý druh dat: jeho hub, zda je připojený
+Pro malé programy, které běží vedle Gleanvoltu: plugin nabíječky a ty, které dodávají data. Viz
+[Pluginy](../plugins/). Pluginy žádající o připojení tu čekají na **Přijmout**. Záložka obsahuje token,
+který pluginy dostanou při přijetí, adresu Gleanvoltu a řádek pro každý druh dat: jeho hub, zda je připojený
 plugin, a odkaz **Otevřít** na stránku pluginu. Název druhu vede na jeho sekci. Řádek **Nabíječka**
 ukazuje plugin, který si Gleanvolt pamatuje, s tlačítkem **Zapomenout**, a proč byl naposledy nějaký
-plugin odmítnut. Viz kroky pro zdroj Externí v [Tarifu](../grid-tariff/) a
+plugin odmítnut. Viz kroky pro plugin v [Tarifu](../grid-tariff/) a
 [Předpovědi solární energie](../solar-forecast/), [Vaše nabíječka](../charger/) a část *Přes jiný
 program* v [Autě](../car/).
 

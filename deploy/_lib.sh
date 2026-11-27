@@ -224,18 +224,13 @@ EOF
     fi
 
     if [ -n "$enabled" ]; then
-        # Without the token a plugin stops at start, and its restart policy brings it back to stop
-        # again, every few seconds, for as long as nobody looks.
+        # Without the token a plugin asks to be paired (#464) and waits, quietly, until the owner accepts it;
+        # the token it is given is kept in its plugins/ directory. GLEANVOLT_PROVIDER_TOKEN still wins when set.
         if [ -z "$(env_value GLEANVOLT_PROVIDER_TOKEN)" ]; then
-            cat >&2 <<EOF
-error: GLEANVOLT_PLUGINS in $REMOTE_DIR/.env asks for:$enabled -- but GLEANVOLT_PROVIDER_TOKEN is not set.
-
-Every plugin signs in to Gleanvolt with the provider token. Make one in the web UI, under Settings ->
-External providers -> Make a token, put it in .env on the Pi, and deploy again:
-
-    ssh $PI_HOST 'nano $REMOTE_DIR/.env'      # GLEANVOLT_PROVIDER_TOKEN=gvp_...
+            cat <<EOF
+GLEANVOLT_PROVIDER_TOKEN is not set, so each new plugin asks to connect: accept it in the web UI, under
+Settings -> Plugins. A plugin accepted before keeps its token.
 EOF
-            exit 1
         fi
 
         for plugin in $enabled; do

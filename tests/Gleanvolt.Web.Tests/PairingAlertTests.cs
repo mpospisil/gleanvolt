@@ -42,7 +42,7 @@ public class PairingAlertTests : PageTest
         Assert.Equal("alert", alert.GetAttribute("role"));
         Assert.Contains("A plugin asks to connect: SolaX EV charger (this machine).", alert.TextContent);
         Assert.Equal("/settings/providers", alert.QuerySelector("a")!.GetAttribute("href"));
-        Assert.Contains("Open Settings → External providers", alert.QuerySelector("a")!.TextContent);
+        Assert.Contains("Open Settings → Plugins", alert.QuerySelector("a")!.TextContent);
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public class PairingAlertTests : PageTest
             var alert = Render<PairingAlert>().Find("#pairing-alert");
 
             Assert.Contains("Plugin žádá o připojení: SolaX EV charger (tento počítač).", alert.TextContent);
-            Assert.Contains("Externí zdroje dat", alert.QuerySelector("a")!.TextContent);
+            Assert.Contains("Pluginy", alert.QuerySelector("a")!.TextContent);
         }
         finally
         {

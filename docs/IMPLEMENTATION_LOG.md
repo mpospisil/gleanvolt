@@ -4,6 +4,56 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-28 — Help when a plugin is missing, and "External providers" becomes "Plugins" (#470)
+
+**Why.** A first run has no charger plugin, so no mode can start, and Gleanvolt said only "No charger plugin is
+connected." The manual sent the owner to a README in another repository, and the UI and the docs used two words
+for one thing.
+
+**What.**
+- `PluginHelp` maps a charger Gleanvolt can't control to a tip and a link, by the reason's phrase key with the state
+  as fallback: `Charger.NoPlugin` → `setting-up/charger` (link shown beside the warning too), `Charger.PluginRefused`
+  → `setting-up/charger-refused`, anything else → `/settings#charger-editor`. `ForKind` does the same for a kind's
+  panel on Settings while its plugin is waiting or disconnected (the charger's own page, the weather page, or the new
+  general `setting-up/plugins`). `PluginHelpTip` and `HelpLink` render it on the Overview, the Charging plan and each
+  kind's panel. New tips on **Plugins asking to connect** and **Forget**.
+- Rename in every user-visible string (en + cs), including the English sentences built in C# (pairing log and plugin
+  waiting page, the refusal reason, the CLI, the setup-file error). Config keys, URLs and identifiers keep "provider".
+- No token is no longer a warning on a kind's panel: accepting a plugin makes one (#464). `ExternalTokenSharedMissing`
+  is gone.
+- The manual: `setting-up/charger` rewritten with a plugin table and tabs by installation (Docker, NAS, Windows,
+  Linux; the Pi deploy scripts as a note), new `setting-up/plugins` (what a plugin is, accepting, the tab, a
+  disconnect, Forget, the token by hand) and `setting-up/charger-refused`, en + cs; the token steps in weather,
+  tariff, forecast, car, settings and the wizard replaced by "start it and accept it". New picture
+  `overview-no-charger`; eleven regenerated.
+- `deploy/_lib.sh` no longer refuses to start a plugin without `GLEANVOLT_PROVIDER_TOKEN`; it notes that the plugin
+  will ask to connect. The compose comments, `deploy/README.md`, `NAS.md`, `CHARGER_SETUP.md` and the other repo docs
+  follow.
+- The OpenWeather, Volkswagen and sample plugins no longer throw without `Gleanvolt:Token`: an empty token makes the
+  SDK pair, as the charger plugins already did.
+
+**Quirks.** A `<details>` inside a `<p>` is moved out of it by the HTML parser (bUnit's AngleSharp and a browser on
+prerender), which left the tip empty; the help is a `<div>` beside the warning. The OpenWeather plugin's no-token path
+was not run against a live Gleanvolt here: with no token it would search the LAN by mDNS and knock on the Pi's
+production Gleanvolt.
+
+**Not done here.** The gleanvolt-chargers READMEs still say "Settings → External providers"; they change when this
+release ships (see DECISIONS).
+
+**Files.** `Components/{PluginHelp.cs,PluginHelpTip.razor,HelpLink.razor,ExternalProviderPanel.razor,
+ExternalProvidersForm.razor,PairingRequestsList.razor,ChargerProviderForm.razor}`, `Pages/{Dashboard,ChargingPlan}.razor`,
+`site.css`; `CarText`, `DashboardText`, `ServiceText`, `SettingsText`, `SetupText`, `SharedText` resx (en + cs);
+`Providers.Client/{ProviderPageMiddleware,ProviderPairing}.cs`, `Providers.Server/ProviderSessions.cs`,
+`Chargers.Hosting/SharedText.cs`, `Hosting/Cli/GleanvoltCli.cs`, `Hosting/Setup/SetupDocument.cs`; five plugins'
+`Program.cs` and READMEs; `deploy/{_lib.sh,docker-compose.yml,docker-compose.nas.yml,README.md}`; the manual's
+`setting-up/{charger,charger-refused,plugins,weather,grid-tariff,solar-forecast,car,settings,setup-wizard}` (en + cs),
+`astro.config.mjs` and pictures; `CHARGER_SETUP.md`, `NAS.md`, `DOCKER.md`, `WEB_UI.md`, `VEHICLE.md`,
+`CONFIGURATION.md`, `PROVIDERS.md`, `SUPPORTED_EVS.md`, `README.md`; tests `PluginHelpTests` (new),
+`ChargingPlanPageTests`, `DashboardPageTests`, `ExternalProviderPanelTests` and the wording in eight others; the
+screenshot fixture.
+
+---
+
 ## 2026-11-27 — Integrations: the API first
 
 The owner ranks the REST API above MQTT: it is how Gleanvolt's own Home Assistant integration and other programs

@@ -1,109 +1,147 @@
 ---
 title: Your charger
-description: Add your EV charger to Gleanvolt through its plugin, at any time after setup.
+description: Add your EV charger to Gleanvolt by starting the plugin for its brand, at any time after setup.
 ---
 
-import { Steps } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
 
-Gleanvolt controls your EV charger through a **plugin**: a small program for your charger's brand,
-such as the plugin for the Shelly TopAC. The plugin talks to the charger, and Gleanvolt tells the plugin
-what to do. The plugin has its own page, where you enter the charger's address and anything else it
-needs.
+Gleanvolt doesn't talk to your EV charger itself. A **plugin** does: a small program for your charger's
+brand that runs beside Gleanvolt. The plugin talks to the charger, and Gleanvolt tells the plugin what to
+do. The plugin has its own page, where you enter the charger's address.
 
-You don't set the charger up in Gleanvolt's wizard. Start the plugin whenever you like, during setup or
-months later, and Gleanvolt uses the charger as soon as the plugin connects. Until then, Gleanvolt shows
-your solar power and your home battery, but no charging mode can be started.
+You don't set the charger up in the setup wizard. Start the plugin whenever you like, during setup or months
+later. Until it connects, Gleanvolt shows your solar power and your home battery, but no charging mode can
+be started, and the Overview links to this page:
 
-## Add the charger
+![The Overview before the charger's plugin connects: the headline says no charger plugin is connected, with a "How to add your charger" link under it.](../../../../assets/screenshots/overview-no-charger.png)
+
+## Which plugin
+
+| Your charger | Plugin | Its page |
+|---|---|---|
+| SolaX X1/X3-HAC, X1/X3-EVC | `solax` | port 8098 |
+| Huawei SCharger-7KS-S0, SCharger-22KT-S0 | `huawei` | port 8099 |
+| go-e Charger (Gemini, HOMEfix, HOME+; hardware V3 or later) | `goe` | port 8100 |
+| Shelly TopAC Portable EV Charger | `shelly` | port 8097 |
+
+Another charger has no plugin yet. Each plugin's notes, such as what to switch on in the charger first, are
+in [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers). See also
+[Preparing your devices](../../installation/preparing-devices/). Run only one charger plugin.
+
+## Start the plugin
+
+Start it the way you installed Gleanvolt. Below, `solax` stands for your plugin's name from the table: put
+yours in its place, and `Solax` in a file name becomes `Huawei`, `GoE` or `Shelly`.
+
+<Tabs syncKey="install">
+<TabItem label="Docker">
+
+Make the plugin's folder, then start it next to Gleanvolt:
+
+```bash
+sudo mkdir -p /opt/gleanvolt/plugins/solax
+sudo chown 1654:1654 /opt/gleanvolt/plugins/solax
+sudo chmod 700 /opt/gleanvolt/plugins/solax
+
+docker run -d --name gleanvolt-plugin-solax --restart unless-stopped --init \
+  --network host \
+  -v /opt/gleanvolt/plugins/solax:/data \
+  ghcr.io/mpospisil/gleanvolt-plugin-solax:latest
+```
+
+The folder keeps the charger's address and the plugin's token. If Gleanvolt isn't on port 8090, add
+`-e Gleanvolt__Endpoint=http://localhost:<its port>`.
+
+</TabItem>
+<TabItem label="NAS">
+
+The file you pasted from [NAS](../../installation/nas/) already has every charger plugin, switched off. In
+your NAS's container app, edit the project's file:
+
+1. Find the service `gleanvolt-plugin-solax` and delete its line `profiles: ["solax"]`.
+2. Save, and start the project again.
+
+</TabItem>
+<TabItem label="Windows">
 
 <Steps>
 
-1. **Start the plugin** for your charger, from
-   [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (SolaX, Huawei, go-e, Shelly TopAC), as its README says. You
-   don't need a token or an address. It can run on the same computer as Gleanvolt or on another one in
-   your home network, and it doesn't matter whether Gleanvolt or the plugin is installed first: the
-   plugin waits, finds Gleanvolt when it appears, and asks to be let in.
+1. From the [gleanvolt-chargers releases](https://github.com/mpospisil/gleanvolt-chargers/releases),
+   download `gleanvolt-plugin-solax-<version>-win-x64.zip`, and unzip it.
 
-2. **Accept the plugin in Gleanvolt.** While a plugin waits, a band at the top of every page says so and
-   links to the list. Under **Settings → External providers**, or on the wizard's
-   **Finish** step, a box **Plugins asking to connect** lists it. Check the row, then press **Accept**.
-   Gleanvolt hands the plugin the provider token by itself, and creates it first if there is none. You
-   never copy it, and the plugin doesn't need a restart. See [Accepting a plugin](#accepting-a-plugin).
+2. In a new terminal, go to the unzipped folder and start it:
 
-3. **Open the plugin's page.** Once the plugin is connected, the **Charger** section on **Settings**
-   shows it, with its page below. Enter your charger's address there and save. **Open in a new tab**
-   opens the page on its own.
-
-4. **Check it.** The **Charger** section says the plugin is connected, and the Overview shows the charger's
-   state. Start a charging mode on the **Charging plan** page.
+   ```powershell
+   .\Gleanvolt.Plugin.Solax.exe
+   ```
 
 </Steps>
 
-## Accepting a plugin
+Like Gleanvolt, it stops when its window closes, so start it again after Windows restarts. It keeps its
+settings in a `data` folder beside it. Its page opens only in a browser on this PC. To open it from your
+phone too, add `--Urls=http://0.0.0.0:8098` (your plugin's port) and allow it through the firewall on
+private networks.
 
-A plugin that runs on the same computer as Gleanvolt is marked **This machine**, and one press of
-**Accept** is enough. A plugin on another computer shows its address, and a six-digit **code**
-such as `482 193`. Open the plugin's own page at its address, or read its log: both show the same code, and
-the page lists the plugin's own addresses. Press **Accept** only if the code matches **and** the address
-Gleanvolt shows is one the plugin's page lists. Another computer on your network can pass a plugin's
-request on, with the right code, and only the address gives it away. If either doesn't match, someone else
-on your network is asking: press **Reject**. A plugin on another computer than Gleanvolt is best given
-Gleanvolt's address, as `Gleanvolt__Endpoint` (see **Gleanvolt moved** below).
+</TabItem>
+<TabItem label="Linux">
 
-:::caution[Accepting needs no sign-in]
-Anyone who can open Gleanvolt can accept a waiting plugin, on **Settings** and in the wizard, with or
-without being signed in. That is so a Gleanvolt without a password can still pair. Settings still shows
-the token itself only to a signed-in owner. **Setting a password closes this**: on a network where other
-people can reach Gleanvolt, set one.
+With the `.deb`, Docker is the simplest way: see the **Docker** tab. Or download
+`gleanvolt-plugin-solax-<version>-linux-arm64.zip` (`linux-x64` on a PC) from the
+[gleanvolt-chargers releases](https://github.com/mpospisil/gleanvolt-chargers/releases), unzip it, and in
+its folder:
+
+```bash
+./Gleanvolt.Plugin.Solax --Urls=http://0.0.0.0:8098
+```
+
+Use your plugin's port from the table.
+
+</TabItem>
+</Tabs>
+
+The plugin needs no token and no address of Gleanvolt's: it finds Gleanvolt on this computer or your home
+network, and asks to be let in. It doesn't matter which of the two starts first.
+
+:::note[Raspberry Pi with the deploy scripts]
+Add the plugin to `GLEANVOLT_PLUGINS` in `/opt/gleanvolt/.env` (`GLEANVOLT_PLUGINS=solax`) and deploy.
+`EV_CHARGER_HOST` there is the charger's address until you save one on the plugin's page.
 :::
 
-Accept stays grey, with the reason beside it, when two waiting plugins claim the same name (reject the
-one you don't know), when that kind of provider is turned off, or when Gleanvolt already uses another
-charger plugin (press **Forget** beside it first). A plugin you reject asks again after an hour, or when
-it restarts. A request that nobody answers disappears after 15 minutes without the plugin asking again,
-and the plugin simply asks anew.
+## Accept it and set it up
 
-**The token by hand.** You can still give the plugin the token yourself, as `Gleanvolt__Token` in its
-environment or `--Gleanvolt:Token=…`. It wins over pairing, and the plugin then connects to the address you
-give it, or to `http://localhost:8090` if you give none. Make the token under **Settings → External
-providers** with **Make the token**. Making a **new** token disconnects every plugin: a paired plugin
-asks again and you accept it again; one set up by hand needs the new token.
+<Steps>
 
-**Gleanvolt moved.** A paired plugin keeps the address it was accepted at and doesn't look for Gleanvolt
-again, so if Gleanvolt gets a new address, tell the plugin: set `Gleanvolt__Endpoint` in its environment, or
-`--Gleanvolt:Endpoint=…`. That address wins over the saved one, and the plugin keeps its token. To unpair a
-plugin, delete `gleanvolt-token` and `gleanvolt-endpoint` from the plugin's data directory, or make a new
-token in Gleanvolt.
+1. **Accept the plugin.** While it waits, a band at the top of every page says so. Under **Settings →
+   Plugins**, or on the wizard's **Finish** step, **Plugins asking to connect** lists it: press **Accept**.
+   A plugin on another computer shows a code to check first: see
+   [Accepting a plugin](../plugins/#accepting-a-plugin).
+
+2. **Enter the charger's address.** The **Charger** section on **Settings** now shows the plugin
+   connected, with its page below. Enter the charger's address there, or let the page search for it, and
+   save. **Open in a new tab** opens the page on its own.
+
+3. **Check it.** The Overview shows the charger's state. Start a charging mode on the **Charging plan**
+   page.
+
+</Steps>
+
+If Gleanvolt turns the plugin away, the **Charger** section says why: see
+[If the charger plugin is turned away](../charger-refused/).
+
+## When Gleanvolt loses the charger
+
+If the plugin stops, or reports that it can't reach the charger, for more than 2 minutes, a running
+charging mode is **suspended**: Gleanvolt sends nothing and releases the battery hold. The charger then
+follows its own settings. When the plugin is back, the mode carries on by itself. The Overview and the
+**Charging plan** say what is wrong, and their (i) says where to look. See
+[Charging plan](../../using/charging-plan/).
 
 ## Moving from the built-in driver
 
 Up to 1.3, Gleanvolt drove SolaX, Huawei and go-e chargers itself. 1.4 removed those built-in drivers:
 every charger now has a plugin, and Gleanvolt never connects to the charger itself.
 
-On a Raspberry Pi with the deploy scripts, there is nothing to do. When you deploy 1.4, the script sees
-your charger's address (`EV_CHARGER_HOST`) in `/opt/gleanvolt/.env`, starts the plugin for your charger's
-brand, and says which one. It needs the provider token (`GLEANVOLT_PROVIDER_TOKEN`, see step 1 above),
-and stops and tells you if it isn't set. To silence the message, add the plugin to `GLEANVOLT_PLUGINS`,
-for example `GLEANVOLT_PLUGINS=solax`, or `openweather,solax` with the weather.
-
-Anywhere else, start the plugin yourself, as in [Add the charger](#add-the-charger). Gleanvolt writes a
-warning to its log at every start until the old charger settings are gone; the warning names the plugin.
-
-## If the plugin is turned away
-
-**Settings → External providers** says why under the **Charger** row:
-
-- **The charger can't do what Gleanvolt asks.** The plugin says what its charger can do: its lowest and
-  highest current, and its phases. If **Maximum current (A)** or **Phases** on the [Car](../car/) page
-  asks for more, for example three phases on a single-phase charger, lower that setting, save and
-  restart Gleanvolt. The plugin tries again within 5 minutes.
-- **Gleanvolt remembers another plugin.** Gleanvolt lets in only the first charger plugin it accepted,
-  so a second one started by mistake can't take over your charger. To switch plugins, stop the old one
-  and press **Forget** beside it. The next plugin to connect is remembered instead.
-
-## When Gleanvolt loses the charger
-
-If the plugin stops, or reports that it can't reach the charger, for more than 2 minutes, a running
-charging mode is **suspended**: Gleanvolt sends nothing and releases the battery hold. The charger then
-follows its own settings. When the plugin is back, the mode carries on by itself. See
-[Charging plan](../../using/charging-plan/).
+Start the plugin for your charger as above, and accept it. Gleanvolt writes a warning to its log at every
+start until the old charger settings are gone; the warning names the plugin. On a Raspberry Pi with the
+deploy scripts, the deploy starts the plugin for you, from `EV_CHARGER_HOST` in `/opt/gleanvolt/.env`, and
+says which one; add it to `GLEANVOLT_PLUGINS` to silence that.

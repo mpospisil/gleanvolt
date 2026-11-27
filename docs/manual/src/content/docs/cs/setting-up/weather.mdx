@@ -18,8 +18,8 @@ Otevřete **Nastavení → Předpověď a ceny** a najděte **Počasí**. V čá
 vyberte:
 
 - **Bez počasí**: počasí se nezaznamenává.
-- **Externí**: počasí Gleanvoltu posílá samostatný program. Hotovým zdrojem je plugin OpenWeather, který
-  vychází s Gleanvoltem: čte počasí z OpenWeatherMap.
+- **Plugin**: počasí Gleanvoltu posílá samostatný program. Hotovým zdrojem je plugin OpenWeather, který
+  vychází s Gleanvoltem: čte počasí z OpenWeatherMap. Viz [Pluginy](../plugins/).
 
 Klikněte na **Uložit**. Restart není potřeba.
 
@@ -44,12 +44,13 @@ uložený a začne fungovat sám.
 
 <Steps>
 
-1. V části **Počasí** vyberte **Externí** a klikněte na **Uložit**.
+1. V části **Počasí** vyberte **Plugin** a klikněte na **Uložit**.
 
-2. Spusťte plugin s tokenem pro externí zdroje z **Nastavení → Externí zdroje dat**: viz
-   [Spuštění pluginu OpenWeather](#spuštění-pluginu-openweather) níže.
+2. Spusťte plugin: viz [Spuštění pluginu OpenWeather](#spuštění-pluginu-openweather) níže.
 
-3. Jakmile se připojí, objeví se v části **Počasí** jeho vlastní stránka. Zadejte na ní klíč
+3. Až požádá o připojení, přijměte ho v **Nastavení → Pluginy**.
+
+4. Jakmile se připojí, objeví se v části **Počasí** jeho vlastní stránka. Zadejte na ní klíč
    OpenWeatherMap a klikněte na **Uložit a ověřit**.
 
 </Steps>
@@ -64,7 +65,7 @@ neodpoví, nabíjení se zaznamená bez počasí. Na ničem jiném to nic neměn
 
 Gleanvolt se dřív ptal OpenWeatherMap sám, s klíčem zadaným v části **Počasí**. To skončilo: počasí
 z OpenWeatherMap teď přichází jen přes plugin OpenWeather. Po aktualizaci Gleanvolt sám vybere
-**Externí** a v části **Počasí** to oznámí, dokud se plugin nepřipojí:
+**Plugin** a v části **Počasí** to oznámí, dokud se plugin nepřipojí:
 
 ![Sekce počasí v Nastavení po aktualizaci s oznámením, že počasí teď dodává plugin OpenWeather.](../../../../assets/screenshots/settings-weather.png)
 
@@ -74,24 +75,14 @@ stránce. Do té doby se nabíjení zaznamenává bez počasí.
 ## Spuštění pluginu OpenWeather
 
 Plugin OpenWeather vychází s každou verzí Gleanvoltu, jako kontejner i ke stažení. Použijte stejnou verzi,
-jakou má váš Gleanvolt. Vždy se začíná tokenem:
-
-<Steps>
-
-1. Otevřete **Nastavení → Externí zdroje dat** a klikněte na **Vytvořit token**. Token, který začíná
-   `gvp_`, si zkopírujte.
-
-2. Spusťte plugin podle vaší instalace, jak ukazuje návod níže.
-
-3. V části **Počasí** vyberte **Externí** a klikněte na **Uložit**. Jakmile se plugin připojí, objeví se
-   tam jeho stránka.
-
-</Steps>
+jakou má váš Gleanvolt. Spusťte ho podle své instalace, jak ukazuje návod níže. Token nepotřebuje: požádá
+o připojení a vy ho přijmete v **Nastavení → Pluginy**. V části **Počasí** vyberte **Plugin** a klikněte na
+**Uložit**; jakmile se plugin připojí, objeví se tam jeho stránka.
 
 <Tabs syncKey="install">
 <TabItem label="Docker">
 
-Vytvořte složku pro plugin a spusťte ho vedle Gleanvoltu. Místo `gvp_...` vložte svůj token:
+Vytvořte složku pro plugin a spusťte ho vedle Gleanvoltu:
 
 ```bash
 sudo mkdir -p /opt/gleanvolt/plugins/openweather
@@ -100,12 +91,11 @@ sudo chmod 700 /opt/gleanvolt/plugins/openweather
 
 docker run -d --name gleanvolt-plugin-openweather --restart unless-stopped --init \
   --network host \
-  -e Gleanvolt__Token=gvp_... \
   -v /opt/gleanvolt/plugins/openweather:/data \
   ghcr.io/mpospisil/gleanvolt-plugin-openweather:latest
 ```
 
-Ve složce je uložený klíč OpenWeatherMap a číst ho může jen plugin. Pokud Gleanvolt neběží na portu
+Ve složce je uložený klíč OpenWeatherMap a token pluginu a číst je může jen plugin. Pokud Gleanvolt neběží na portu
 8090, přidejte `-e Gleanvolt__Endpoint=http://localhost:<jeho port>`.
 
 </TabItem>
@@ -114,10 +104,8 @@ Ve složce je uložený klíč OpenWeatherMap a číst ho může jen plugin. Pok
 Soubor, který jste vložili podle návodu [NAS](../../installation/nas/), plugin už obsahuje, jen vypnutý.
 V aplikaci pro kontejnery na NAS upravte soubor projektu:
 
-1. Najděte `${GLEANVOLT_PROVIDER_TOKEN:-}` a za `:-` vložte svůj token, aby to vypadalo takto:
-   `${GLEANVOLT_PROVIDER_TOKEN:-gvp_...}`.
-2. Smažte řádek `profiles: ["openweather"]`.
-3. Uložte a projekt znovu spusťte.
+1. Smažte řádek `profiles: ["openweather"]`.
+2. Uložte a projekt znovu spusťte.
 
 </TabItem>
 <TabItem label="Windows">
@@ -127,10 +115,10 @@ V aplikaci pro kontejnery na NAS upravte soubor projektu:
 1. Ze [stránky s verzemi](https://github.com/mpospisil/gleanvolt/releases) stáhněte
    `gleanvolt-plugin-openweather-<verze>-win-x64.zip` pro verzi vašeho Gleanvoltu a rozbalte ho.
 
-2. V novém terminálu přejděte do složky `gleanvolt-plugin-openweather` a spusťte plugin se svým tokenem:
+2. V novém terminálu přejděte do složky `gleanvolt-plugin-openweather` a spusťte plugin:
 
    ```powershell
-   .\Gleanvolt.Plugin.OpenWeather.exe --Gleanvolt:Token=gvp_...
+   .\Gleanvolt.Plugin.OpenWeather.exe
    ```
 
 </Steps>
@@ -147,7 +135,7 @@ S balíčkem `.deb` je nejjednodušší Docker: viz záložka **Docker**. Nebo s
 spusťte:
 
 ```bash
-./Gleanvolt.Plugin.OpenWeather --Gleanvolt:Token=gvp_... --Urls=http://0.0.0.0:8096
+./Gleanvolt.Plugin.OpenWeather --Urls=http://0.0.0.0:8096
 ```
 
 Běží, dokud ho nezastavíte, a po zapnutí počítače se sám nespustí.
@@ -158,5 +146,5 @@ Běží, dokud ho nezastavíte, a po zapnutí počítače se sám nespustí.
 Stránka pluginu používá port 8096 na stejném počítači jako Gleanvolt. Gleanvolt ji otevře pod stejným
 názvem, pod jakým jste otevřeli Gleanvolt, takže funguje `gleanvolt.local` i adresa.
 
-Pokud vytvoříte nový token, plugin se odpojí, dokud ho nespustíte s novým.
+Pokud vytvoříte nový token, plugin se odpojí a znovu požádá o připojení: přijměte ho znovu.
 
