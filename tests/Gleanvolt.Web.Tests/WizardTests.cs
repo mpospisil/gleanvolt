@@ -193,6 +193,17 @@ public class WizardTests : PageTest
     }
 
     [Fact]
+    public void Once_running_the_finish_step_sends_the_restart_to_the_system_tab()
+    {
+        _setup.SetupMode = false;
+
+        var finish = Step("finish").Find("#wizard-finish");
+
+        Assert.NotNull(finish.QuerySelector("a[href='/settings/system']"));
+        Assert.Null(finish.QuerySelector("a[href='/settings/health']"));
+    }
+
+    [Fact]
     public void The_finish_step_lists_what_is_missing_with_the_step_that_sets_it()
     {
         _setup.Status = new SetupStatus(
@@ -215,7 +226,7 @@ public class WizardTests : PageTest
         var links = Step("finish").FindAll(".optional-checklist a").Select(link => link.GetAttribute("href")).ToList();
 
         Assert.Equal(
-            ["/settings#solcast-editor", "/car#car-editor", "/settings#tariff-editor", "/settings#mqtt-editor", "/settings#weather-editor"],
+            ["/settings/forecast-prices#solcast-editor", "/car#car-editor", "/settings/forecast-prices#tariff-editor", "/settings/integrations#mqtt-editor", "/settings/forecast-prices#weather-editor"],
             links);
     }
 
@@ -347,7 +358,7 @@ public class WizardTests : PageTest
     {
         public SetupStatus Status { get; set; } = new([], []);
 
-        public bool SetupMode => true;
+        public bool SetupMode { get; set; } = true;
 
         public SetupStatus AtStartup => Status;
 

@@ -148,7 +148,7 @@
     <value>funkční</value>
   </data>
   <data name="MqttTip2_1" xml:space="preserve">
-    <value>Stav</value>
+    <value>Systém</value>
   </data>
   <data name="MqttTip2" xml:space="preserve">
     <value>Údaje níže načetl správce nabíjení při startu; formuláře výše je změní až od dalšího startu. Neukazují, zda je některé ze spojení {0}, a stránka {1} ukazuje smyčku čtení, ne broker. Spojení s Home Assistant ověříte tlačítkem Vyzkoušet připojení výše, nebo podle toho, zda Home Assistant ukazuje zařízení jako nedostupné.</value>
@@ -327,8 +327,8 @@
   <data name="NotRunningUntilRestart" xml:space="preserve">
     <value>— začne platit po restartu správce nabíjení.</value>
   </data>
-  <data name="RestartOnHealth" xml:space="preserve">
-    <value>Restartovat na stránce Stav</value>
+  <data name="RestartOnSystem" xml:space="preserve">
+    <value>Restartovat na stránce Systém</value>
   </data>
   <data name="ReadOnlyNoLogin" xml:space="preserve">
     <value>Jen pro čtení, protože toto rozhraní nemá přihlášení. Pole obsahují i adresy, na které správce nabíjení posílá příkazy Modbus, a bez přihlášení by je kdokoli v místní síti mohl přesměrovat jinam. Nastavte {0} ({1}) a pole půjde upravovat tady; do té doby je měňte v {2} a restartujte.</value>
@@ -974,7 +974,7 @@
     <value>Nový token odpojí všechny zdroje, dokud nedostanou ten nový. Vytvořte ho, pokud token unikl.</value>
   </data>
   <data name="ExternalTokenFailed" xml:space="preserve">
-    <value>Token se nepodařilo uložit. Úložiště tajných údajů najdete ve Stavu.</value>
+    <value>Token se nepodařilo uložit. Úložiště tajných údajů najdete na kartě Systém.</value>
   </data>
   <data name="ExternalStatus" xml:space="preserve">
     <value>Stav</value>

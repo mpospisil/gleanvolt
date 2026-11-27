@@ -40,6 +40,23 @@ public class HealthPageTests : PageTest
     }
 
     [Fact]
+    public void The_optional_settings_list_is_on_the_installation_tab_not_here()
+    {
+        Services.AddSingleton<ISetupState>(new MissingWeather());
+
+        Assert.Empty(Render<Health>().FindAll("#optional-settings"));
+    }
+
+    private sealed class MissingWeather : ISetupState
+    {
+        public bool SetupMode => false;
+
+        public SetupStatus AtStartup => Current();
+
+        public SetupStatus Current() => new([], [OptionalSetting.Weather]);
+    }
+
+    [Fact]
     public void The_system_tab_offers_the_password_change()
     {
         Services.AddSingleton(new Gleanvolt.Web.Auth.WebPasswordState(Gleanvolt.Web.Auth.WebPasswordHasher.Hash("s3cret-enough")));

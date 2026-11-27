@@ -206,10 +206,10 @@
     // Whole paths, since this section is a tab of its own.
     private static string Section(string kind) => kind switch
     {
-        "tariff" => "/settings#tariff-editor",
-        "solar-forecast" => "/settings#solcast-editor",
+        "tariff" => "/settings/forecast-prices#tariff-editor",
+        "solar-forecast" => "/settings/forecast-prices#solcast-editor",
         "vehicle" => "/car#car-editor",
-        "weather" => "/settings#weather-editor",
+        "weather" => "/settings/forecast-prices#weather-editor",
         "charger" => "/settings#charger-editor",
         _ => "/settings/providers",
     };

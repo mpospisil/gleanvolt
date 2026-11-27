@@ -152,7 +152,7 @@
     <value>up</value>
   </data>
   <data name="MqttTip2_1" xml:space="preserve">
-    <value>Health</value>
+    <value>System</value>
   </data>
   <data name="MqttTip2" xml:space="preserve">
     <value>The details below are what the controller read when it started; the forms above change them from the next start. They do not show whether either connection is {0}, and {1} reports the polling loop, not the broker. To check the Home Assistant link, use Test connection above, or see whether Home Assistant shows the device as unavailable.</value>
@@ -336,8 +336,8 @@
   <data name="NotRunningUntilRestart" xml:space="preserve">
     <value>— not in use until the controller restarts.</value>
   </data>
-  <data name="RestartOnHealth" xml:space="preserve">
-    <value>Restart on Health</value>
+  <data name="RestartOnSystem" xml:space="preserve">
+    <value>Restart on System</value>
   </data>
   <data name="ReadOnlyNoLogin" xml:space="preserve">
     <value>Read-only, because this UI has no login. These fields include the addresses the controller sends Modbus commands to, and without a login anyone on the LAN could point them elsewhere. Configure {0} ({1}) to edit them here; until then, change them in {2} and restart.</value>
@@ -989,7 +989,7 @@
     <value>A new token disconnects every provider until it is given the new one. Make one if the token has leaked.</value>
   </data>
   <data name="ExternalTokenFailed" xml:space="preserve">
-    <value>The token could not be saved. See Health for the secret store.</value>
+    <value>The token could not be saved. See System for the secret store.</value>
   </data>
   <data name="ExternalStatus" xml:space="preserve">
     <value>Status</value>

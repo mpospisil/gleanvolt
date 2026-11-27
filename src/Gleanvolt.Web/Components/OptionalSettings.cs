@@ -24,15 +24,15 @@ internal static class OptionalSettings
         _ => SetupText.OptionalWeatherAdds,
     };
 
-    // The wizard's step that sets each one.
+    // The Settings tab (or the Car page) that sets each one.
     public static string? Where(OptionalSetting setting) => setting switch
     {
         // On Settings and the Car page, where they live (#442): the wizard sets up only Gleanvolt itself.
-        OptionalSetting.Solcast => "/settings#solcast-editor",
+        OptionalSetting.Solcast => "/settings/forecast-prices#solcast-editor",
         OptionalSetting.Ev => "/car#car-editor",
-        OptionalSetting.Tariff => "/settings#tariff-editor",
-        OptionalSetting.Mqtt => "/settings#mqtt-editor",
-        OptionalSetting.Weather => "/settings#weather-editor",
+        OptionalSetting.Tariff => "/settings/forecast-prices#tariff-editor",
+        OptionalSetting.Mqtt => "/settings/integrations#mqtt-editor",
+        OptionalSetting.Weather => "/settings/forecast-prices#weather-editor",
         _ => null,
     };
 }

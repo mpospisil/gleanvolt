@@ -325,7 +325,7 @@ public class PvSystemEditorFormTests : BunitContext
 
         var pending = form.Find("#pv-pending");
         Assert.Contains("2 changes saved", pending.TextContent);
-        Assert.Equal("/settings/health", pending.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Equal("/settings/system", pending.QuerySelector("a")!.GetAttribute("href"));
 
         // Each field still running something else says so under its box.
         var tilt = form.Find(Field(PvSystemSettingKeys.TiltDegrees)).ParentElement!;
