@@ -162,7 +162,7 @@ public static class PluginHost
         {
             context.Response.ContentType = "text/html; charset=utf-8";
             context.Response.Headers.CacheControl = "no-store";
-            return context.Response.WriteAsync(WaitingPage.Html(plugin, pairing.Status, LanScan.OwnAddresses(), CultureInfo.CurrentUICulture));
+            return context.Response.WriteAsync(WaitingPage.Html(plugin, pairing.Status, AddressesOrNone(LanScan.OwnAddresses), CultureInfo.CurrentUICulture));
         });
 
         app.Use((context, next) =>
@@ -194,6 +194,20 @@ public static class PluginHost
             .AddInteractiveServerRenderMode(options => options.ContentSecurityFrameAncestorsPolicy = null);
 
         return app;
+    }
+
+    // The waiting view is all a plugin that waits to be paired shows: a machine whose interfaces cannot be listed (a
+    // sandbox, a container without netlink) shows it without its addresses rather than answering 500.
+    internal static IReadOnlyList<System.Net.IPAddress> AddressesOrNone(Func<IReadOnlyList<System.Net.IPAddress>> read)
+    {
+        try
+        {
+            return read();
+        }
+        catch (System.Net.NetworkInformation.NetworkInformationException)
+        {
+            return [];
+        }
     }
 }
 

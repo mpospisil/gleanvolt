@@ -148,6 +148,10 @@ public sealed class ChargersHostingTests
     }
 
     [Fact]
+    public void AMachineWhoseAddressesCannotBeListedShowsNone() =>
+        Assert.Empty(PluginHost.AddressesOrNone(() => throw new System.Net.NetworkInformation.NetworkInformationException()));
+
+    [Fact]
     public async Task TheWaitingViewIsInCzechForCzech()
     {
         await using var plugin = await PluginApp.StartAsync();
