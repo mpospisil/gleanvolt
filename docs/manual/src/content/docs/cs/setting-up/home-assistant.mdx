@@ -10,7 +10,7 @@ nabíjení, nastavit, co režim potřebuje, a spustit i zastavit nabíjení. MQT
 Integrace vyžaduje Gleanvolt 1.2.0 nebo novější.
 
 :::caution[Propojte je jen jedním způsobem]
-Gleanvolt se umí k Home Assistantu připojit i přes MQTT (**Nastavení → Home Assistant (MQTT)**). Ten
+Gleanvolt se umí k Home Assistantu připojit i přes MQTT (**Nastavení → Integrace → Home Assistant (MQTT)**). Ten
 způsob se hodí, když už broker máte. Pokud jsou zapnuté oba, Gleanvolt se v Home Assistantu objeví
 dvakrát. Když tedy nastavíte integraci, nechte **Home Assistant (MQTT)** vypnutý.
 :::
@@ -19,14 +19,14 @@ dvakrát. Když tedy nastavíte integraci, nechte **Home Assistant (MQTT)** vypn
 
 <Steps>
 
-1. V Gleanvoltu otevřete **Nastavení** a najděte **Přístup k API**. (Nebo krok průvodce **Doplňky**.)
+1. V Gleanvoltu otevřete **Nastavení → Integrace** a najděte **Přístup k API**.
 
 2. Zaškrtněte **Zapnout API**.
 
 3. Do pole **Nový klíč pro** napište `home-assistant` a klikněte na **Vytvořit klíč**. Pod tímto
    názvem protokol Gleanvoltu a historie nabíjení uvádějí, že akci spustil Home Assistant.
 
-4. Klikněte na **Restartovat** v **Nastavení → Stav**.
+4. Klikněte na **Restartovat** v **Nastavení → Systém**.
 
 </Steps>
 

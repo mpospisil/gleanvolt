@@ -32,7 +32,7 @@ computer are in [its own troubleshooting](../deploy/README.md#troubleshooting), 
 | *Port open, no Modbus reply* | Something else holds the device's only Modbus connection — Home Assistant's SolaX or `huawei_solar` integration, evcc, or a second Gleanvolt | Stop the other client; a device serves one or very few |
 | Numbers look implausible rather than absent | The register map doesn't match your firmware | Keep charging **Off** and compare with the device's own display before enabling anything that writes. See [Supported PV systems](SUPPORTED_PV_SYSTEMS.md) |
 | The house appears to use all the sun every afternoon, and no solar mode starts the car | The grid meter misses a phase | See [Unmetered grid phase](UNMETERED_GRID_PHASE.md) |
-| Forecast figures stay empty | No Solcast account, or Solcast refused it | **Settings → Installation → Solar forecast** says which; see [Solcast](CONFIGURATION.md#solcast-solar-forecast) |
+| Forecast figures stay empty | No Solcast account, or Solcast refused it | **Settings → Forecast & prices → Solar forecast** says which; see [Solcast](CONFIGURATION.md#solcast-solar-forecast) |
 | Sessions filed under the wrong day | The controller is running in UTC | Set the time zone in the wizard or on **Settings → Installation**. On Windows, .NET ignores `TZ` |
 | The controller stops at startup naming a time zone | An id this host can't resolve | Correct the id. On the Windows container use a Windows id, e.g. `Central Europe Standard Time` |
 
@@ -53,7 +53,7 @@ computer are in [its own troubleshooting](../deploy/README.md#troubleshooting), 
 ## Reading the log
 
 The first line names the running build, e.g. `Gleanvolt 1.1.0 (31bf347) starting.` — the same string as
-on **Settings → Health** and Home Assistant's device page. If they differ, you are not looking at the
+on **Settings → System** and Home Assistant's device page. If they differ, you are not looking at the
 instance you think you are.
 
 A run that ends properly says how on its last line: `stopped cleanly at the request of <surface>`

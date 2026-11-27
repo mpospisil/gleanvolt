@@ -1,73 +1,89 @@
 ---
 title: Stránka Nastavení
-description: Co je v Nastavení, jak funguje ukládání a kdy změna potřebuje restart.
+description: Co je na které záložce Nastavení, jak funguje ukládání a kdy změna potřebuje restart.
 ---
 
 Vše, na co se ptal průvodce nastavením, je i v **Nastavení**, se stejnými poli a stejnými kontrolami.
-Má tři záložky: **Instalace**, **Externí zdroje dat** a **Stav**. Auto má vlastní stránku **Auto**.
+Má pět záložek v pořadí, v jakém věci nastavujete: **Instalace**, **Externí zdroje dat**, **Předpověď a
+ceny**, **Integrace** a **Systém**. Auto má vlastní stránku **Auto**.
 
 ## Ukládání a kdy restartovat
 
 Každá sekce má vlastní tlačítko **Uložit**. Gleanvolt hodnoty před uložením zkontroluje: pokud by něco
 bránilo Gleanvoltu ve spuštění, nic se neuloží a sekce napíše, co je špatně.
 
-Některé sekce platí hned. Jiné se načítají, jen když se Gleanvolt spouští:
+Na některých záložkách změna platí hned. Jiné se načítají, jen když se Gleanvolt spouští:
 
 | Platí hned | Potřebuje restart |
 |---|---|
-| Předpověď solární energie, Počasí, Tarif, Externí zdroje dat, změna hesla | Instalace (zařízení a místo), Auto, Home Assistant, přístup k API |
+| Externí zdroje dat, Předpověď a ceny, heslo na záložce Systém | Instalace, Integrace, Auto |
 
-Když změna potřebuje restart, sekce napíše **Uloženo, zatím neplatí** a vypíše, co se změnilo, s tlačítkem
-**Restartovat** vedle. Restart trvá asi půl minuty. Pozastaví probíhající nabíjení a Gleanvolt se vrátí
-s vypnutým nabíjením, takže restartujte, když auto nenabíjí.
+Když změna potřebuje restart, nahoře na záložce je napsáno, kolik změn je uložených, ale ještě neplatí,
+s odkazem na **Restartovat** na záložce **Systém**. Restart trvá asi půl minuty. Pozastaví probíhající
+nabíjení a Gleanvolt se vrátí s vypnutým nabíjením, takže restartujte, když auto nenabíjí.
 
 U každého pole malá poznámka říká, odkud jeho hodnota pochází. Pole, které jste tady změnili, má tlačítko
 **Vrátit na …**, které vrátí původní hodnotu.
 
+## Instalace
+
+Váš dům a vaše zařízení.
+
+- **Zatím nenastaveno**: volitelná nastavení, která ještě nemáte, každé s tím, co přidá, a s odkazem na
+  něj. Předpověď solární energie je označená jako **doporučeno**: plánují s ní Forecasted a Targeted.
+- **Instalace**: název a adresa, poloha a časové pásmo, solární panely, domácí baterie a značka a adresa
+  střídače. Střídač znovu vyhledáte v průvodci na `/wizard`: viz [Vyhledání zařízení](../finding-devices/).
+
+  Pole, která potřebujete jen výjimečně, jsou sbalená pod **Pokročilé**: id, datum uvedení do provozu,
+  ztrátový koeficient, účinnost nabíjení baterie, [neměřená fáze sítě](../../how-it-works/unmetered-phase/)
+  a snímek registrů střídače. **Pokročilé** se otevře samo, když některé z nich čeká na restart nebo když
+  bylo uložení odmítnuto.
+
+  ![Sekce Instalace: název a adresa místa, poloha, časové pásmo a panely, domácí baterie, střídač s adresou a sbalené Pokročilé.](../../../../assets/screenshots/settings-installation.png)
+
+- **Nabíječka**: plugin nabíječky, zda je připojený, a jeho stránka, kde je adresa a nastavení
+  nabíječky. Viz [Vaše nabíječka](../charger/).
+
 ## Externí zdroje dat
 
-Druhá záložka, pro případ, že Gleanvolt bere data od jiných programů (pluginů). Obsahuje jeden
-token, kterým se připojují všechny pluginy, adresu Gleanvoltu a řádek pro každý druh dat: jeho hub, zda
-je připojený plugin, a odkaz **Otevřít** na stránku pluginu. Název druhu vede na jeho sekci na záložce
-**Instalace**. Řádek **Nabíječka** ukazuje plugin, který si Gleanvolt pamatuje, s tlačítkem
-**Zapomenout**, a proč byl naposledy nějaký plugin odmítnut. Viz kroky pro zdroj Externí v [Tarifu](../grid-tariff/)
-a [Předpovědi solární energie](../solar-forecast/), [Vaše nabíječka](../charger/) a část *Přes jiný
+Pro případ, že Gleanvolt bere data od jiných programů (pluginů). Obsahuje jeden token, kterým se
+připojují všechny pluginy, adresu Gleanvoltu a řádek pro každý druh dat: jeho hub, zda je připojený
+plugin, a odkaz **Otevřít** na stránku pluginu. Název druhu vede na jeho sekci. Řádek **Nabíječka**
+ukazuje plugin, který si Gleanvolt pamatuje, s tlačítkem **Zapomenout**, a proč byl naposledy nějaký
+plugin odmítnut. Viz kroky pro zdroj Externí v [Tarifu](../grid-tariff/) a
+[Předpovědi solární energie](../solar-forecast/), [Vaše nabíječka](../charger/) a část *Přes jiný
 program* v [Autě](../car/).
 
 Každá sekce, která bere data z pluginu, ukazuje nejdřív plugin a zda je připojený, pod tím vlastní
 stránku pluginu. Odkaz **Otevřít na nové kartě** pod stránkou ji otevře samostatně, pro stránku, která
 v Gleanvoltu zůstane prázdná. Zbytek vysvětlují tlačítka (i).
 
-## Instalace
+## Předpověď a ceny
 
-Odshora dolů:
+Co Gleanvolt čte zvenčí, aby mohl plánovat. Každá změna platí hned po uložení.
 
-- **Instalace**: váš dům a vaše zařízení. Název, poloha a časové pásmo, solární panely, domácí baterie a
-  značka a adresa střídače. Nabíječka se nastavuje na stránce svého pluginu: viz
-  [Vaše nabíječka](../charger/). Střídač znovu vyhledáte v průvodci na `/wizard`: viz
-  [Vyhledání zařízení](../finding-devices/).
+- **Předpověď solární energie**: účet Solcast, nebo plugin. Viz [Předpověď slunce](../solar-forecast/).
+- **Počasí**: odkud počasí pochází (bez počasí, nebo plugin), a jeho stránka. Viz [Počasí](../weather/).
+- **Tarif**: hodiny nízkého tarifu, nebo plugin. Viz [Tarif](../grid-tariff/).
 
-  ![Sekce Instalace: název místa, adresa, poloha, časové pásmo a panely, domácí baterie a střídač s adresou.](../../../../assets/screenshots/settings-installation.png)
+## Integrace
 
-- **Nabíječka**: plugin nabíječky, zda je připojený, a jeho stránka, kde je adresa a nastavení
-  nabíječky. Viz [Vaše nabíječka](../charger/).
-- **Předpověď solární energie**: účet Solcast. Viz [Předpověď slunce](../solar-forecast/).
-- **Počasí**: odkud počasí pochází (bez počasí, nebo externí zdroj), zdroj a jeho vlastní stránka. Viz [Počasí](../weather/).
-- **Tarif**: hodiny nízkého tarifu. Viz [Tarif](../grid-tariff/).
-- **Změnit heslo**: heslo ke stránce Gleanvoltu. Dostanete nový klíč pro obnovení a všechny prohlížeče se
-  odhlásí.
-- **Home Assistant (MQTT)** a **Přístup k API**: pro propojení s jiným softwarem. Pokud je nepoužíváte,
-  nechte je vypnuté. Propojení s Home Assistantem popisuje stránka [Home Assistant](../home-assistant/);
-  zbytek popisuje repozitář.
+Pro propojení s jiným softwarem. Pokud je nepoužíváte, nechte je vypnuté.
 
-Sekce pro nastavení, která ještě nemáte, jsou vypsané nahoře v části **Zatím nenastaveno**, každá
-s odkazem na nastavení.
+- **Home Assistant (MQTT)**: posílá stav a ovládání Gleanvoltu do Home Assistantu přes MQTT broker.
+  **Používaná témata** (sbalená) vypisují všechna témata. Viz [Home Assistant](../home-assistant/).
 
-## Stav
+  ![Sekce Home Assistant (MQTT): přepínač, adresa a port brokeru, uživatelské jméno, prefix discovery a heslo, s tlačítkem pro vyzkoušení připojení.](../../../../assets/screenshots/settings-integrations.png)
 
-Záložka **Stav** ukazuje, zda Gleanvolt běží správně, a umožňuje ho restartovat nebo zastavit.
+- **Telemetrie vozidla**: k čemu je přihlášený MQTT zdroj auta. Zapíná se i s tématem na stránce **Auto**.
+- **Přístup k API**: REST API pro skripty, dashboardy a AI asistenty. Ukazuje adresu API a jeho klíče,
+  jeden pro každý program; **Volání** (sbalené) dává příkaz, kterým API vyzkoušíte.
 
-![Záložka Stav: verze, časové pásmo, poslední čtení ze zařízení, režim nabíjení, kde jsou uložená hesla, a tlačítka Zastavit službu a Restartovat.](../../../../assets/screenshots/settings-health.png)
+## Systém
+
+Zda Gleanvolt běží správně, restart a vaše heslo.
+
+![Záložka Systém: verze, časové pásmo, poslední čtení ze zařízení, režim nabíjení, kde jsou uložená hesla, tlačítka Zastavit službu a Restartovat a změna hesla.](../../../../assets/screenshots/settings-system.png)
 
 - **Poslední čtení**: kdy Gleanvolt naposledy přečetl střídač a nabíječku. Mělo by to být před pár
   sekundami.
@@ -76,8 +92,10 @@ Záložka **Stav** ukazuje, zda Gleanvolt běží správně, a umožňuje ho res
 - **Zastavit službu**: bezpečně Gleanvolt zastaví. Nejdřív pozastaví nabíječku a uloží probíhající
   nabíjení. **Sám se už nevrátí**: musíte ho spustit na počítači, na kterém běží, nebo ten počítač
   restartovat.
+- **Heslo**: heslo ke stránce Gleanvoltu. Dostanete nový klíč pro obnovení a všechny prohlížeče se
+  odhlásí.
 
-Obě tlačítka chtějí potvrzení. Stisknout je může každý, kdo otevře stránku Gleanvoltu a zná heslo.
+Obě tlačítka služby chtějí potvrzení. Stisknout je může každý, kdo otevře stránku Gleanvoltu a zná heslo.
 
 ## Auto
 

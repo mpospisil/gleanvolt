@@ -37,8 +37,8 @@ the same way the MCP server does. It needs no broker, and it adds no capability 
 it does, the web UI and the API already do. The [user manual](https://mpospisil.github.io/gleanvolt/latest/en/setting-up/home-assistant/)
 walks through the setup with pictures.
 
-1. **A key.** On **Settings → Installation → API access**, switch the API on, create a key named
-   `home-assistant`, and **Restart** on **Settings → Health**. The key's name is what the log and each
+1. **A key.** On **Settings → Integrations → API access**, switch the API on, create a key named
+   `home-assistant`, and **Restart** on **Settings → System**. The key's name is what the log and each
    session record as the source of an action: *"API (home-assistant) started Targeted"*.
 2. **Install it.** On Home Assistant 2026.11 and later, open **Settings → Marketplace → Add from
    link**, enter `mpospisil/gleanvolt-ha` (type *Integration*), install **Gleanvolt**, and restart Home
@@ -107,9 +107,9 @@ the tariff table, Solcast, the setup wizard and **Stop service** stay in the web
 This and the next section are the MQTT way. Home Assistant and its broker stay where they are — on another machine, or on this one outside the
 Docker stack — and the controller connects to the broker.
 
-**In the web UI**, on **Settings → Installation → Home Assistant (MQTT)**: switch it on, and enter the broker's address and port, the user name and the password.
+**In the web UI**, on **Settings → Integrations → Home Assistant (MQTT)**: switch it on, and enter the broker's address and port, the user name and the password.
 **Test connection** checks the broker before you save. The installation needs an id (`Pv:Id`, on the
-same page); the form says so if it is missing. Then **Restart** on **Settings → Health**. The entities
+same page); the form says so if it is missing. Then **Restart** on **Settings → System**. The entities
 appear in Home Assistant through its MQTT integration's discovery.
 
 **Optionally, in `/opt/gleanvolt/.env`** instead — what is saved in the web UI wins over it:
@@ -269,8 +269,8 @@ to another machine and [connect to it there](#to-a-home-assistant-you-already-ru
 
 **Nothing connects to the broker.** `docker compose logs mosquitto` shows the rejected connections.
 Almost always the password file and `MQTT_USERNAME`/`MQTT_PASSWORD` disagreeing, or the file not
-being readable by uid 1883. `/pv-system` in the web UI shows what the controller is dialling and as
-whom — including the client id to search the broker's log for — so the two sides can be compared
+being readable by uid 1883. **Settings → Integrations** shows what the controller is dialling — the
+client id to search the broker's log for is under **Topics in use** — so the two sides can be compared
 without an ssh session.
 
 **Port 8123 or 1883 is already in use.** Something else on the Pi — usually a Home Assistant or
@@ -279,8 +279,7 @@ Mosquitto you already run — has it. Use that one instead:
 
 ## Settings (the `HomeAssistant` section)
 
-Disabled by default. **In the web UI**, on **Settings → Installation → Home Assistant (MQTT)** or in
-the wizard's **Extras** step: on/off, the broker's address and port, the user name, the password and the
+Disabled by default. **In the web UI**, on **Settings → Integrations → Home Assistant (MQTT)**: on/off, the broker's address and port, the user name, the password and the
 discovery prefix. They apply on the next start. **Test connection** connects once with what the form
 holds, without disturbing the running link. The same page shows what the controller is publishing and
 where, including the topic prefix; the password is shown only behind a login.

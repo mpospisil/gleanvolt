@@ -158,7 +158,7 @@ holds:
 | `dotnet run` | `src/Gleanvolt.Worker/data` | mode `0600`; gitignored |
 
 **This is file permissions, not encryption** — the service has to start unattended after a reboot, so
-it must be able to read its own secrets. The startup log and **Settings → Health** say which protection
+it must be able to read its own secrets. The startup log and **Settings → System** say which protection
 is in use. Against a stolen SD card, use full-disk encryption on the host.
 
 **Back the directory up accordingly**: onto an encrypted volume, and never into an issue attachment or a
@@ -181,7 +181,7 @@ as usual.
 them from your installation, since the forecast is only as good as they are. The saved site has a
 **resource id**; your **API key** is in your account settings.
 
-**On the web UI:** **Settings → Installation → Solar forecast** — paste the API key and the rooftop
+**On the web UI:** **Settings → Forecast & prices → Solar forecast** — paste the API key and the rooftop
 site's resource id and press **Save and fetch**. It is used from that fetch on, with no restart, and the
 status line says what Solcast made of it: a refused key, an unknown site, a spent quota. A refused key
 or unknown site is not retried until the account changes, so a typo does not burn the day's calls. The
@@ -201,8 +201,8 @@ The API key is a secret: `Solcast__ApiKey` (`SOLCAST_API_KEY` in `deploy/.env`),
 `appsettings.json`.
 
 `SolarForecast:Source` chooses where the forecast comes from: `solcast`, the default, or `external`,
-a [provider](PROVIDERS.md#the-solar-forecast-kind) that publishes to Gleanvolt. **Settings → Solar
-forecast** sets it, at once and for the next start (saved in `pv-system.json`). While `external` is
+a [provider](PROVIDERS.md#the-solar-forecast-kind) that publishes to Gleanvolt. **Settings → Forecast & prices →
+Solar forecast** sets it, at once and for the next start (saved in `pv-system.json`). While `external` is
 selected, Solcast is not called.
 
 With no account, the controller logs a warning and runs without a forecast. The free hobbyist tier
@@ -217,7 +217,7 @@ read against its day. Gleanvolt calls no weather service itself (#425): an
 with a key entered on its own page. Gleanvolt gives the provider the site's
 [coordinates](#the-pv-system-the-pv-section).
 
-**Where it comes from: `Weather:Source`** (#424), chosen under **Settings → Installation → Weather**, in
+**Where it comes from: `Weather:Source`** (#424), chosen under **Settings → Forecast & prices → Weather**, in
 the setup wizard's Extras step, or with `gleanvolt setup`. A choice applies at once and is saved in
 `pv-system.json` for the next start.
 
@@ -243,7 +243,7 @@ after the upgrade, an installation that used it (that source chosen, or a key wi
 - gets `Weather:Source` = `External`, saved in `pv-system.json`;
 - has the key Settings kept deleted from the secret store. It is not handed to the plugin, which keeps
   its own;
-- logs one warning, and shows a notice under **Settings → Weather**, until a weather provider connects.
+- logs one warning, and shows a notice under **Settings → Forecast & prices → Weather**, until a weather provider connects.
 
 `Weather__ApiKey` (`WEATHER_API_KEY`) is used for nothing but that recognition; while it is set, each
 start logs a warning asking for it to move to `OPENWEATHER_API_KEY`. The Pi's compose file still passes
@@ -262,7 +262,7 @@ tariff only** option of [`FastNoBattery`](MODE_FAST_NO_BATTERY.md#fastnobattery-
 [`SolarGrid`](MODE_SOLAR_GRID.md#solargrid-on-low-tariff-only), which wait for low tariff before buying
 from the grid.
 
-It is set up on **Settings → Installation**, under *Tariff*. A save applies at once. Like the rest of
+It is set up on **Settings → Forecast & prices**, under *Tariff*. A save applies at once. Like the rest of
 Settings it is read-only until the UI has a login.
 
 **The provider** — where the low-tariff times come from:

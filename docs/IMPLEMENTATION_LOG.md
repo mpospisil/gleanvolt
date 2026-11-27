@@ -4,6 +4,53 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-27 — Settings in five tabs, each fact said once
+
+**Why.** The Installation tab had grown into about ten large sections: the installation, charger, forecast,
+weather, tariff, password, the MQTT form and a read-only description of MQTT, the API form and a read-only
+description of the API. The API keys were listed twice, the broker was shown twice, the read-only blocks still told
+the owner to set `HomeAssistant__Enabled` and `Api__Keys__…` in `.env` though the form above did it, three forms each
+carried a restart banner, and the optional-settings list was on two tabs. Settings is used once, at setup, and rarely
+revisited, so it is now organised by what a thing is. Design:
+`docs/superpowers/specs/2026-11-27-settings-reorganization-design.md`.
+
+**What.**
+- Five tabs, in the order an installation is set up: **Installation** (`/settings`, also `/pv-system`), **External
+  providers** (`/settings/providers`), **Forecast & prices** (`/settings/forecast-prices`: Solcast, weather,
+  tariff; a planned energy-price provider goes here too), **Integrations** (`/settings/integrations`: Home Assistant,
+  car telemetry, API) and **System** (`/settings/system`, also `/settings/health` and `/health`: the old Health tab plus
+  the password). Each tab saves one way: Forecast & prices at once, Installation and Integrations after a restart.
+- The read-only MQTT and API blocks merged into their forms. Home Assistant keeps, folded under **Topics in use**,
+  the client id, device id, topic prefix, status interval and the topic table; the retiring notice stays in view.
+  Car telemetry is a section of its own (`VehicleTelemetrySection`), pointing to the Car page where it is turned on.
+  The API form shows the base URL and OpenAPI link, has the only keys table, and folds the `curl` example, which
+  uses the first listed key when signed in and `<key>` otherwise. Every "set … in `.env`" sentence for something
+  a form does is gone.
+- `RestartPendingBanner`: one banner per restart-to-apply tab. Integrations counts both forms through
+  `IntegrationSettings.MqttPendingCount` and `ApiPendingCount`, refreshed by each form's `OnSaved`.
+- The installation form folds the id, commissioning date, loss factor, battery charge efficiency, unmetered grid
+  phase and register snapshot under **Advanced** on Settings only (the wizard passes `Sections` and is unfolded).
+  It opens by itself on a pending advanced field or a refused save; not on a merely edited one, or it would stay
+  open for ever.
+- The optional-settings list is on Installation only, with the solar forecast marked *recommended*. Every link
+  (optional list, `NotConfiguredCard`, External providers rows, the plan's "no tariff yet", Forecast) points at the
+  new tab; restart links say "Restart on System".
+
+**Not changed.** What any setting saves, where, or how it is validated. `ApiDisplayOptions.Keys` is no longer read by
+the UI but the host still composes it; removing it is a follow-up.
+
+**Files.** `Components/Pages/{PvSystem,ForecastPrices,Integrations,Health}.razor`, `SettingsTab(s)`,
+`RestartPendingBanner.razor`, `VehicleTelemetrySection.razor`, `MqttEditorForm.razor`, `ApiEditorForm.razor`,
+`PvSystemEditorForm.razor`, `OptionalChecklist.razor`, `OptionalSettings.cs`, link fixes in `ExternalProvidersForm`,
+`Plan/TargetedTab`, `Plan/LowTariffOption`, `Pages/Forecast`, `Pages/Wizard`; `Core/Models/IntegrationSettings.cs`;
+`SettingsText`, `SharedText`, `SetupText` resx (en + cs); web tests; the screenshot fixture; the manual's
+`setting-up/*`, `troubleshooting`, `how-it-works/unmetered-phase` (en + cs) and regenerated `settings-*` pictures
+(`settings-health` → `settings-system`, new `settings-integrations`); `WEB_UI.md`, `CONFIGURATION.md`,
+`TROUBLESHOOTING.md`, `HOME_ASSISTANT.md`. The manual also lost mentions of wizard steps (Extras, Forecast) that no
+longer exist.
+
+---
+
 ## 2026-11-27 — Stop and restart no longer sit out the 30 s shutdown timeout
 
 **Found.** In a test on a PC with the SolaX charger plugin, every restart from the web UI took exactly 30 s, and each
