@@ -4,6 +4,17 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-27 — Integrations: the API first
+
+The owner ranks the REST API above MQTT: it is how Gleanvolt's own Home Assistant integration and other programs
+connect, while MQTT is the alternative for a home that already runs a broker. **Settings → Integrations** now shows
+**API access** first, then **Home Assistant (MQTT)** and **Vehicle telemetry**. Only the order changed; a test pins it.
+
+**Files.** `Components/Pages/Integrations.razor`, `PvSystemPageTests.cs`, the manual's `setting-up/settings` (en + cs,
+with the API picture now under its item), `WEB_UI.md`.
+
+---
+
 ## 2026-11-27 — Settings in five tabs, each fact said once
 
 **Why.** The Installation tab had grown into about ten large sections: the installation, charger, forecast,

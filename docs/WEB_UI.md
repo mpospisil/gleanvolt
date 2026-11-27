@@ -117,7 +117,7 @@ set it up.
 | **Settings → Installation** (`/settings`) | The PV system and its devices (expert fields under **Advanced**), and the charger. |
 | **Settings → External providers** (`/settings/providers`) | The plugins' token, pairing requests and each kind's session. |
 | **Settings → Forecast & prices** (`/settings/forecast-prices`) | Solcast, the weather and the grid tariff. Applies on save. |
-| **Settings → Integrations** (`/settings/integrations`) | The Home Assistant (MQTT) link, the car's MQTT telemetry and the API. Applies after a restart. |
+| **Settings → Integrations** (`/settings/integrations`) | The API, then the Home Assistant (MQTT) link and the car's MQTT telemetry. Applies after a restart. |
 | **Settings → System** (`/settings/system`) | The running build, time zone and last poll; **Restart**, **Stop service** and the password. |
 
 `/pv-system` still opens Installation, and `/health` and `/settings/health` open System. The header and the browser tab carry the
