@@ -206,17 +206,11 @@
     <value>Both connections use the same broker, {0}. They are still two connections with two client ids, and either can be pointed elsewhere without affecting the other.</value>
   </data>
   <!-- API -->
-  <data name="Api" xml:space="preserve">
-    <value>API</value>
-  </data>
   <data name="ApiTopic" xml:space="preserve">
     <value>API</value>
   </data>
   <data name="ApiTip" xml:space="preserve">
     <value>The address is built from the one this page was loaded from, not from {0}: with a hostname or reverse proxy in front, the configured port may not be the one that works, while this page's address clearly does. Both links answer without a key on purpose — a browser cannot send one, and neither allows any action — so opening either is the quickest way to check the API is up.</value>
-  </data>
-  <data name="ApiOff" xml:space="preserve">
-    <value>Off by default: no routes are mapped and no document is served, so there is nothing to find, not even a 401. Two endpoints write to hardware, so it must be turned on deliberately — with {0} and at least one key, {1}. Turning it on without a key stops the controller from starting, rather than leaving control open.</value>
   </data>
   <data name="BaseUrl" xml:space="preserve">
     <value>Base URL</value>
@@ -233,12 +227,6 @@
   <data name="Keys" xml:space="preserve">
     <value>Keys</value>
   </data>
-  <data name="ApiKeysTopic" xml:space="preserve">
-    <value>API keys</value>
-  </data>
-  <data name="ApiKeysTip" xml:space="preserve">
-    <value>The name is not a credential. It is written to the log and to the charging session as the source of an action, so a charge started through the API is recorded under the name that started it. That is why each client should have its own key.</value>
-  </data>
   <data name="Name" xml:space="preserve">
     <value>Name</value>
   </data>
@@ -248,14 +236,8 @@
   <data name="Configured" xml:space="preserve">
     <value>configured</value>
   </data>
-  <data name="KeysWithheld" xml:space="preserve">
-    <value>The keys are not shown, because this UI has no login: anyone who can reach it could read them, and a key gives the same power as the wallbox's stop button. Configure {0} ({1}) to show them here.</value>
-  </data>
   <data name="CallingIt" xml:space="preserve">
     <value>Calling it</value>
-  </data>
-  <data name="CallingTopic" xml:space="preserve">
-    <value>calling the API</value>
   </data>
   <data name="CallingTip" xml:space="preserve">
     <value>The first key, this installation's address, and the endpoint to try first. Every other endpoint uses the same base URL and header; the document above lists them.</value>

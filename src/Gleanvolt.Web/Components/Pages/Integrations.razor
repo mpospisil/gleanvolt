@@ -1,8 +1,6 @@
 @page "/settings/integrations"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@inject ApiDisplayOptions Api
-@inject NavigationManager Nav
 @inject IIntegrationsEditor Editor
 
 @*
@@ -26,142 +24,11 @@
 
 <ApiEditorForm OnSaved="Recount" />
 
-<div class="section-head tip-head">
-    <h2>@SettingsText.Api</h2>
-    @if (Api.Enabled)
-    {
-        <InfoTip Topic="@SettingsText.ApiTopic" Group="settings-info" Wide="true">
-            <p>
-                @Localized.Rich(SettingsText.ApiTip, @<code>Web:Port</code>)
-            </p>
-        </InfoTip>
-    }
-</div>
-
-@*
-    The third control surface (issue #142), and the one whose whole configuration lives in a file on
-    the Pi. Turning it on is a line in .env and a key from `openssl rand -hex 32`; after that the only
-    confirmation it worked is a line in the startup log, and the only place the key exists is that
-    file. Anyone pointing an MCP server, a script or a dashboard at this installation needs exactly two
-    things -- the base URL and a key -- and used to get them by ssh'ing to the Pi and grepping .env.
-
-    Read-only for the same reason as everything above: ApiOptions is bound once at startup, the
-    keyless-API check has already refused what could not be honoured, and the routes are mapped -- or
-    not mapped -- from it. A control that generated a key here would be editing a copy of a settled
-    decision.
-*@
-
-@if (!Api.Enabled)
-{
-    <p class="muted" id="api-off">
-        @Localized.Rich(SettingsText.ApiOff, @<code>Api__Enabled=true</code>, @<code>Api__Keys__&lt;name&gt;=$(openssl rand -hex 32)</code>)
-    </p>
-}
-else
-{
-    <dl class="facts">
-        <dt>@SettingsText.BaseUrl</dt>
-        <dd>
-            <code>@_api.BaseUrl</code>
-            @if (_api.PortIsImplicit)
-            {
-                <span class="muted">
-                    @Localized.Rich(SettingsText.DefaultPort, @<code>host:@Api.Port</code>)
-                </span>
-            }
-        </dd>
-
-        <dt>@SettingsText.Index</dt>
-        <dd><a href="@_api.BaseUrl">@Api.BasePath</a></dd>
-
-        <dt>@SettingsText.OpenApiDocument</dt>
-        <dd><a href="@_api.DocumentUrl">@Api.DocumentPath</a></dd>
-    </dl>
-
-    <div class="section-head tip-head minor">
-        <h3>@SettingsText.Keys</h3>
-        <InfoTip Topic="@SettingsText.ApiKeysTopic" Group="settings-info" Wide="true">
-            <p>
-                @SettingsText.ApiKeysTip
-            </p>
-        </InfoTip>
-    </div>
-
-    <table class="sessions">
-        <thead>
-            <tr>
-                <th>@SettingsText.Name</th>
-                <th>@SettingsText.Key</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var key in Api.Keys)
-            {
-                <tr>
-                    <td><code>@key.Name</code></td>
-                    <td>
-                        @if (key.Secret is { } secret)
-                        {
-                            <Secret Value="@secret" />
-                        }
-                        else
-                        {
-                            <span class="muted">@SettingsText.Configured</span>
-                        }
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-
-    @if (Api.SecretsWithheld)
-    {
-        <p class="table-note muted" id="api-keys-withheld">
-            @Localized.Rich(SettingsText.KeysWithheld, @<code>Web__PasswordHash</code>, @<code>hash-password</code>)
-        </p>
-    }
-
-    <div class="section-head tip-head minor">
-        <h3>@SettingsText.CallingIt</h3>
-        <InfoTip Topic="@SettingsText.CallingTopic" Group="settings-info" Wide="true">
-            <p>
-                @SettingsText.CallingTip
-            </p>
-        </InfoTip>
-    </div>
-
-    <p class="code-line">
-        @if (Api.Keys[0].Secret is { } example)
-        {
-            <Secret Value="@example" Before="@CurlPrefix" After="@CurlSuffix" />
-        }
-        else
-        {
-            <code>@CurlPrefix&lt;@SettingsText.KeyPlaceholder&gt;@CurlSuffix</code>
-        }
-    </p>
-
-}
-
 @code {
-    // The example call the section exists to serve, split around the key so the secret can be masked
-    // inside it while Copy still hands over the whole command.
-    private const string CurlPrefix = "curl -H \"Authorization: Bearer ";
-
-    private string CurlSuffix => $"\" {_api.BaseUrl}/status";
-
-    // Where the API is, as seen from the browser that fetched this page -- resolved once, since the
-    // address cannot change under a rendered page.
-    private ApiAddressDisplay _api = new(string.Empty, string.Empty, PortIsImplicit: true);
-
     // Saved changes of both forms the running process does not have yet: one banner for the tab.
     private int _pending;
 
-    protected override void OnInitialized()
-    {
-        _api = Api.AddressFrom(Nav.BaseUri);
-        Recount();
-    }
+    protected override void OnInitialized() => Recount();
 
     private void Recount()
     {

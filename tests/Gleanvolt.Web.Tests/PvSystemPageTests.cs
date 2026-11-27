@@ -512,31 +512,38 @@ public class PvSystemPageTests : BunitContext
 
     // -- The API (#142).
 
-    [Fact]
-    public void Says_plainly_when_the_api_is_off()
+    /// <summary>The form's editor with the given keys, as saved here.</summary>
+    private static FakeIntegrationsEditor WithKeys(params (string Name, string Key)[] keys)
     {
-        // Off is the default, so it must read as a deliberate one -- and say what turns it on, keys
-        // included, since enabled without a key does not start at all.
+        var editor = new FakeIntegrationsEditor();
+        editor.Keys.AddRange(keys.Select(key => new ApiKeyEntry(key.Name, key.Key, SettingSource.SecretStore, IsPending: false)));
+        return editor;
+    }
+
+    [Fact]
+    public void With_the_api_off_shows_no_address_and_no_example()
+    {
+        // The form's checkbox says it is off; nothing describes a surface that is not there, and nothing
+        // tells the owner to edit .env for what the checkbox does.
         var page = RenderIntegrations();
 
-        var off = page.Find("#api-off").TextContent;
-        Assert.Contains("Api__Enabled=true", off);
-        Assert.Contains("openssl rand -hex 32", off);
-
-        // And nothing else: no key table and no example call to a surface that is not there.
-        Assert.Empty(page.FindAll("p.code-line"));
+        Assert.Empty(page.FindAll("#api-example"));
+        Assert.Empty(page.FindAll("#api-off"));
         Assert.DoesNotContain("openapi.json", page.Markup);
+        Assert.DoesNotContain("Api__Enabled", page.Markup);
     }
 
     [Fact]
     public void Shows_where_the_api_is_and_links_to_what_answers_without_a_key()
     {
-        var page = RenderIntegrations(api: Api(new ApiKeyDisplay("client", null)));
+        var page = RenderIntegrations(api: Api());
+
+        var form = page.Find("#api-editor");
 
         // Absolute, built from the address the browser used -- bUnit's is http://localhost/.
-        Assert.Contains("http://localhost/api/v1", page.Markup);
+        Assert.Contains("http://localhost/api/v1", form.TextContent);
 
-        var links = page.FindAll("a").Select(link => link.GetAttribute("href")).ToList();
+        var links = form.QuerySelectorAll("a").Select(link => link.GetAttribute("href")).ToList();
         Assert.Contains("http://localhost/api/v1", links);
         Assert.Contains("http://localhost/api/v1/openapi.json", links);
     }
@@ -546,61 +553,59 @@ public class PvSystemPageTests : BunitContext
     {
         // A proxy answering on 80 leaves no port in the URL, and the direct LAN address is still
         // host:8090. bUnit's base URI has no port, which is exactly that case.
-        var page = RenderIntegrations(api: Api(new ApiKeyDisplay("client", null)));
+        var page = RenderIntegrations(api: Api());
 
-        Assert.Contains("host:8090", page.Markup);
+        Assert.Contains("host:8090", page.Find("#api-editor").TextContent);
     }
 
     [Fact]
-    public void Lists_every_key_by_name()
+    public void One_keys_table()
     {
-        // The name is the column that earns its place: it is what the log and the recorded session
-        // attribute an action to.
-        var page = RenderIntegrations(api: Api(
-            new ApiKeyDisplay("claude-mcp", null),
-            new ApiKeyDisplay("dashboard", null)));
+        var page = RenderIn<Integrations>(this, api: Api(), integrations: WithKeys(("claude-mcp", "k1"), ("dashboard", "k2")));
 
-        Assert.Contains("claude-mcp", page.Markup);
-        Assert.Contains("dashboard", page.Markup);
+        var table = Assert.Single(page.FindAll("table"), table => table.QuerySelector("th")?.TextContent == "Name"
+            && table.TextContent.Contains("claude-mcp"));
+        Assert.Contains("dashboard", table.TextContent);
+        Assert.NotNull(table.Closest("#api-editor"));
     }
 
     [Fact]
     public void No_api_key_reaches_an_unauthenticated_page()
     {
-        // The host withholds the secret when no login is enforced. Nothing secret may be in the markup
-        // at all -- not masked, not in an attribute, not in the example call.
-        var page = RenderIntegrations(api: Api(new ApiKeyDisplay("client", null)));
+        // Signed out, nothing secret may be in the markup at all -- not masked, not in an attribute, not
+        // in the example call.
+        var page = RenderIn<Integrations>(this, api: Api(), integrations: WithKeys(("client", "a-real-key")));
 
         Assert.DoesNotContain("a-real-key", page.Markup);
-        Assert.Contains("Web__PasswordHash", page.Find("#api-keys-withheld").TextContent);
-        Assert.Empty(page.FindAll("button"));
+        Assert.Contains("Web__PasswordHash", page.Find("#api-readonly").TextContent);
 
         // The example call still has to be useful, so the key is a placeholder rather than absent.
-        Assert.Contains("Bearer &lt;key&gt;", page.Markup);
+        Assert.Contains("Bearer &lt;key&gt;", page.Find("#api-example").InnerHtml);
     }
 
     [Fact]
     public void An_api_key_renders_masked_until_it_is_asked_for()
     {
-        var page = RenderIntegrations(api: Api(new ApiKeyDisplay("client", "a-real-key")));
+        var page = RenderIn<Integrations>(this, api: Api(), integrations: WithKeys(("client", "a-real-key")), signedIn: true);
 
         Assert.DoesNotContain("a-real-key", page.Markup);
-        Assert.Contains("•", page.Markup);
-        Assert.Empty(page.FindAll("#api-keys-withheld"));
 
-        page.FindAll("button").First(button => button.TextContent == "Reveal").Click();
+        page.Find("#api-keys").QuerySelectorAll("button").First(button => button.TextContent == "Reveal").Click();
 
-        Assert.Contains("a-real-key", page.Markup);
+        Assert.Contains("a-real-key", page.Find("#api-keys").TextContent);
     }
 
     [Fact]
     public void The_example_call_carries_this_installations_own_address()
     {
-        // The task the section exists to serve: a line that can be pasted into a terminal on another
-        // machine and work, rather than one with placeholders to fill in.
-        var page = RenderIntegrations(api: Api(new ApiKeyDisplay("client", "a-real-key")));
+        // A line that can be pasted into a terminal on another machine and work, folded until wanted.
+        var page = RenderIn<Integrations>(this, api: Api(), integrations: WithKeys(("client", "a-real-key")), signedIn: true);
 
-        var call = page.Find("p.code-line").TextContent;
+        var example = page.Find("#api-example");
+        Assert.Equal("details", example.TagName, ignoreCase: true);
+        Assert.False(example.HasAttribute("open"));
+
+        var call = example.QuerySelector("p.code-line")!.TextContent;
         Assert.Contains("curl -H \"Authorization: Bearer", call);
         Assert.Contains("http://localhost/api/v1/status", call);
 
@@ -631,7 +636,7 @@ public class PvSystemPageTests : BunitContext
     {
         var page = PseudoLocale.Render(() => RenderIntegrations(
             mqtt: Mqtt(homeAssistant: Link(), vehicle: Link(), batteryHold: true, retiredDeviceIds: ["solax_old"]),
-            api: Api(new ApiKeyDisplay("home-assistant", null))));
+            api: Api()));
 
         // Only the configuration's own values: host names, ids, topic paths and the example command.
         PseudoLocale.AssertTranslated(

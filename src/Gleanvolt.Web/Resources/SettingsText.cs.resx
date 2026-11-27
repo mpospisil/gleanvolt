@@ -201,17 +201,11 @@
   <data name="OneBroker" xml:space="preserve">
     <value>Obě spojení používají stejný broker {0}. Stále jsou to dvě připojení se dvěma ID klienta a každé lze nasměrovat jinam bez vlivu na druhé.</value>
   </data>
-  <data name="Api" xml:space="preserve">
-    <value>API</value>
-  </data>
   <data name="ApiTopic" xml:space="preserve">
     <value>API</value>
   </data>
   <data name="ApiTip" xml:space="preserve">
     <value>Adresa je sestavená podle adresy, přes kterou se načetla tato stránka, ne podle {0}. Pokud je před aplikací název hostitele nebo reverzní proxy, nastavený port nemusí být ten správný, zatímco adresa této stránky prokazatelně funguje. Oba odkazy záměrně odpovídají bez klíče — prohlížeč ho poslat neumí a žádný z nich neumožňuje nic ovládat. Otevřít kterýkoli je proto nejrychlejší způsob, jak ověřit, že API běží.</value>
-  </data>
-  <data name="ApiOff" xml:space="preserve">
-    <value>Vypnuto (výchozí stav): žádné cesty nejsou zaregistrované a žádný dokument se neposkytuje, takže není co najít — API neodpovídá ani chybou 401. Dva koncové body zapisují do hardwaru, proto se API zapíná vědomě — pomocí {0} a aspoň jednoho klíče, {1}. Zapnuté API bez klíče způsobí chybu při startu, nikoli otevřené řízení.</value>
   </data>
   <data name="BaseUrl" xml:space="preserve">
     <value>Základní URL</value>
@@ -228,12 +222,6 @@
   <data name="Keys" xml:space="preserve">
     <value>Klíče</value>
   </data>
-  <data name="ApiKeysTopic" xml:space="preserve">
-    <value>klíče API</value>
-  </data>
-  <data name="ApiKeysTip" xml:space="preserve">
-    <value>Název není přihlašovací údaj. Zapisuje se do logu a do záznamu nabíjení jako původce akce, takže nabíjení spuštěné přes API se přiřadí názvu klíče, ne anonymnímu volání. Právě proto má mít každý klient vlastní klíč.</value>
-  </data>
   <data name="Name" xml:space="preserve">
     <value>Název</value>
   </data>
@@ -243,14 +231,8 @@
   <data name="Configured" xml:space="preserve">
     <value>nastaven</value>
   </data>
-  <data name="KeysWithheld" xml:space="preserve">
-    <value>Samotné klíče se nezobrazují, protože toto rozhraní nemá přihlášení: přečíst by je mohl kdokoli, kdo se k němu dostane, a klíč dává stejnou moc jako tlačítko stop na wallboxu. Chcete-li je zobrazit, nastavte {0} ({1}).</value>
-  </data>
   <data name="CallingIt" xml:space="preserve">
     <value>Volání</value>
-  </data>
-  <data name="CallingTopic" xml:space="preserve">
-    <value>volání API</value>
   </data>
   <data name="CallingTip" xml:space="preserve">
     <value>První klíč, adresa této instalace a koncový bod, který stojí za to vyzkoušet jako první. Všechny ostatní jsou na stejné základní URL a používají stejnou hlavičku; jejich seznam je v dokumentu výše.</value>
