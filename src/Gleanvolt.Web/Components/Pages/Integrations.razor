@@ -4,8 +4,9 @@
 @inject IIntegrationsEditor Editor
 
 @*
-    Settings: the links to other systems (2026-11-27) -- Home Assistant over MQTT, the car's telemetry
-    over MQTT, and the REST API. Each is read once at startup, so a save here is for the next start.
+    Settings: the links to other systems (2026-11-27) -- the REST API first, the way Home Assistant's own
+    integration and other programs connect, then Home Assistant over MQTT and the car's telemetry over
+    MQTT. Each is read once at startup, so a save here is for the next start.
 *@
 
 <SiteTitle Page="@SettingsText.IntegrationsPageTitle" />
@@ -18,11 +19,11 @@
 
 <RestartPendingBanner Count="_pending" Id="integrations-pending" />
 
+<ApiEditorForm OnSaved="Recount" />
+
 <MqttEditorForm OnSaved="Recount" />
 
 <VehicleTelemetrySection />
-
-<ApiEditorForm OnSaved="Recount" />
 
 @code {
     // Saved changes of both forms the running process does not have yet: one banner for the tab.

@@ -286,6 +286,18 @@ public class PvSystemPageTests : BunitContext
     }
 
     [Fact]
+    public void The_api_comes_first_then_home_assistant_then_car_telemetry()
+    {
+        var markup = RenderIntegrations().Markup;
+
+        var api = markup.IndexOf("id=\"api-editor\"", StringComparison.Ordinal);
+        var mqtt = markup.IndexOf("id=\"mqtt-editor\"", StringComparison.Ordinal);
+        var telemetry = markup.IndexOf("id=\"vehicle-telemetry\"", StringComparison.Ordinal);
+
+        Assert.True(api >= 0 && api < mqtt && mqtt < telemetry, $"api {api}, mqtt {mqtt}, telemetry {telemetry}");
+    }
+
+    [Fact]
     public void Integrations_holds_home_assistant_and_the_api()
     {
         var page = RenderIntegrations();
