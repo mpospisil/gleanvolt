@@ -715,6 +715,32 @@ The feed's health, as the Overview, Health and **Car feed** show it:
 
 There is no fallback to another feed while the provider is away.
 
+### A car plugin on `Gleanvolt.Cars.Hosting`
+
+A car plugin in its own repository (#473) references **`Gleanvolt.Cars.Hosting`** (MIT, on nuget.org with the
+SDK), the car's layer on the shared plugin host. It brings the start before Gleanvolt, pairing, the guarded page and
+the saved settings, and adds:
+
+- **`PluginCar`**, which the plugin extends with one method, `FetchAsync(car, cancellationToken)`: read the car from
+  its maker and return a `VehicleReading`, or null when there is nothing new. Around it, however many reasons to
+  read arrive at once (Gleanvolt's refresh, a session opening, Read now), the maker is asked once, and never sooner
+  than `MinimumTimeBetweenReads` after the last time. A failure reports `unreachable` and the next read may heal it;
+  override `OnFetchFailed` to do otherwise. While the owner is needed, `Block(words, code)` (`needs-sign-in`,
+  `needs-code`, `not-set-up`) stops every request until the page calls `Resume()`.
+- **The clock** (`CarPoller`): a read at start, then every `PollInterval` (5 min) while Gleanvolt has a session open
+  or the car says it is charging, every `IdlePollInterval` (15 min) otherwise, and at once when a session opens or
+  the owner presses Read now. Without Gleanvolt it still reads, so the page shows the car before the owner accepts
+  the plugin. The three intervals are `<Section>:PollInterval`, `<Section>:IdlePollInterval` and
+  `<Section>:MinimumTimeBetweenReads`.
+- **`CarFrame`**, the page: the status, Gleanvolt's car and whether it is charging, the last reading and Read now,
+  then the plugin's own `ChildContent` and `Settings` (the account, the sign-in).
+- **`CarPluginHost.CreateBuilder<TCar>(args, plugin)`** and **`Build`**, as `PluginHost` is for chargers.
+
+There is no recording for testers, unlike the chargers': a car's service is a cloud account, and a recording would
+hold its VIN and the owner's details. `Gleanvolt.Providers.Testing` has **`VehicleTestHub`** (it welcomes with the car
+and the session, asks for readings, changes the car or the session, and refuses a reading as Gleanvolt would) and
+**`CarPluginHarness`**, to test a car plugin without Gleanvolt or the maker.
+
 ## The weather kind
 
 Hub: `/providers/weather`. A program outside Gleanvolt reads the weather at the site and publishes it.
