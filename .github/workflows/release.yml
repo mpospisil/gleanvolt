@@ -178,7 +178,7 @@ jobs:
       - name: Pack the libraries
         run: |
           set -euo pipefail
-          for project in Gleanvolt.Modbus Gleanvolt.Devices.Abstractions Gleanvolt.Devices.Solax Gleanvolt.Devices.Huawei Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting Gleanvolt.Providers.Contracts Gleanvolt.Providers.Client Gleanvolt.Providers.Testing Gleanvolt.Providers.Server Gleanvolt.Chargers.Hosting; do
+          for project in Gleanvolt.Modbus Gleanvolt.Devices.Abstractions Gleanvolt.Devices.Solax Gleanvolt.Devices.Huawei Gleanvolt.Core Gleanvolt.Infrastructure Gleanvolt.Api Gleanvolt.Web Gleanvolt.Hosting Gleanvolt.Providers.Contracts Gleanvolt.Providers.Client Gleanvolt.Providers.Testing Gleanvolt.Providers.Server Gleanvolt.Plugins.Hosting Gleanvolt.Chargers.Hosting; do
             dotnet pack "src/$project/$project.csproj" --no-build --configuration Release \
               -p:BuildNumber=${{ needs.version.outputs.build }} \
               -p:SourceRevisionId=${{ github.sha }} \
@@ -597,7 +597,7 @@ jobs:
 
           # By name, like the zips and the .debs: a missing library is named, and a new packable
           # project fails here until it is added, rather than shipping a release short of it.
-          expected="Api Chargers.Hosting Core Devices.Abstractions Devices.Huawei Devices.Solax Hosting Infrastructure Modbus Providers.Client Providers.Contracts Providers.Server Providers.Testing Web"
+          expected="Api Chargers.Hosting Core Devices.Abstractions Devices.Huawei Devices.Solax Hosting Infrastructure Modbus Plugins.Hosting Providers.Client Providers.Contracts Providers.Server Providers.Testing Web"
           for package in $expected; do
             if [ ! -f "artifacts/Gleanvolt.${package}.${VERSION}.nupkg" ]; then
               echo "No Gleanvolt.${package}.${VERSION}.nupkg; the packable projects and this list disagree." >&2
@@ -740,7 +740,7 @@ jobs:
             echo
             echo "The \`.nupkg\` files are the libraries. The MIT ones a plugin is built on are also on nuget.org:"
             echo "\`Gleanvolt.Providers.Contracts\`, \`Gleanvolt.Providers.Client\`, \`Gleanvolt.Providers.Testing\`,"
-            echo "\`Gleanvolt.Chargers.Hosting\` and \`Gleanvolt.Modbus\`, at ${VERSION}."
+            echo "\`Gleanvolt.Plugins.Hosting\`, \`Gleanvolt.Chargers.Hosting\` and \`Gleanvolt.Modbus\`, at ${VERSION}."
             echo
             echo "## Verify your download"
             echo
@@ -815,7 +815,7 @@ jobs:
             exit 0
           fi
 
-          for package in Gleanvolt.Providers.Contracts Gleanvolt.Providers.Client Gleanvolt.Providers.Testing Gleanvolt.Chargers.Hosting Gleanvolt.Modbus; do
+          for package in Gleanvolt.Providers.Contracts Gleanvolt.Providers.Client Gleanvolt.Providers.Testing Gleanvolt.Plugins.Hosting Gleanvolt.Chargers.Hosting Gleanvolt.Modbus; do
             dotnet nuget push "artifacts/${package}.${VERSION}.nupkg" \
               --api-key "$NUGET_API_KEY" \
               --source https://api.nuget.org/v3/index.json \

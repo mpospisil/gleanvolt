@@ -126,7 +126,7 @@ Then, for each skill that changed:
 
 ## Publishing to nuget.org
 
-The five MIT packages go to nuget.org by **Trusted Publishing** (#439): no API key is stored anywhere. Set up
+The six MIT packages go to nuget.org by **Trusted Publishing** (#439): no API key is stored anywhere. Set up
 once, on nuget.org and on GitHub:
 
 1. On nuget.org, under your name → **Trusted Publishing**, add a policy owned by the account (or organization)
@@ -150,7 +150,7 @@ comes in those 7 days, restart the window on nuget.org.
 | `gleanvolt-<version>-linux-arm64.zip` | self-contained, ~46 MB — this is the Pi |
 | `gleanvolt_<version>_amd64.deb`, `gleanvolt_<version>_arm64.deb` | the same build as a systemd service for Debian, Ubuntu and Raspberry Pi OS (#205), ~50 MB each |
 | `install.sh` | the one-line Linux install; it finds the `.deb` by name in `SHA256SUMS`, so both names above are a contract — and so does the `gleanvolt-install` skill, which repeats those steps |
-| fifteen `.nupkg` and fifteen `.snupkg` | the libraries and their symbols: Api, Core, Hosting, Infrastructure, Web, the device packages Devices.Abstractions, Devices.Solax, Devices.Huawei, Devices.GoE, Providers.Server, and, under MIT, Providers.Contracts, Providers.Client, Providers.Testing, Chargers.Hosting (#443) and Modbus. The five MIT ones are also pushed to nuget.org (#439), after the release is created, by Trusted Publishing when the `NUGET_USER` variable is set (see below); the rest go to no feed |
+| sixteen `.nupkg` and sixteen `.snupkg` | the libraries and their symbols: Api, Core, Hosting, Infrastructure, Web, the device packages Devices.Abstractions, Devices.Solax, Devices.Huawei, Devices.GoE, Providers.Server, and, under MIT, Providers.Contracts, Providers.Client, Providers.Testing, Plugins.Hosting (#472), Chargers.Hosting (#443) and Modbus. The six MIT ones are also pushed to nuget.org (#439), after the release is created, by Trusted Publishing when the `NUGET_USER` variable is set (see below); the rest go to no feed |
 | `SHA256SUMS` | covers every file above, and not itself |
 
 Each zip, `.deb`, `install.sh` and `.nupkg` also carries a build provenance attestation, verifiable with
