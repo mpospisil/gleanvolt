@@ -144,16 +144,12 @@ The connection isn’t encrypted (plain HTTP), so use it only on a home network 
 <td>Your Solcast key and the site id you created at Solcast. Not your location</td>
 <td>A few times a day</td>
 </tr>
-<tr>
-<td><strong>Volkswagen, Škoda or the VW Group Data Act portal</strong> (car battery level)</td>
-<td>Your account’s sign-in, and your car’s VIN, to the car maker</td>
-<td>While reading the car</td>
-</tr>
 </tbody>
 </table>
-<p>Requests to your car’s maker go to them, under their privacy policy. Gleanvolt signs in as you, with the
-details you gave it, and keeps only the car’s battery level, range, plug and charge state, and when the
-car reported them. Your VIN isn’t stored in the history.</p>
+<p>Gleanvolt itself doesn’t contact your car’s maker. A car plugin does, if you run one: the Volkswagen, Škoda
+and VW Group plugins sign in as you, with the account you gave the plugin, under the maker’s privacy policy.
+Gleanvolt receives only the car’s battery level, range, plug and charge state, and when the car reported
+them. Your VIN isn’t stored in the history.</p>
 <p>Gleanvolt itself sends <strong>your home’s location</strong> nowhere outside your network.</p>
 <p>For the weather, Gleanvolt gives your home’s location to the weather program on your network, and that
 program decides where it goes: the OpenWeather plugin sends it, with your key, to OpenWeatherMap, at most
