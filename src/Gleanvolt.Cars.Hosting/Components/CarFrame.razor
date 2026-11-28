@@ -1,0 +1,172 @@
+@implements IDisposable
+@inject PluginInfo Plugin
+@inject PluginCar Car
+@inject CarPoller Poller
+@inject Gleanvolt.Providers.Client.Vehicle.VehicleProviderConnection Connection
+@inject Gleanvolt.Providers.Client.ProviderCredentials Credentials
+@inject TimeProvider Time
+
+@*
+    Every car plugin's page (#473): the status, the car Gleanvolt is configured for and whether it is charging, the
+    car's last reading with a button to read now, the plugin's own view of the car (ChildContent), and its own settings
+    (Settings: the account, the sign-in). Opening the page asks the car's maker nothing.
+*@
+
+<PageTitle>@Plugin.Name</PageTitle>
+
+<h1>@Plugin.Name</h1>
+
+<p id="status" class="@StatusClass">@StatusText</p>
+
+<section>
+    <h2>@HostText.Gleanvolt</h2>
+
+    @if (Connection.Car is { } car)
+    {
+        <dl id="car">
+            <dt>@CarText.GleanvoltCar</dt>
+            <dd>@CarName(car)</dd>
+        </dl>
+        <p id="session" class="muted">@SessionText</p>
+    }
+    else
+    {
+        <p class="muted" id="not-connected">@HostText.NotConnected</p>
+    }
+
+    @if (TokenSource is { } source)
+    {
+        <p class="muted" id="token-source">@source</p>
+    }
+</section>
+
+<section>
+    <h2>@CarText.Car</h2>
+
+    @if (Car.LastReading is { } reading)
+    {
+        <dl id="reading">
+            <dt>@CarText.Soc</dt>
+            <dd id="reading-soc">@(reading.SocPercent is { } soc ? soc.ToString("0.#", CultureInfo.CurrentCulture) + " %" : HostText.NotSaid.ToString())</dd>
+            <dt>@CarText.ChargeState</dt>
+            <dd id="reading-charge">@ChargeText(reading.ChargeState)</dd>
+            <dt>@CarText.Cable</dt>
+            <dd id="reading-plug">@PlugText(reading.PlugState)</dd>
+            <dt>@CarText.Range</dt>
+            <dd id="reading-range">@(reading.RangeMetres is { } range ? (range / 1000).ToString("0", CultureInfo.CurrentCulture) + " km" : HostText.NotSaid.ToString())</dd>
+            <dt>@CarText.TimeToFull</dt>
+            <dd id="reading-remaining">@(reading.ChargeTimeRemaining is { } left ? Hours(left) : HostText.NotSaid.ToString())</dd>
+            <dt>@CarText.CapturedAt</dt>
+            <dd id="reading-captured">@Local(reading.CapturedAt)</dd>
+            @if (Car.LastReadAt is { } readAt)
+            {
+                <dt>@HostText.Read</dt>
+                <dd id="reading-read">@Local(readAt)</dd>
+            }
+        </dl>
+    }
+    else
+    {
+        <p class="muted" id="reading-none">@HostText.NoReadingYet</p>
+    }
+
+    <p><button type="button" id="read-now" disabled="@Car.IsBlocked" @onclick="Poller.Wake">@CarText.ReadNow</button></p>
+
+    @ChildContent
+</section>
+
+@Settings
+
+@code {
+    /// <summary>The plugin's own view of the car, under the reading.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>The plugin's own settings as sections of their own: the account, the sign-in, the car's VIN.</summary>
+    [Parameter] public RenderFragment? Settings { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Car.Changed += Refresh;
+        Connection.Welcomed += OnWelcomed;
+        Connection.SessionChanged += OnSessionChanged;
+    }
+
+    public void Dispose()
+    {
+        Car.Changed -= Refresh;
+        Connection.Welcomed -= OnWelcomed;
+        Connection.SessionChanged -= OnSessionChanged;
+    }
+
+    private void OnWelcomed(VehicleWelcome welcome) => Refresh();
+
+    private void OnSessionChanged(ChargingSessionInfo? session) => Refresh();
+
+    // The viewer's culture, for the renders an event from another thread asks for.
+    private readonly ViewerCulture _viewer = new();
+
+    private void Refresh() => _ = InvokeAsync(_viewer.Wrap(StateHasChanged));
+
+    private string StatusText => Car.Status switch
+    {
+        null => CarText.StatusWaiting.ToString(),
+        { Healthy: true } => CarText.StatusReading.ToString(),
+        _ => (Car.StatusWords ?? CarText.StatusNotReading).ToString(),
+    };
+
+    private string? StatusClass => Car.Status switch
+    {
+        { Healthy: true } => "ok",
+        { NeedsOwner: true } => "error",
+        _ => null,
+    };
+
+    private string SessionText => Connection.Session switch
+    {
+        { Open: true, Mode: { Length: > 0 } mode } => CarText.SessionOpen.Format(mode).ToString(),
+        { Open: true } => CarText.SessionOpen.Format("…").ToString(),
+        _ => CarText.SessionClosed.ToString(),
+    };
+
+    // Whether the owner set the token by hand or accepted the plugin in Gleanvolt, for when it stops connecting.
+    private Words? TokenSource => Credentials.Source switch
+    {
+        Gleanvolt.Providers.Client.CredentialSource.Configuration => HostText.TokenFromConfiguration,
+        Gleanvolt.Providers.Client.CredentialSource.Paired => HostText.TokenFromPairing,
+        _ => null,
+    };
+
+    private static string CarName(VehicleInfo car)
+    {
+        var model = string.Join(' ', new[] { car.Make, car.Model }.Where(part => part.Length > 0));
+        return car.Name.Length > 0 && model.Length > 0 ? $"{car.Name} ({model})"
+            : car.Name.Length > 0 ? car.Name
+            : model.Length > 0 ? model
+            : car.Id;
+    }
+
+    private static string ChargeText(CarChargeState? state) => state switch
+    {
+        CarChargeState.Idle => CarText.ChargeIdle.ToString(),
+        CarChargeState.Charging => CarText.ChargeCharging.ToString(),
+        CarChargeState.Complete => CarText.ChargeComplete.ToString(),
+        _ => HostText.NotSaid.ToString(),
+    };
+
+    private static string PlugText(CarPlugState? state) => state switch
+    {
+        CarPlugState.Connected => CarText.PlugConnected.ToString(),
+        CarPlugState.Disconnected => CarText.PlugDisconnected.ToString(),
+        _ => HostText.NotSaid.ToString(),
+    };
+
+    private static string Hours(TimeSpan time) =>
+        string.Create(CultureInfo.InvariantCulture, $"{(int)time.TotalHours}:{time.Minutes:00}");
+
+    private TimeZoneInfo Zone => Connection.Car?.TimeZone is { Length: > 0 } id && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var found)
+        ? found
+        : Time.LocalTimeZone;
+
+    private string Local(DateTimeOffset at) =>
+        TimeZoneInfo.ConvertTime(at, Zone).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+}

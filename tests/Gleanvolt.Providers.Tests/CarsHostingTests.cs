@@ -1,8 +1,16 @@
+using System.Runtime.CompilerServices;
 using Gleanvolt.Cars;
+using Gleanvolt.Cars.Components;
 using Gleanvolt.Plugins;
+using Gleanvolt.Providers.Client;
 using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Vehicle;
 using Gleanvolt.Providers.Testing;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 
 namespace Gleanvolt.Providers.Tests;
@@ -168,6 +176,117 @@ public sealed class CarsHostingTests
             "the session's clock reads again");
     }
 
+    [Fact]
+    public async Task TheCarPageShowsTheLastReading()
+    {
+        await using var app = await CarApp.StartAsync();
+        var car = app.App.Services.GetRequiredService<PageCar>();
+        car.Reading = new VehicleReading(
+            DateTimeOffset.UtcNow.AddMinutes(-2), SocPercent: 61.5, RangeMetres: 312_000,
+            ChargeTimeRemaining: new TimeSpan(1, 20, 0), ChargeState: CarChargeState.Charging, PlugState: CarPlugState.Connected);
+        await car.ReadAsync(null, default);
+
+        var body = await app.PageAsync();
+
+        Assert.Contains("id=\"reading\"", body, StringComparison.Ordinal);
+        Assert.Contains("61.5 %", body, StringComparison.Ordinal);
+        Assert.Contains(">Charging<", body, StringComparison.Ordinal);
+        Assert.Contains("Plugged in", body, StringComparison.Ordinal);
+        Assert.Contains("312 km", body, StringComparison.Ordinal);
+        Assert.Contains("1:20", body, StringComparison.Ordinal);
+        Assert.Contains("id=\"read-now\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheCarPageIsInCzechForCzech()
+    {
+        await using var app = await CarApp.StartAsync();
+        var car = app.App.Services.GetRequiredService<PageCar>();
+        car.Reading = new VehicleReading(DateTimeOffset.UtcNow.AddMinutes(-2), SocPercent: 61.5, PlugState: CarPlugState.Connected);
+        await car.ReadAsync(null, default);
+
+        // Blazor writes letters outside ASCII as character references: compared as the browser reads them.
+        var body = System.Net.WebUtility.HtmlDecode(await app.PageAsync("&" + ProviderPage.CultureParameter + "=cs"));
+
+        Assert.Contains("Stav nabití", body, StringComparison.Ordinal);
+        Assert.Contains("Připojen", body, StringComparison.Ordinal);
+        Assert.Contains("61,5 %", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheCarPageSaysWhereTheTokenCameFrom()
+    {
+        await using var app = await CarApp.StartAsync();
+
+        Assert.Contains(HostText.TokenFromPairing.En, await app.PageAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task BeforeAnyReadingThePageSaysSo()
+    {
+        await using var app = await CarApp.StartAsync(readAtStart: false);
+
+        var body = await app.PageAsync();
+
+        Assert.Contains("id=\"reading-none\"", body, StringComparison.Ordinal);
+        Assert.Contains(CarText.StatusWaiting.En, body, StringComparison.Ordinal);
+    }
+
+    // A car plugin's whole app, as CarPluginHost builds it, on a test server, paired with a Gleanvolt nothing listens on.
+    private sealed class CarApp : IAsyncDisposable
+    {
+        public const string Id = "page-car";
+
+        private readonly string _directory;
+
+        private CarApp(WebApplication app, string directory)
+        {
+            App = app;
+            _directory = directory;
+            Client = app.GetTestClient();
+        }
+
+        public WebApplication App { get; }
+
+        public HttpClient Client { get; }
+
+        public static async Task<CarApp> StartAsync(bool readAtStart = true)
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "gleanvolt-plugin-" + Guid.NewGuid().ToString("N"));
+            var plugin = new PluginInfo(Id, "Page car", "PageCar", 8114) { PageAssembly = typeof(TestCarPage).Assembly };
+            var builder = CarPluginHost.CreateBuilder<PageCar>(
+                [$"--DataDirectory={directory}", "--applicationName=Gleanvolt.Plugins.Hosting", "--environment=Development"], plugin);
+            builder.WebHost.UseTestServer();
+            builder.Services.AddSingleton<IGleanvoltFinder, NoGleanvolt>();
+            var app = CarPluginHost.Build(builder);
+            app.Services.GetRequiredService<PageCar>().Answers = readAtStart;
+            // An endpoint nothing listens on: the connection that starts with the token fails at once and keeps it.
+            app.Services.GetRequiredService<ProviderCredentials>().Save(new Uri("http://127.0.0.1:9"), "gvp_paired");
+            await app.StartAsync();
+            return new CarApp(app, directory);
+        }
+
+        public Task<string> PageAsync(string query = "") =>
+            Client.GetStringAsync("/car?" + ProviderPage.TicketParameter + "="
+                + Uri.EscapeDataString(ProviderPage.CreateTicket("gvp_paired", Id, DateTimeOffset.UtcNow.AddMinutes(2))) + query);
+
+        public async ValueTask DisposeAsync()
+        {
+            await App.StopAsync();
+            await App.DisposeAsync();
+            Directory.Delete(_directory, recursive: true);
+        }
+    }
+
+    private sealed class NoGleanvolt : IGleanvoltFinder
+    {
+        public async IAsyncEnumerable<Uri> CandidatesAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            yield break;
+        }
+    }
+
     // A car whose maker answers at once, fails, or waits, on demand.
     private sealed class CountingCar : PluginCar
     {
@@ -199,5 +318,27 @@ public sealed class CarsHostingTests
                 ? throw failure
                 : Reading ?? new VehicleReading(_clock.GetUtcNow(), SocPercent: 50 + Fetches);
         }
+    }
+}
+
+/// <summary>The page test's car: it answers with the reading the test set, or nothing while <see cref="Answers"/> is false.</summary>
+public sealed class PageCar(CarPollOptions options, TimeProvider time) : PluginCar(new CarPollOptions { MinimumTimeBetweenReads = TimeSpan.Zero, PollInterval = options.PollInterval }, time)
+{
+    public bool Answers { get; set; } = true;
+
+    public VehicleReading? Reading { get; set; }
+
+    protected override Task<VehicleReading?> FetchAsync(VehicleInfo? car, CancellationToken cancellationToken) =>
+        Task.FromResult(Answers ? Reading : null);
+}
+
+/// <summary>The test car plugin's page: the shared frame and nothing of its own.</summary>
+[Route("/car")]
+public sealed class TestCarPage : ComponentBase
+{
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<CarFrame>(0);
+        builder.CloseComponent();
     }
 }
