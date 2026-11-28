@@ -18,16 +18,6 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <!--
-    The VW portal fixtures (#139). Copied rather than embedded so a failing test can be diffed against
-    the file a reviewer already read; see Fixtures/VwGroup/README.md for why they are JSON rather than
-    committed ZIPs.
-  -->
-  <ItemGroup>
-    <None Update="Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Update="Fixtures\**\*.html" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
   <!-- The fake Modbus device lives with the client's own tests (#439); the read-only wrapper's tests use it too. -->
   <ItemGroup>
     <Compile Include="..\Gleanvolt.Modbus.Tests\FakeModbusTcpServer.cs" Link="FakeModbusTcpServer.cs" />

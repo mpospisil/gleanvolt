@@ -20,37 +20,10 @@
     <value>Car</value>
   </data>
   <data name="CarIntro" xml:space="preserve">
-    <value>Everything below the form is what the controller is running with, read from the configuration at startup. The form changes what the next start reads: restart to apply it, then check the account below.</value>
+    <value>Everything below the form is what the controller is running with, read from the configuration at startup. The form changes what the next start reads: restart to apply it.</value>
   </data>
   <data name="AskTheCarHeading" xml:space="preserve">
     <value>Ask the car</value>
-  </data>
-  <data name="PortalIntro_2" xml:space="preserve">
-    <value>This check</value>
-  </data>
-  <data name="PortalIntro" xml:space="preserve">
-    <value>Asks {0} for {1} once, when you press the button. {2} runs on no schedule and its result goes nowhere else — not to the dashboard card, not to any charging decision. Use it to check that the credentials work and that the portal's fields are understood, whether or not the scheduled feed is on.</value>
-  </data>
-  <data name="NotConfiguredNeeds" xml:space="preserve">
-    <value>Not configured: needs {0}.</value>
-  </data>
-  <data name="PortalFieldsHint_0" xml:space="preserve">
-    <value>Brand</value>
-  </data>
-  <data name="PortalFieldsHint_1" xml:space="preserve">
-    <value>VW ID</value>
-  </data>
-  <data name="PortalFieldsHint_2" xml:space="preserve">
-    <value>Password</value>
-  </data>
-  <data name="PortalFieldsHint_3" xml:space="preserve">
-    <value>VIN</value>
-  </data>
-  <data name="PortalFieldsHint_4" xml:space="preserve">
-    <value>continuous data request</value>
-  </data>
-  <data name="PortalFieldsHint" xml:space="preserve">
-    <value>Those are the {0}, {1}, {2} and {3} fields in the form above; fill them in and restart. The portal also delivers nothing until you enable a {4} by hand — see {5}.</value>
   </data>
   <data name="AskingTheCar" xml:space="preserve">
     <value>Asking the car…</value>
@@ -58,32 +31,8 @@
   <data name="AskTheCar" xml:space="preserve">
     <value>Ask the car</value>
   </data>
-  <data name="SignsInAfresh" xml:space="preserve">
-    <value>Each press signs in again. That is fine by hand, and it is why this is not polled: repeated sign-ins at a real identity provider can get the account locked.</value>
-  </data>
-  <data name="FeedIntro_2" xml:space="preserve">
-    <value>does</value>
-  </data>
-  <data name="FeedIntro" xml:space="preserve">
-    <value>Asks {0} for {1} once, now — the same call the feed makes on its own schedule, just made on request. Unlike a Data Act check, the result {2} reach the dashboard card: pressing the button updates the whole UI, not only this page. The feed's own schedule is not affected.</value>
-  </data>
-  <data name="FeedAskHint" xml:space="preserve">
-    <value>If the account above is not signed in, this will show it: the feed answers with what is stopping it instead of a reading.</value>
-  </data>
-  <data name="NothingToAskYet" xml:space="preserve">
-    <value>Nothing to ask yet: this feed is switched on but did not start, so the controller has no client for it. Fill in the fields it needs in the form above and restart.</value>
-  </data>
   <data name="NothingToAskChargeOnly" xml:space="preserve">
     <value>Nothing to ask, because nothing reads this car — and nothing needs to. The charger, not the car, reports whether a cable is plugged in, so the dashboard shows that anyway. Without a feed, only the car's state of charge is missing, so targets are set in kWh.</value>
-  </data>
-  <data name="WorthRetrying" xml:space="preserve">
-    <value>Try again — this error is expected and usually clears by itself.</value>
-  </data>
-  <data name="NotWorthRetrying" xml:space="preserve">
-    <value>Trying again will not help. Something needs to change, or needs fixing in a browser.</value>
-  </data>
-  <data name="NothingOnTheCard" xml:space="preserve">
-    <value>Nothing has reached the dashboard card yet, so there is nothing to compare with. That is normal for an installation with no feed switched on: this check is the only reading.</value>
   </data>
   <data name="CarDidNotAnswer" xml:space="preserve">
     <value>The car did not answer — {0}</value>
@@ -181,12 +130,6 @@
   <data name="CarPlugStateHint" xml:space="preserve">
     <value>Whether the car reports a cable in its socket. This is separate from the charger's status and updates much more slowly.</value>
   </data>
-  <data name="TargetSoc" xml:space="preserve">
-    <value>Target SOC</value>
-  </data>
-  <data name="TargetSocHint" xml:space="preserve">
-    <value>The charge limit set in the car or its app. Only the Data Act portal provides it; no plan uses it yet (#101). A dash means this source did not provide it.</value>
-  </data>
   <data name="TimeLeft" xml:space="preserve">
     <value>Time left</value>
   </data>
@@ -198,9 +141,6 @@
   </data>
   <data name="CaptureTimeNote" xml:space="preserve">
     <value>The capture time is when the {0} took the reading, not now. A parked car that last reported hours ago is normal, not a fault — its state of charge does not change.</value>
-  </data>
-  <data name="SameSoc" xml:space="preserve">
-    <value>— the same state of charge</value>
   </data>
   <data name="TheCarFallback" xml:space="preserve">
     <value>the car</value>
@@ -224,30 +164,8 @@
   <data name="TheFeed" xml:space="preserve">
     <value>the feed</value>
   </data>
-  <data name="CardShowing" xml:space="preserve">
-    <value>The dashboard card shows {0} from {1}, captured {2} ago{3}. That is a separate reading taken at a different time, so a difference alone is not a fault.</value>
-    <comment>{3} is SameSoc or PointsBelow/PointsAbove, with its leading space, or nothing.</comment>
-  </data>
   <data name="OwnTopicToo" xml:space="preserve">
     <value>This car also has its own topic, {0}. It can run alongside a manufacturer feed; the newest reading wins.</value>
-  </data>
-  <data name="PointsBelow_One" xml:space="preserve">
-    <value>— {0} point below this check</value>
-  </data>
-  <data name="PointsBelow_Few" xml:space="preserve">
-    <value>— {0} points below this check</value>
-  </data>
-  <data name="PointsBelow_Other" xml:space="preserve">
-    <value>— {0} points below this check</value>
-  </data>
-  <data name="PointsAbove_One" xml:space="preserve">
-    <value>— {0} point above this check</value>
-  </data>
-  <data name="PointsAbove_Few" xml:space="preserve">
-    <value>— {0} points above this check</value>
-  </data>
-  <data name="PointsAbove_Other" xml:space="preserve">
-    <value>— {0} points above this check</value>
   </data>
   <!-- Car form -->
   <data name="ChangesTakeEffect_One" xml:space="preserve">
@@ -268,35 +186,20 @@
   <data name="FeedChange" xml:space="preserve">
     <value>Feed: {0} → {1}</value>
   </data>
-  <data name="SecretSet" xml:space="preserve">
-    <value>set</value>
-  </data>
-  <data name="SecretRemoved" xml:space="preserve">
-    <value>removed</value>
-  </data>
   <data name="ApplyThem" xml:space="preserve">
     <value>Apply them</value>
   </data>
   <data name="CarReadOnly" xml:space="preserve">
     <value>Read-only, because this UI has no login. These fields include a manufacturer account's password, and without a login anyone on the LAN could read the car or change which account it is read from. Configure {0} ({1}) to edit them here; until then, change them in {2} and restart.</value>
   </data>
-  <data name="CarSaveNote_2" xml:space="preserve">
-    <value>sign in below</value>
-  </data>
   <data name="CarSaveNote" xml:space="preserve">
-    <value>A save is checked the same way startup checks the configuration, and only values that differ are written to {0}. That file overrides {1} key by key, so each field shows where its value comes from. Nothing changes until the controller restarts — and saving cannot prove an account, because the feed is built from these keys at startup. Restart, then {2} and ask the car.</value>
+    <value>A save is checked the same way startup checks the configuration, and only values that differ are written to {0}. That file overrides {1} key by key, so each field shows where its value comes from. Nothing changes until the controller restarts.</value>
   </data>
   <data name="Manufacturer" xml:space="preserve">
     <value>Manufacturer</value>
   </data>
   <data name="WhatReadsThisCar" xml:space="preserve">
     <value>What reads this car</value>
-  </data>
-  <data name="SignInIdChanged" xml:space="preserve">
-    <value>The brand's sign-in id has changed</value>
-  </data>
-  <data name="SignInIdChangedNote" xml:space="preserve">
-    <value>The portal's client ids are reverse-engineered, not published, so one can stop working without warning. The symptom is a sign-in that fails as if the password were wrong. An id entered here overrides the brand above.</value>
   </data>
   <data name="TheCar" xml:space="preserve">
     <value>The car</value>
@@ -315,9 +218,6 @@
   </data>
   <data name="NotSaved" xml:space="preserve">
     <value>Not saved — the controller would refuse to start with this:</value>
-  </data>
-  <data name="ProveIt" xml:space="preserve">
-    <value>Prove it below</value>
   </data>
   <data name="FieldId" xml:space="preserve">
     <value>Id</value>
@@ -346,24 +246,6 @@
   <data name="FieldMaxCurrent" xml:space="preserve">
     <value>Maximum current (A)</value>
   </data>
-  <data name="FieldVwId" xml:space="preserve">
-    <value>VW ID (e-mail)</value>
-  </data>
-  <data name="FieldPassword" xml:space="preserve">
-    <value>Password</value>
-  </data>
-  <data name="FieldVin" xml:space="preserve">
-    <value>VIN</value>
-  </data>
-  <data name="FieldDataAct" xml:space="preserve">
-    <value>Data Act portal</value>
-  </data>
-  <data name="FieldBrand" xml:space="preserve">
-    <value>Brand</value>
-  </data>
-  <data name="FieldClientId" xml:space="preserve">
-    <value>Client id</value>
-  </data>
   <data name="FieldOwnTopic" xml:space="preserve">
     <value>Own topic</value>
   </data>
@@ -382,32 +264,11 @@
   <data name="HintMaxCurrent" xml:space="preserve">
     <value>the on-board charger's maximum</value>
   </data>
-  <data name="Hint17Characters" xml:space="preserve">
-    <value>17 characters</value>
-  </data>
-  <data name="SavedRestartSignIn" xml:space="preserve">
-    <value>Saved. Restart the controller to apply it, then sign in.</value>
-  </data>
   <data name="SavedRunning" xml:space="preserve">
     <value>Saved. The controller is already running with these values.</value>
   </data>
-  <data name="Unchanged" xml:space="preserve">
-    <value>unchanged</value>
-  </data>
-  <data name="NotSet" xml:space="preserve">
-    <value>not set</value>
-  </data>
-  <data name="Remove" xml:space="preserve">
-    <value>Remove</value>
-  </data>
-  <data name="KeptInSecretStore" xml:space="preserve">
-    <value>Kept in the secret store — {0}. Leave it empty to keep it unchanged; Remove deletes it.</value>
-  </data>
   <data name="RevertTo" xml:space="preserve">
     <value>Revert to {0}</value>
-  </data>
-  <data name="FeedDataAct" xml:space="preserve">
-    <value>Audi · SEAT · Cupra · Bentley · VW commercial</value>
   </data>
   <data name="FeedOwnTopic" xml:space="preserve">
     <value>A feed I publish myself</value>
@@ -415,29 +276,11 @@
   <data name="FeedNone" xml:space="preserve">
     <value>Another manufacturer — charge only</value>
   </data>
-  <data name="FreshVolkswagen" xml:space="preserve">
-    <value>about 20 s, plug state, live while charging</value>
-  </data>
-  <data name="FreshSkoda" xml:space="preserve">
-    <value>5–15 min, plug state</value>
-  </data>
-  <data name="FreshDataAct" xml:space="preserve">
-    <value>hours behind; no plug state</value>
-  </data>
   <data name="FreshOwnTopic" xml:space="preserve">
     <value>depends on your publisher</value>
   </data>
   <data name="FreshNone" xml:space="preserve">
     <value>no reading from the car</value>
-  </data>
-  <data name="NoteVolkswagen" xml:space="preserve">
-    <value>volkswagen.de, read live. The first sign-in always needs a one-time code e-mailed to this account, so it is done under Account below, after the restart.</value>
-  </data>
-  <data name="NoteSkoda" xml:space="preserve">
-    <value>The MyŠkoda Public API. It needs no password: create an API key in the MyŠkoda app and paste it under Account below. Keys expire, so they are renewed there, not here.</value>
-  </data>
-  <data name="NoteDataAct" xml:space="preserve">
-    <value>The EU Data Act portal — for a Group brand with no live feed of its own. It delivers data in batches, so expect the car's state of charge to be hours old, and no plug state at all.</value>
   </data>
   <data name="NoteOwnTopic" xml:space="preserve">
     <value>An MQTT topic you publish to yourself. The broker and its credentials are the house broker's and are set in the Vehicle section; only the topic belongs to the car.</value>
@@ -447,9 +290,6 @@
   </data>
   <data name="SourceSecretStore" xml:space="preserve">
     <value>secret store</value>
-  </data>
-  <data name="SourceEnvironmentDetail" xml:space="preserve">
-    <value>environment ({0})</value>
   </data>
   <data name="SourceCommandLine" xml:space="preserve">
     <value>command line</value>
@@ -479,110 +319,7 @@
     <value>Set nowhere; the built-in default applies.</value>
   </data>
   <!-- Portal diagnostics -->
-  <data name="FieldsRecognised_One" xml:space="preserve">
-    <value>{0} field this build recognised</value>
-  </data>
-  <data name="FieldsRecognised_Few" xml:space="preserve">
-    <value>{0} fields this build recognised</value>
-  </data>
-  <data name="FieldsRecognised_Other" xml:space="preserve">
-    <value>{0} fields this build recognised</value>
-  </data>
-  <data name="FieldsUnread_One" xml:space="preserve">
-    <value>{0} field nothing here reads</value>
-  </data>
-  <data name="FieldsUnread_Few" xml:space="preserve">
-    <value>{0} fields nothing here reads</value>
-  </data>
-  <data name="FieldsUnread_Other" xml:space="preserve">
-    <value>{0} fields nothing here reads</value>
-  </data>
-  <data name="Empty" xml:space="preserve">
-    <value>(empty)</value>
-    <comment>A field the car reported with no value.</comment>
-  </data>
   <!-- Account -->
-  <data name="Account" xml:space="preserve">
-    <value>Account</value>
-  </data>
-  <data name="SignedIn" xml:space="preserve">
-    <value>Signed in</value>
-  </data>
-  <data name="SignOut" xml:space="preserve">
-    <value>Sign out</value>
-  </data>
-  <data name="OneTimeCode" xml:space="preserve">
-    <value>One-time code</value>
-  </data>
-  <data name="SubmitCode" xml:space="preserve">
-    <value>Submit code</value>
-  </data>
-  <data name="ApiKey" xml:space="preserve">
-    <value>API key</value>
-  </data>
-  <data name="SaveKey" xml:space="preserve">
-    <value>Save key</value>
-  </data>
-  <data name="SigningIn" xml:space="preserve">
-    <value>Signing in…</value>
-  </data>
-  <data name="SignIn" xml:space="preserve">
-    <value>Sign in</value>
-  </data>
-  <data name="AccountDataAct" xml:space="preserve">
-    <value>This portal signs in on every read, so there is no session to set up here. The account is the VW ID and password in the form above; asking the car below checks them.</value>
-  </data>
-  <data name="AccountOwnTopic" xml:space="preserve">
-    <value>Nothing signs in here: you publish the readings yourself, so no manufacturer account is involved. The broker's credentials are the house broker's and are set in the Vehicle section.</value>
-  </data>
-  <data name="AccountChargeOnly" xml:space="preserve">
-    <value>No account, because nothing reads this car. Charging is unaffected — a target is asked for in kWh rather than as a state of charge.</value>
-  </data>
-  <data name="NoAccountYet" xml:space="preserve">
-    <value>There is no account to sign in to yet.</value>
-  </data>
-  <data name="Diagnostics" xml:space="preserve">
-    <value>Diagnostics</value>
-  </data>
-  <data name="DiagnosticsIntro_0" xml:space="preserve">
-    <value>why is that field a dash</value>
-  </data>
-  <data name="DiagnosticsIntro" xml:space="preserve">
-    <value>What the portal delivered and how much of it this build understands. This answers {0} — open it when a figure above is missing; otherwise you can ignore it.</value>
-  </data>
-  <data name="TheDelivery" xml:space="preserve">
-    <value>The delivery</value>
-  </data>
-  <data name="Vehicle" xml:space="preserve">
-    <value>Vehicle</value>
-  </data>
-  <data name="Snapshots" xml:space="preserve">
-    <value>Snapshots</value>
-  </data>
-  <data name="Odometer" xml:space="preserve">
-    <value>Odometer</value>
-  </data>
-  <data name="FieldMoments_0" xml:space="preserve">
-    <value>car</value>
-  </data>
-  <data name="FieldMoments" xml:space="preserve">
-    <value>Each with the time the {0} reported it. A read merges several deliveries, so two figures here can be hours apart — without the times, a coarse reading and a stale one are easy to confuse.</value>
-  </data>
-  <data name="NothingInVocabulary" xml:space="preserve">
-    <value>None of the fields in the bundle is in the vocabulary, so these are names to add, not a car reporting empty values.</value>
-  </data>
-  <data name="NeverBecameReading" xml:space="preserve">
-    <value>What the bundle held that was not turned into a reading</value>
-  </data>
-  <data name="UnmappedNote" xml:space="preserve">
-    <value>If a value above is missing, its real name is probably in this list. The portal's vocabulary was written from VW's data dictionary, not from your car, so this is expected on a first run and is not a fault. The fix is to add the right names to {0}; pasting this list into an issue is enough for someone else to do it.</value>
-  </data>
-  <data name="AllRecognised" xml:space="preserve">
-    <value>Every field in the bundle was recognised.</value>
-  </data>
-  <data name="OdometerNote" xml:space="preserve">
-    <value>The odometer is delivered, but nothing uses it. Target SOC would let a plan reject an impossible battery target; that is deferred in {0}.</value>
-  </data>
   <data name="PhasesNotStated" xml:space="preserve">
     <value>Not stated — the installation's count is used</value>
   </data>
@@ -592,40 +329,7 @@
   <data name="PhasesThree" xml:space="preserve">
     <value>3 — three-phase</value>
   </data>
-  <data name="NoManufacturerAccount" xml:space="preserve">
-    <value>no manufacturer account</value>
-  </data>
-  <data name="NoAccountExplanation" xml:space="preserve">
-    <value>No manufacturer account is set up, so there is nothing to sign in to. A feed that needs one offers its own sign-in once all its required fields are filled in and the controller has restarted.</value>
-  </data>
   <!-- The portal's failure kinds, as the Ask the car result names them -->
-  <data name="PortalFailure_NotConfigured" xml:space="preserve">
-    <value>Not configured</value>
-  </data>
-  <data name="PortalFailure_SessionExpired" xml:space="preserve">
-    <value>Session expired</value>
-  </data>
-  <data name="PortalFailure_SignInRejected" xml:space="preserve">
-    <value>Sign-in rejected</value>
-  </data>
-  <data name="PortalFailure_OwnerActionRequired" xml:space="preserve">
-    <value>Needs you</value>
-  </data>
-  <data name="PortalFailure_VehicleNotFound" xml:space="preserve">
-    <value>Car not found</value>
-  </data>
-  <data name="PortalFailure_NoDataAvailable" xml:space="preserve">
-    <value>No data yet</value>
-  </data>
-  <data name="PortalFailure_NoDataRequest" xml:space="preserve">
-    <value>No data request</value>
-  </data>
-  <data name="PortalFailure_UnusableData" xml:space="preserve">
-    <value>Unreadable data</value>
-  </data>
-  <data name="PortalFailure_Transient" xml:space="preserve">
-    <value>Temporary failure</value>
-  </data>
   <data name="FeedExternal" xml:space="preserve">
     <value>A plugin</value>
   </data>
@@ -634,9 +338,6 @@
   </data>
   <data name="NoteExternal" xml:space="preserve">
     <value>A plugin, a program outside Gleanvolt, reads the car and publishes what it says: any car, through its own app, cloud or dongle. Gleanvolt does not poll it; the plugin publishes whenever the car has something new. Start it and accept it on Settings → Plugins.</value>
-  </data>
-  <data name="AccountExternal" xml:space="preserve">
-    <value>Nothing signs in here: the plugin signs in to the car's account itself, and Gleanvolt keeps no account for it. When its login expires, the plugin says so and the Overview asks you to act. A plugin with a page of its own shows it below, under Plugin: that is where you sign in.</value>
   </data>
   <data name="ExternalAskIntro" xml:space="preserve">
     <value>Asks {0} for {1} once, now. The plugin has a minute to answer, and its reading reaches the dashboard card. It also publishes on its own whenever the car has something new, so there is usually no need to ask.</value>
@@ -659,22 +360,25 @@
     <value>The page of {0}</value>
     <comment>{0} the provider's name.</comment>
   </data>
-  <data name="FeedDeprecatedName" xml:space="preserve">
-    <value>{0} (deprecated)</value>
-  </data>
-  <data name="FeedDeprecated" xml:space="preserve">
-    <value>This built-in feed is deprecated and goes in the next release. Run the {0} plugin instead, and choose “{1}” above.</value>
-  </data>
   <data name="FeedDeprecatedHow" xml:space="preserve">
     <value>How to set it up</value>
-  </data>
-  <data name="FeedDeprecatedCopy" xml:space="preserve">
-    <value>If the plugin's page doesn't show these yet, enter them there.</value>
   </data>
   <data name="FeedDeprecatedPassword" xml:space="preserve">
     <value>Enter the password on the plugin's page: it never carries over.</value>
   </data>
   <data name="FeedDeprecatedApiKey" xml:space="preserve">
     <value>Paste the API key from the MySkoda app on the plugin's page: it never carries over.</value>
+  </data>
+  <data name="SavedRestart" xml:space="preserve">
+    <value>Saved. Restart the controller to apply it.</value>
+  </data>
+  <data name="FeedRetired" xml:space="preserve">
+    <value>Gleanvolt no longer reads the car itself, and this installation used its built-in feed. Run the {0} plugin, accept it on Settings → Plugins, and keep “{1}” chosen above. Until it connects, the car isn’t read.</value>
+  </data>
+  <data name="FieldTopic" xml:space="preserve">
+    <value>Topic</value>
+  </data>
+  <data name="HintTopic" xml:space="preserve">
+    <value>one concrete topic, no wildcards</value>
   </data>
 </root>

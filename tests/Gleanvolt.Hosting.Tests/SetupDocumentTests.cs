@@ -153,6 +153,22 @@ public sealed class SetupDocumentTests : IDisposable
     public void The_built_ins_key_is_no_longer_a_setup_setting() =>
         Assert.False(SetupDocument.IsAllowed("Weather:ApiKey"));
 
+    [Theory]
+    [InlineData("Vehicle:Website:Enabled", "Volkswagen plugin")]
+    [InlineData("Vehicle:Website:Password", "Volkswagen plugin")]
+    [InlineData("Vehicle:Skoda:Enabled", "MyŠkoda plugin")]
+    [InlineData("vehicle:dataact:enabled", "VW Group Data Act plugin")]
+    public void A_built_in_car_feeds_key_is_refused_naming_the_plugin(string key, string plugin)
+    {
+        // #477: the built-in car feeds are gone; a document that enables one is told which plugin replaces it.
+        var problems = Document((key, "true")).Validate(Target().Configuration);
+
+        var problem = Assert.Single(problems);
+        Assert.Contains(plugin, problem);
+        Assert.StartsWith(key, problem);
+        Assert.False(SetupDocument.IsSecret(key));
+    }
+
     [Fact]
     public void A_weather_source_that_names_none_is_refused()
     {

@@ -20,9 +20,6 @@ using Gleanvolt.Hosting.Tariff.External;
 using Gleanvolt.Providers.Server;
 using Gleanvolt.Hosting.Vehicles;
 using Gleanvolt.Hosting.Vehicles.External;
-using Gleanvolt.Infrastructure.Vehicles.Skoda;
-using Gleanvolt.Infrastructure.Vehicles.VwGroup;
-using Gleanvolt.Infrastructure.Vehicles.VwWebsite;
 using Gleanvolt.Infrastructure;
 using Gleanvolt.Infrastructure.Modbus;
 using Gleanvolt.Infrastructure.Monitoring;
@@ -213,10 +210,10 @@ public static class GleanvoltHostingExtensions
             // Resolved against the content root, as the SQLite stores and pv-system.json are, so a
             // relative path means the same thing under `dotnet run`, the debugger and the container.
             // The .deb sets it absolutely: its content root is a read-only /opt/gleanvolt. Shared with
-            // VehicleAccountSecret, which has to open the same store before the container exists.
+            // SecretStoreLocation, which has to open the same store before the container exists.
             return SecretStoreSelection.Create(
                 secretStore,
-                VehicleAccountSecret.Directory(secrets, environment.ContentRootPath),
+                SecretStoreLocation.Directory(secrets, environment.ContentRootPath),
                 provider.GetRequiredService<ILoggerFactory>());
         });
 
@@ -242,7 +239,7 @@ public static class GleanvoltHostingExtensions
             (options, environment, loggers) =>
             {
                 var keys = Path.Combine(
-                    VehicleAccountSecret.Directory(secrets, environment.ContentRootPath), "keys");
+                    SecretStoreLocation.Directory(secrets, environment.ContentRootPath), "keys");
 
                 System.IO.Directory.CreateDirectory(keys);
                 options.XmlRepository = new FileSystemXmlRepository(new DirectoryInfo(keys), loggers);
@@ -409,16 +406,14 @@ public static class GleanvoltHostingExtensions
         // describe the same car and which no owner could be expected to know are related. The running
         // values are taken on first resolution, while they are still the ones EvInfo was resolved from;
         // nothing but this editor ever writes them, so there is nothing that could have moved in
-        // between. The password is not among them: EvRunningState carries whether there is one.
+        // between.
         services.AddSingleton<IEvEditor>(provider =>
         {
             var chargeControl = provider.GetRequiredService<IOptions<ChargeControlOptions>>().Value;
-            var secretStore = provider.GetRequiredService<ISecretStore>();
 
             return new EvEditor(
                 configuration,
-                EvEditor.Snapshot(configuration, secretStore),
-                secretStore,
+                EvEditor.Snapshot(configuration),
                 chargeControl.MinChargingCurrentAmps,
                 chargeControl.MaxChargingCurrentAmps,
                 provider.GetRequiredService<ILogger<EvEditor>>());
@@ -817,128 +812,13 @@ public static class GleanvoltHostingExtensions
         // which *manufacturer* feed reads the car, not whether an owner's own topic may.
         services.AddHostedService<VehicleMqttWorker>();
 
-        // The car read from VW's own EU Data Act portal, on demand from a button in the web UI
-        // (issues #137/#139). Registered unconditionally, like the holder above and for the same
-        // reason: the page injects it and renders "not configured" itself, rather than the container
-        // deciding whether a page may exist.
-        //
-        // Configuration is Vehicle:DataAct:*, and falls back to the VW_* environment variables the
-        // console harness reads -- one .env then serves both, which is the whole point of having
-        // documented those names.
-        services.AddSingleton<IVehiclePortalReader>(provider => new VwGroupPortalReader(
-            VwGroupPortalOptionsResolver.Resolve(configuration),
-            provider.GetService<ILogger<VwGroupPortalReader>>()));
+        // The built-in car feeds are gone (#477): a car plugin reads the car, through Vehicle:External. An installation
+        // that used one is moved to it at this start (RetiredCarFeed), so this start already runs the plugin's feed.
+        services.AddSingleton<RetiredCarFeed>();
+        services.AddSingleton<IRetiredCarFeed>(provider => provider.GetRequiredService<RetiredCarFeed>());
+        services.AddHostedService<RetiredCarFeedWatcher>();
 
-        // The same portal on its own clock (issue #140), which is a different thing from the button
-        // above and is registered on different terms: only when Vehicle:DataAct:Enabled says so.
-        // Credentials being present is not consent to replay them at an identity provider every
-        // quarter of an hour -- pressing the button is how they are proved, and this is how a feed is
-        // asked for.
-        //
-        // The service, not the host, owns the cadence: nothing here states an interval.
-        //
-        // One car, one feed (issue #212): a live feed for this car -- volkswagen.de for a VW, MyŠkoda
-        // for a Škoda -- is more precise than the portal's delayed batch, so with one configured the
-        // portal is not started at all. Skipped with a startup log line rather than refused, so an
-        // ID.4 .env that has carried both since #170 keeps booting.
-        var website = configuration.GetSection(VwWebsiteOptions.SectionName).Get<VwWebsiteOptions>()
-            ?? new VwWebsiteOptions();
-
-        // MyŠkoda's public API -- the live source for a Škoda (issue #193), in vw-website's place.
-        var skoda = configuration.GetSection(SkodaApiOptions.SectionName).Get<SkodaApiOptions>()
-            ?? new SkodaApiOptions();
-
-        // An external provider (#408): any car, read by a program outside Gleanvolt. One car, one feed,
-        // so it is refused beside a live feed and sets the Data Act portal aside, as a live feed does.
-        var external = configuration.GetValue<bool>(EvSettingKeys.ExternalEnabled);
-
-        if (external && (website.Enabled || skoda.Enabled))
-        {
-            throw new InvalidOperationException(
-                $"Vehicle:External and {(website.Enabled ? "Vehicle:Website" : "Vehicle:Skoda")} are both enabled, but an "
-                + "installation reads its car from one feed. Pick one on the Car page, or switch off "
-                + $"{(website.Enabled ? "VW_WEBSITE_ENABLED" : "SKODA_ENABLED")} or Vehicle__External__Enabled.");
-        }
-
-        var portalSetAside = VwGroupPortalOptionsResolver.IsFeedEnabled(configuration)
-            ? external
-                ? "Vehicle:External is enabled, so the Data Act portal is not used: an external provider reads "
-                  + "this car. Vehicle:DataAct:Enabled (VW_ENABLED) can be switched off."
-                : LiveFeedSettingAside(website, skoda)
-            : null;
-
-        if (VwGroupPortalOptionsResolver.IsFeedEnabled(configuration) && portalSetAside is null)
-        {
-            services.AddSingleton<IVehicleUpdateService>(provider => new VwGroupUpdateService(
-                provider.GetRequiredService<EvInfo>().Id,
-                VwGroupPortalOptionsResolver.Resolve(configuration),
-                provider.GetRequiredService<TimeProvider>(),
-                provider.GetService<ILogger<VwGroupUpdateService>>()));
-        }
-
-        // volkswagen.de -- the live source, read continuously (issues #170, #212). A cold login
-        // always wants an emailed one-time code, so the sign-in seam is registered too and the web UI
-        // drives it while a person is there to read the email. The client is shared between the two:
-        // one cookie jar for the whole flow is not optional, and two of them lose the session.
-        if (website.Enabled && skoda.Enabled)
-        {
-            // Refused rather than both run: they are live sources for two different cars, and one
-            // installation has one car -- the reasoning that refuses a second Ev:Vehicles entry.
-            throw new InvalidOperationException(
-                "Vehicle:Website and Vehicle:Skoda are both enabled, but they read two different cars "
-                + "(volkswagen.de and the MyŠkoda API) and an installation has one. Switch off whichever "
-                + "is not this installation's car (VW_WEBSITE_ENABLED or SKODA_ENABLED).");
-        }
-
-        if (website.IsConfigured)
-        {
-            services.AddSingleton(website);
-            services.AddSingleton(provider => new VwWebsiteSessionStore(
-                provider.GetRequiredService<ISecretStore>()));
-            services.AddSingleton(provider => new VwWebsiteClient(
-                website,
-                provider.GetRequiredService<VwWebsiteSessionStore>(),
-                provider.GetService<ILogger<VwWebsiteClient>>(),
-                provider.GetRequiredService<TimeProvider>()));
-
-            services.AddSingleton<IVehicleAccountSignIn>(provider => new VwWebsiteSignIn(
-                website, provider.GetRequiredService<VwWebsiteClient>()));
-
-            services.AddSingleton<IVehicleUpdateService>(provider => new VwWebsiteUpdateService(
-                website,
-                provider.GetRequiredService<VwWebsiteClient>(),
-                provider.GetRequiredService<ChargeControlStatusHolder>(),
-                provider.GetRequiredService<EvInfo>().Id,
-                provider.GetService<ILogger<VwWebsiteUpdateService>>()));
-        }
-
-        // Registered on Enabled and a VIN, not on a key: the key is pasted on the Car page,
-        // and until it is the feed is there, fetches nothing and says NeedsOwner. The store is shared
-        // by the sign-in and the feed, so a pasted key is in use without a restart; the client is
-        // shared so both spend -- and read -- one quota. The feed is chosen by this section alone;
-        // nothing reads Ev:Vehicles[].Make.
-        if (skoda.IsConfigured)
-        {
-            services.AddSingleton(skoda);
-            services.AddSingleton(provider => new SkodaApiKeyStore(
-                provider.GetRequiredService<ISecretStore>()));
-            services.AddSingleton(provider => new SkodaApiClient(skoda, provider.GetRequiredService<TimeProvider>()));
-
-            services.AddSingleton<IVehicleAccountSignIn>(provider => new SkodaApiSignIn(
-                skoda,
-                provider.GetRequiredService<SkodaApiKeyStore>(),
-                provider.GetRequiredService<SkodaApiClient>(),
-                provider.GetService<ILogger<SkodaApiSignIn>>()));
-
-            services.AddSingleton<IVehicleUpdateService>(provider => new SkodaApiUpdateService(
-                skoda,
-                provider.GetRequiredService<SkodaApiKeyStore>(),
-                provider.GetRequiredService<SkodaApiClient>(),
-                provider.GetRequiredService<EvInfo>().Id,
-                provider.GetRequiredService<ChargeControlStatusHolder>(),
-                provider.GetRequiredService<TimeProvider>(),
-                provider.GetService<ILogger<SkodaApiUpdateService>>()));
-        }
+        var external = configuration.GetValue<bool>(EvSettingKeys.ExternalEnabled) || RetiredCarFeed.Moving(configuration) is not null;
 
         // The provider pushes over its hub on the web port; the feed is what Ask the car and a plan ask,
         // and the hub is on only while this is the installation's feed. The kind is registered either
@@ -967,16 +847,9 @@ public static class GleanvoltHostingExtensions
         // (issue #168). Registered unconditionally: the page injects it and renders "nothing to ask"
         // itself, rather than the container deciding whether a control may exist.
         // The one feed, resolved once (#212), so that every surface quoting its health -- the dashboard,
-        // the sign-in banner, Health, Home Assistant -- quotes the feed behind the reading. At most one
+        // the feed band, Health, Home Assistant -- quotes the feed behind the reading. At most one
         // IVehicleUpdateService is ever registered above; this makes that a type rather than a habit.
-        // The built-in this installation runs, for the deprecation warning (#476). The portal first: when it runs, it
-        // is the feed, whatever a website or Škoda flag without its settings says.
-        VehicleFeed? builtIn = VwGroupPortalOptionsResolver.IsFeedEnabled(configuration) && portalSetAside is null ? VehicleFeed.DataAct
-            : website.Enabled ? VehicleFeed.Volkswagen
-            : skoda.Enabled ? VehicleFeed.Skoda
-            : null;
-        services.AddSingleton(provider => new ConfiguredVehicleFeed(
-            provider.GetService<IVehicleUpdateService>(), portalSetAside, builtIn));
+        services.AddSingleton(provider => new ConfiguredVehicleFeed(provider.GetService<IVehicleUpdateService>()));
 
         services.AddSingleton<IVehicleStateRefresh>(provider => new VehicleStateRefresh(
             provider.GetRequiredService<ConfiguredVehicleFeed>(),
@@ -1056,11 +929,6 @@ public static class GleanvoltHostingExtensions
         // configuration source, and has to be in place before anything below reads the Pv section.
         builder.Configuration.AddPvSystemOverrides(builder.Environment.ContentRootPath);
 
-        // The manufacturer account's password, from the secret store rather than from that file
-        // (issues #214, #215). Beside it in the order, and for the same reason: a password typed on
-        // /car has to beat the one a long-forgotten .env still carries. See VehicleAccountSecret.
-        builder.Configuration.AddVehicleAccountPassword(builder.Environment.ContentRootPath);
-
         // The MQTT broker password and the API keys saved on Settings, likewise from the secret store.
         builder.Configuration.AddIntegrationSecrets(builder.Environment.ContentRootPath);
 
@@ -1089,20 +957,6 @@ public static class GleanvoltHostingExtensions
 
         return builder;
     }
-
-    /// <summary>
-    /// Why the Data Act portal is not started although it is switched on, or null when nothing
-    /// better reads this car (issue #212). A live feed that is configured wins; one merely enabled
-    /// without a VIN registers nothing, so it sets nothing aside either.
-    /// </summary>
-    private static string? LiveFeedSettingAside(VwWebsiteOptions website, SkodaApiOptions skoda) =>
-        website.IsConfigured
-            ? "Vehicle:Website is configured, so the Data Act portal is not used: volkswagen.de reads "
-              + "this car live. Vehicle:DataAct:Enabled (VW_ENABLED) can be switched off."
-            : skoda.IsConfigured
-                ? "Vehicle:Skoda is configured, so the Data Act portal is not used: MyŠkoda reads this "
-                  + "car live. Vehicle:DataAct:Enabled (VW_ENABLED) can be switched off."
-                : null;
 
     private static PvSystemInfo ResolveSite(IConfiguration configuration)
     {
@@ -1462,7 +1316,7 @@ public static class GleanvoltHostingExtensions
             // Where a one-time password reset code is written (#301): beside the secrets, owner-only,
             // where only someone with access to the host can read it.
             services.AddSingleton(provider => new PasswordResetOptions(Path.Combine(
-                VehicleAccountSecret.Directory(
+                SecretStoreLocation.Directory(
                     configuration.GetSection(SecretsOptions.SectionName).Get<SecretsOptions>() ?? new SecretsOptions(),
                     provider.GetRequiredService<IHostEnvironment>().ContentRootPath),
                 "password-reset-code.txt")));

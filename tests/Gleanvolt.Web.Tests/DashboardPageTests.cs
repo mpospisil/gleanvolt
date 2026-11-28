@@ -1000,8 +1000,8 @@ public class DashboardPageTests : PageTest
     {
         _car = Id4();
         Feed(VehicleSourceHealth.NeedsOwner(
-            "Škoda no longer recognises the stored API key — paste a new one on the Car page.",
-            Phrase.Of("Skoda.FeedKeyUnknown")));
+            "The car plugin is not connected.",
+            Phrase.Of("ExternalVehicle.DisconnectedNoReading")));
         _holder.Set(Statuses.Sample(_time.Now, ChargeControlMode.Off));
 
         var page = PseudoLocale.Render(() => Render<Dashboard>());

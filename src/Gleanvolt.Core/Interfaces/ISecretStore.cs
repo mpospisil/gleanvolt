@@ -53,14 +53,13 @@ public interface ISecretStore
 /// </summary>
 public static class SecretNames
 {
-    /// <summary>The volkswagen.de cookie jar, including the <i>remember this browser</i> grant (#170).</summary>
-    public const string VwWebsiteSession = "vw-website-session";
-
-    /// <summary>The pasted MyŠkoda Public API key and what Škoda said about it (#193).</summary>
-    public const string SkodaApiKey = "skoda-api-key";
-
-    /// <summary>The vehicle account password, when it is entered in the web UI rather than in the environment (#214).</summary>
-    public const string VehicleAccountPassword = "vehicle-account-password";
+    /// <summary>
+    /// The built-in car feeds' secrets, as they were kept until #477: the volkswagen.de cookie jar (#170), the pasted
+    /// MyŠkoda key (#193) and the VW ID password entered on the Car page (#214). No longer read: deleted at every start
+    /// that finds one, whatever feed is chosen. The car plugins keep their own, entered on their own pages.
+    /// </summary>
+    public static IReadOnlyList<string> RetiredVehicleSecrets { get; } =
+        ["vw-website-session", "skoda-api-key", "vehicle-account-password"];
 
     /// <summary>The one token every external provider connects with (#406).</summary>
     public const string ProviderToken = "provider-token";

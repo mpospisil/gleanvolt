@@ -65,11 +65,11 @@ public static class WebUiHost
         // constructed where nothing can answer. TryAdd, so Gleanvolt.Hosting's real one wins whenever
         // it has been registered.
         services.TryAddSingleton<IVehicleStateRefresh, NoVehicleRefresh>();
-        services.TryAddSingleton<IVehicleAccountSignIn, NoVehicleAccountSignIn>();
+        services.TryAddSingleton<IRetiredCarFeed, NoRetiredCarFeed>();
         services.TryAddSingleton<ITariffSchedule, NoTariffSchedule>();
         services.TryAddSingleton<IExternalProviders, NoExternalProviders>();
 
-        // The one feed (#212). Gleanvolt.Hosting registers it with its startup note; a host that has
+        // The one feed (#212). Gleanvolt.Hosting registers it; a host that has
         // not gets whatever update service is registered, or none.
         services.TryAddSingleton(provider => new ConfiguredVehicleFeed(provider.GetService<IVehicleUpdateService>()));
 

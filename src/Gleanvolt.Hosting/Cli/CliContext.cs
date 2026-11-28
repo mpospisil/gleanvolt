@@ -27,7 +27,6 @@ public sealed record CliContext(
         var contentRoot = builder.Environment.ContentRootPath;
 
         builder.Configuration.AddPvSystemOverrides(contentRoot);
-        builder.Configuration.AddVehicleAccountPassword(contentRoot);
         builder.Configuration.AddIntegrationSecrets(contentRoot);
 
         return new CliContext(
@@ -35,7 +34,7 @@ public sealed record CliContext(
             contentRoot,
             CliConsole.System(),
             platform(builder.Configuration),
-            VehicleAccountSecret.Open(builder.Configuration, contentRoot));
+            SecretStoreLocation.Open(builder.Configuration, contentRoot));
     }
 }
 

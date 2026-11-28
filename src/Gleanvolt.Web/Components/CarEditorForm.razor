@@ -1,27 +1,23 @@
 @inject IEvEditor Editor
 @inject IOptions<WebOptions> Web
 @inject Gleanvolt.Web.Auth.WebPasswordState WebPassword
+@inject IRetiredCarFeed Retired
+@implements IDisposable
 
 @*
     The car, editable (issue #214). Everything below this form on /car is what the process is running
     with; this is what the next start will read — the same split, and the same overrides file, as
     /pv-system's form (#204).
 
-    One <select> is the only control here that changes which fields exist. It removes two startup
-    failures by construction: two live feeds cannot both be enabled, because picking one disables the
-    others in the same save, and the Data Act portal cannot be arranged beside a live feed by accident.
-
-    What it cannot do is probe. The feed is built at startup out of these very keys, so there is
-    nothing running to test them against — and a cold volkswagen.de sign-in wants an emailed code
-    anyway. Save, restart, sign in, ask the car; the page says so rather than letting a green save look
-    like a working feed. Since #227 all four of those are on this one page, so what used to be a link
-    to /vehicle-portal is a pointer down the page.
+    One <select> is the only control here that changes which fields exist: a plugin, the owner's own
+    topic, or charge only. Picking one disables the others in the same save. Since #477 Gleanvolt reads
+    no manufacturer itself: a car plugin does, with the account on its own page.
 *@
 
 <section class="controls pv-editor car-editor" id="car-editor">
     <h2>@CarText.Edit</h2>
 
-    @if (_pending.Count > 0 || _pendingSecrets.Count > 0 || _settings.FeedIsPending)
+    @if (_pending.Count > 0 || _settings.FeedIsPending)
     {
         <div class="alert pending" id="car-pending">
             <p>
@@ -36,14 +32,6 @@
                 @foreach (var setting in _pending)
                 {
                     <li>@Label(setting.Key): @Show(setting.Running) → @Show(setting.Saved)</li>
-                }
-                @*
-                    Named, never valued. A pending-changes banner that printed "hunter2 → correct-horse"
-                    would undo every other precaution on this page in one line.
-                *@
-                @foreach (var secret in _pendingSecrets)
-                {
-                    <li>@Label(secret.Key): @(secret.Stored ? CarText.SecretSet : CarText.SecretRemoved)</li>
                 }
             </ul>
             <div class="control">
@@ -65,7 +53,7 @@
     else
     {
         <p class="muted">
-            @Localized.Rich(CarText.CarSaveNote, @<code>@_settings.OverridesPath</code>, @<code>.env</code>, @<a href="#account">@CarText.CarSaveNote_2</a>)
+            @Localized.Rich(CarText.CarSaveNote, @<code>@_settings.OverridesPath</code>, @<code>.env</code>)
         </p>
     }
 
@@ -79,7 +67,7 @@
                     @onchange="e => Choose(e.Value?.ToString())">
                 @foreach (var feed in VehicleFeeds.All)
                 {
-                    <option value="@feed.ToString()">@(VehicleFeeds.Plugin(feed) is null ? FeedName(feed) : Localized.Format(CarText.FeedDeprecatedName, FeedName(feed)))</option>
+                    <option value="@feed.ToString()">@FeedName(feed)</option>
                 }
             </select>
             <span class="source">@FeedFreshness(_feed)</span>
@@ -89,29 +77,17 @@
     <p class="table-note muted" id="car-feed-note">@FeedNote(_feed)</p>
 
     @*
-        #476: the built-in manufacturer feeds go in the next release. The notice names the plugin that replaces this
-        one, and lists what to enter on its page: compose hands over what .env holds, but a value saved here lives
-        in the overrides file, which a plugin never reads. Never a password: those are entered on the plugin's page.
+        #477: the built-in manufacturer feeds are gone, and this installation used one. Until a car plugin connects,
+        the page names the plugin to run and what to enter on its page; the startup moved the choice to a plugin.
     *@
-    @if (VehicleFeeds.Plugin(_feed) is { } replacement)
+    @if (Retired.Notice is { } replacement)
     {
-        <div class="warning" id="car-feed-deprecated" role="status">
+        <div class="warning" id="car-feed-retired" role="status">
             <p>
-                @Localized.Format(CarText.FeedDeprecated, replacement.Name, CarText.FeedExternal)
+                @Localized.Format(CarText.FeedRetired, replacement.Name, CarText.FeedExternal)
                 <ManualLink Page="setting-up/car">@CarText.FeedDeprecatedHow</ManualLink>
             </p>
-            @if (Carried(replacement) is { Count: > 0 } carried)
-            {
-                <p>@CarText.FeedDeprecatedCopy</p>
-                <dl class="facts">
-                    @foreach (var (key, value) in carried)
-                    {
-                        <dt>@Label(key)</dt>
-                        <dd><code>@value</code></dd>
-                    }
-                </dl>
-            }
-            <p>@(_feed == VehicleFeed.Skoda ? CarText.FeedDeprecatedApiKey : CarText.FeedDeprecatedPassword)</p>
+            <p>@(replacement.Secret == CarFeedSecret.ApiKey ? CarText.FeedDeprecatedApiKey : CarText.FeedDeprecatedPassword)</p>
         </div>
     }
 
@@ -120,42 +96,9 @@
         <div class="pv-fields">
             @foreach (var key in VehicleFeeds.Fields(_feed))
             {
-                @if (key == EvSettingKeys.DataActClientId)
-                {
-                    continue;
-                }
-
-                @if (EvSettingKeys.IsSecret(key))
-                {
-                    @Password(key)
-                }
-                else if (key == EvSettingKeys.DataActBrand)
-                {
-                    @Brand(key)
-                }
-                else
-                {
-                    @Field(key)
-                }
+                @Field(key)
             }
         </div>
-
-        @if (_feed == VehicleFeed.DataAct)
-        {
-            @*
-                Documentation for a failure rather than a field to fill: the table above knows every
-                brand's sign-in id, and this is what to do on the day one of them changes.
-            *@
-            <details class="car-escape-hatch">
-                <summary>@CarText.SignInIdChanged</summary>
-                <p class="muted">
-                    @CarText.SignInIdChangedNote
-                </p>
-                <div class="pv-fields">
-                    @Field(EvSettingKeys.DataActClientId)
-                </div>
-            </details>
-        }
     }
 
     <h3>@CarText.TheCar</h3>
@@ -203,10 +146,7 @@
 
     @if (_message is { } message)
     {
-        <p class="muted" id="car-message">
-            @message
-            <a href="#account">@CarText.ProveIt</a>.
-        </p>
+        <p class="muted" id="car-message">@message</p>
     }
 </section>
 
@@ -224,19 +164,7 @@
         [EvSettingKeys.Phases] = CarText.FieldPhases,
         [EvSettingKeys.MinChargingCurrentAmps] = CarText.FieldMinCurrent,
         [EvSettingKeys.MaxChargingCurrentAmps] = CarText.FieldMaxCurrent,
-        [EvSettingKeys.TelemetryTopic] = "Topic",
-        [EvSettingKeys.WebsiteEnabled] = "volkswagen.de",
-        [EvSettingKeys.WebsiteUsername] = CarText.FieldVwId,
-        [EvSettingKeys.WebsitePassword] = CarText.FieldPassword,
-        [EvSettingKeys.WebsiteVin] = CarText.FieldVin,
-        [EvSettingKeys.SkodaEnabled] = "MyŠkoda",
-        [EvSettingKeys.SkodaVin] = CarText.FieldVin,
-        [EvSettingKeys.DataActEnabled] = CarText.FieldDataAct,
-        [EvSettingKeys.DataActBrand] = CarText.FieldBrand,
-        [EvSettingKeys.DataActClientId] = CarText.FieldClientId,
-        [EvSettingKeys.DataActUsername] = CarText.FieldVwId,
-        [EvSettingKeys.DataActPassword] = CarText.FieldPassword,
-        [EvSettingKeys.DataActVin] = CarText.FieldVin,
+        [EvSettingKeys.TelemetryTopic] = CarText.FieldTopic,
         [EvSettingKeys.MqttEnabled] = CarText.FieldOwnTopic,
         [EvSettingKeys.ExternalEnabled] = CarText.FeedExternal,
     };
@@ -248,38 +176,40 @@
         [EvSettingKeys.ChargeEfficiency] = CarText.HintEfficiency,
         [EvSettingKeys.MinChargingCurrentAmps] = CarText.HintMinCurrent,
         [EvSettingKeys.MaxChargingCurrentAmps] = CarText.HintMaxCurrent,
-        [EvSettingKeys.TelemetryTopic] = "one concrete topic, no wildcards",
-        [EvSettingKeys.WebsiteVin] = CarText.Hint17Characters,
-        [EvSettingKeys.SkodaVin] = CarText.Hint17Characters,
-        [EvSettingKeys.DataActVin] = CarText.Hint17Characters,
-        [EvSettingKeys.DataActClientId] = "…@apps_vw-dilab_com",
+        [EvSettingKeys.TelemetryTopic] = CarText.HintTopic,
     };
 
     private EvSettings _settings = Empty;
     private Dictionary<string, string> _values = [];
-    private Dictionary<string, string> _passwords = [];
     private VehicleFeed _feed;
     private List<ConfiguredSetting> _pending = [];
-    private List<EvSecret> _pendingSecrets = [];
     private IReadOnlyList<string> _problems = [];
     private string? _message;
     private bool _busy;
 
     private static EvSettings Empty { get; } = new(
-        string.Empty, [], [], VehicleFeed.ChargeOnly, VehicleFeed.ChargeOnly, [], string.Empty, 0, 0);
+        string.Empty, [], VehicleFeed.ChargeOnly, VehicleFeed.ChargeOnly, 0, 0);
 
-    // These fields are a manufacturer account, so the rule #204 set for the device addresses applies
-    // at least as strongly: an open UI shows the form without letting anyone use it.
+    // The rule #204 set for the device addresses: an open UI shows the form without letting anyone use it.
     // The password in force, not the startup one, so a password set on /setup unlocks this at once.
     private bool ReadOnly => !Web.Value.LoginEnforced(WebPassword);
 
     private bool Editable => !ReadOnly && _settings.Unavailable is null;
 
-    private int PendingCount => _pending.Count + _pendingSecrets.Count + (_settings.FeedIsPending ? 1 : 0);
+    private int PendingCount => _pending.Count + (_settings.FeedIsPending ? 1 : 0);
 
     private bool HasChanges => _feed != _settings.Feed || Edits().Count > 0;
 
-    protected override void OnInitialized() => Reload();
+    protected override void OnInitialized()
+    {
+        Retired.Changed += OnRetiredChanged;
+        Reload();
+    }
+
+    public void Dispose() => Retired.Changed -= OnRetiredChanged;
+
+    // A car plugin connected while the page is open: the notice goes.
+    private void OnRetiredChanged() => _ = InvokeAsync(StateHasChanged);
 
     private void Reload()
     {
@@ -287,13 +217,8 @@
         _values = _settings.Settings.ToDictionary(
             setting => setting.Key, setting => setting.Saved ?? string.Empty, StringComparer.OrdinalIgnoreCase);
 
-        // Always empty, on every load and after every save: a password field that rendered its value
-        // back would put a bearer-equivalent secret on the wire for every browser that opened the page.
-        _passwords = EvSettingKeys.Secrets.ToDictionary(key => key, _ => string.Empty, StringComparer.OrdinalIgnoreCase);
-
         _feed = _settings.Feed;
         _pending = [.. _settings.Pending];
-        _pendingSecrets = [.. _settings.PendingSecrets];
     }
 
     private void Choose(string? value)
@@ -308,27 +233,12 @@
     }
 
     // What the form holds that the next start would not already read. Hidden feeds contribute nothing:
-    // switching manufacturer leaves the old account's fields exactly as they were, so switching back
-    // does not mean typing a VIN in again.
-    private Dictionary<string, string> Edits()
-    {
-        var edits = _settings.Settings
+    // switching feed leaves the topic exactly as it was, so switching back does not mean typing it in again.
+    private Dictionary<string, string> Edits() =>
+        _settings.Settings
             .Where(setting => _values.TryGetValue(setting.Key, out var value)
                 && !string.Equals(value.Trim(), setting.Saved ?? string.Empty, StringComparison.Ordinal))
             .ToDictionary(setting => setting.Key, setting => _values[setting.Key].Trim(), StringComparer.OrdinalIgnoreCase);
-
-        // An empty password box means unchanged, never cleared. Clearing is the Remove button, which
-        // goes through Revert.
-        foreach (var (key, typed) in _passwords)
-        {
-            if (!string.IsNullOrWhiteSpace(typed))
-            {
-                edits[key] = typed;
-            }
-        }
-
-        return edits;
-    }
 
     private void Save()
     {
@@ -356,7 +266,7 @@
 
             Reload();
             _message = PendingCount > 0
-                ? CarText.SavedRestartSignIn
+                ? CarText.SavedRestart
                 : CarText.SavedRunning;
         }
         finally
@@ -381,22 +291,6 @@
         _message = $"{Label(key)} removed; it comes from {SourceName(_settings[key])} again.";
     }
 
-    private void RemoveSecret(string key)
-    {
-        _message = null;
-        var result = Editor.Revert(key);
-
-        if (!result.Saved)
-        {
-            _problems = Localized.Say(result.Problems, result.ProblemPhrases);
-            return;
-        }
-
-        _problems = [];
-        Reload();
-        _message = "The stored password was removed.";
-    }
-
     private void Discard()
     {
         _problems = [];
@@ -404,9 +298,8 @@
         Reload();
     }
 
-    // The fields are Razor templates rather than markup repeated five times: every one of them has to
-    // carry the same provenance line and the same Revert, and the two that do not — a password, which
-    // is never read back, and a choice, which is a <select> — differ only where they must.
+    // The fields are Razor templates rather than markup repeated: every one of them has to carry the same
+    // provenance line and the same Revert, and the one that is a <select> differs only where it must.
 
     private RenderFragment Field(string key) => @<div class="pv-field">
         <label for="@Id(key)">@Label(key)</label>
@@ -415,20 +308,6 @@
                disabled="@(!Editable || _busy)"
                value="@_values[key]"
                @oninput="e => _values[key] = e.Value?.ToString() ?? string.Empty" />
-        @Provenance(key)
-    </div>;
-
-    private RenderFragment Brand(string key) => @<div class="pv-field">
-        <label for="@Id(key)">@Label(key)</label>
-        <select id="@Id(key)" disabled="@(!Editable || _busy)"
-                value="@_values[key]"
-                @onchange="e => _values[key] = e.Value?.ToString() ?? string.Empty">
-            <option value="">—</option>
-            @foreach (var brand in _settings.Brands)
-            {
-                <option value="@brand.Name">@brand.Label</option>
-            }
-        </select>
         @Provenance(key)
     </div>;
 
@@ -445,31 +324,6 @@
             <option value="3">@CarText.PhasesThree</option>
         </select>
         @Provenance(EvSettingKeys.Phases)
-    </div>;
-
-    private RenderFragment Password(string key) => @<div class="pv-field">
-        <label for="@Id(key)">@Label(key)</label>
-        <RevealInput Disabled="!Editable">
-            <input id="@Id(key)" type="password" autocomplete="new-password" spellcheck="false"
-                   placeholder="@(_settings.Secret(key).Stored ? CarText.Unchanged : CarText.NotSet)"
-                   disabled="@(!Editable || _busy)"
-                   value="@_passwords[key]"
-                   @oninput="e => _passwords[key] = e.Value?.ToString() ?? string.Empty" />
-        </RevealInput>
-        <span class="source @(_settings.Secret(key).IsEdited ? "edited" : null)">@SecretSource(_settings.Secret(key))</span>
-        @if (_settings.Secret(key).IsEdited && Editable)
-        {
-            <button type="button" class="link revert" id="@(Id(key))-remove" disabled="@_busy" @onclick="() => RemoveSecret(key)">
-                @CarText.Remove
-            </button>
-        }
-        @*
-            An owner typing a password into a browser deserves to be told where it ends up, in words
-            taken from the store itself so this cannot drift into claiming more than is true.
-        *@
-        <span class="hint">
-            @Localized.Format(CarText.KeptInSecretStore, Localized.Say(_settings.SecretProtectionPhrase, _settings.SecretProtection))
-        </span>
     </div>;
 
     private RenderFragment Provenance(string key) => @<text>
@@ -492,9 +346,6 @@
 
     private static string FeedName(VehicleFeed feed) => feed switch
     {
-        VehicleFeed.Volkswagen => "Volkswagen",
-        VehicleFeed.Skoda => "Škoda",
-        VehicleFeed.DataAct => CarText.FeedDataAct,
         VehicleFeed.OwnTopic => CarText.FeedOwnTopic,
         VehicleFeed.External => CarText.FeedExternal,
         _ => CarText.FeedNone,
@@ -502,43 +353,19 @@
 
     private static string FeedFreshness(VehicleFeed feed) => feed switch
     {
-        VehicleFeed.Volkswagen => CarText.FreshVolkswagen,
-        VehicleFeed.Skoda => CarText.FreshSkoda,
-        VehicleFeed.DataAct => CarText.FreshDataAct,
         VehicleFeed.OwnTopic => CarText.FreshOwnTopic,
         VehicleFeed.External => CarText.FreshExternal,
         _ => CarText.FreshNone,
     };
 
-    // The carried settings this form holds a value for, in the plugin's order.
-    private List<(string Key, string Value)> Carried(VehicleFeedPlugin plugin) =>
-        [.. plugin.CarriedKeys
-            .Select(key => (Key: key, Value: _values.GetValueOrDefault(key)?.Trim() ?? string.Empty))
-            .Where(entry => entry.Value.Length > 0)];
-
     private static string FeedNote(VehicleFeed feed) => feed switch
     {
-        VehicleFeed.Volkswagen =>
-            CarText.NoteVolkswagen,
-        VehicleFeed.Skoda =>
-            CarText.NoteSkoda,
-        VehicleFeed.DataAct =>
-            CarText.NoteDataAct,
         VehicleFeed.OwnTopic =>
             CarText.NoteOwnTopic,
         VehicleFeed.External =>
             CarText.NoteExternal,
         _ =>
             CarText.NoteNone,
-    };
-
-    private static string SecretSource(EvSecret secret) => secret.Source switch
-    {
-        SettingSource.SecretStore => CarText.SourceSecretStore,
-        SettingSource.Environment => Localized.Format(CarText.SourceEnvironmentDetail, secret.SourceDetail),
-        SettingSource.CommandLine => CarText.SourceCommandLine,
-        SettingSource.AppSettings => "appsettings.json",
-        _ => CarText.NotSet,
     };
 
     private static string SourceName(ConfiguredSetting setting) => setting.Source switch

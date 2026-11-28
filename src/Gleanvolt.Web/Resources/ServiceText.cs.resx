@@ -141,173 +141,8 @@
   <data name="Tariff_ProviderEmpty" xml:space="preserve">
     <value>Zdroj tarifu {0} zatím nemá data, takže se tarif nebere v úvahu.</value>
   </data>
-  <data name="Feed_VolkswagenWantsCode" xml:space="preserve">
-    <value>volkswagen.de vyžaduje jednorázový kód — přihlaste se znovu na stránce Auto.</value>
-  </data>
-  <data name="Feed_SkodaNeedsKey" xml:space="preserve">
-    <value>Chybí klíč API MyŠkoda, nebo vypršel — vložte nový na stránce Auto.</value>
-  </data>
   <data name="Health_Starting" xml:space="preserve">
     <value>čeká na první údaj</value>
-  </data>
-  <data name="SignIn_NotConfigured" xml:space="preserve">
-    <value>Není nastaven žádný účet výrobce, takže není k čemu se přihlásit.</value>
-  </data>
-  <data name="SignIn_NotTried" xml:space="preserve">
-    <value>Zatím nezkoušeno.</value>
-  </data>
-  <data name="SignIn_VwEnterCode" xml:space="preserve">
-    <value>Zadejte kód z e-mailu.</value>
-  </data>
-  <data name="SignIn_VwSignedIn" xml:space="preserve">
-    <value>Přihlášeno. Tento prohlížeč si portál pamatuje, takže po restartu by neměl být potřeba další kód.</value>
-  </data>
-  <data name="SignIn_VwCodeSent" xml:space="preserve">
-    <value>Volkswagen poslal e-mailem jednorázový kód. Zadejte ho níže.</value>
-  </data>
-  <data name="SignIn_VwCodeRejected" xml:space="preserve">
-    <value>Kód nebyl přijat. Zkontrolujte nejnovější e-mail — starší kód nebude fungovat — a zkuste to znovu. Výzva je stále otevřená, takže není třeba začínat znovu.</value>
-  </data>
-  <data name="SignIn_VwConsent" xml:space="preserve">
-    <value>Volkswagen ukazuje obrazovku se souhlasem nebo podmínkami. Otevřete volkswagen.de v prohlížeči, potvrďte ji tam a pak se tady přihlaste znovu.</value>
-  </data>
-  <data name="SignIn_VwCredentials" xml:space="preserve">
-    <value>Přihlašovací údaje nebyly přijaty. Zkontrolujte Vehicle:Website:Username a :Password.</value>
-  </data>
-  <data name="SignIn_VwNoChallenge" xml:space="preserve">
-    <value>Není otevřená žádná výzva k zadání kódu, takže kód nebyl nikam odeslán. Stiskněte Přihlásit a začněte znovu. Pokud Volkswagen nepošle nový kód, stiskněte nejdřív Odhlásit a pak Přihlásit: tím se zahodí výzva, která zůstala z dřívějšího pokusu.</value>
-  </data>
-  <data name="SignIn_VwIncomplete" xml:space="preserve">
-    <value>Přihlášení se nedokončilo. Pokud se to opakuje, počkejte několik minut a nezkoušejte to hned znovu: opakované přihlašování může vést k zablokování účtu.</value>
-  </data>
-  <data name="SignIn_SkodaAskForKey" xml:space="preserve">
-    <value>Vytvořte pro toto auto klíč API v aplikaci MySkoda a vložte ho sem.</value>
-  </data>
-  <data name="SignIn_SkodaPasteKey" xml:space="preserve">
-    <value>Vložte klíč API z aplikace MySkoda.</value>
-  </data>
-  <data name="SignIn_SkodaSignedOut" xml:space="preserve">
-    <value>Odhlášeno: klíč byl ze správce nabíjení smazán, ale u Škody platí, dokud ho nezrušíte v aplikaci MySkoda. Pro nové přihlášení sem vložte klíč.</value>
-  </data>
-  <data name="SignIn_SkodaValidUntil" xml:space="preserve">
-    <value>Klíč platí do {0}{1}</value>
-  </data>
-  <data name="SignIn_SkodaValidUntilUnsaved" xml:space="preserve">
-    <value>Klíč platí do {0}{1}. Nepodařilo se ho uložit do datového adresáře správce nabíjení, takže po restartu ho bude potřeba zadat znovu.</value>
-  </data>
-  <data name="SignIn_SkodaAccepted" xml:space="preserve">
-    <value>Klíč přijat{0}</value>
-  </data>
-  <data name="SignIn_SkodaAcceptedUnsaved" xml:space="preserve">
-    <value>Klíč přijat{0}. Nepodařilo se ho uložit do datového adresáře správce nabíjení, takže po restartu ho bude potřeba zadat znovu.</value>
-  </data>
-  <data name="Skoda_KeyExpired" xml:space="preserve">
-    <value>Tento klíč vypršel — vytvořte v aplikaci nový.</value>
-  </data>
-  <data name="Skoda_KeyUnknown" xml:space="preserve">
-    <value>Škoda tento klíč nerozpoznala.</value>
-  </data>
-  <data name="Skoda_KeyNotAuthorized" xml:space="preserve">
-    <value>Tento klíč neplatí pro VIN {0}; při vytváření klíče vyberte i toto auto.</value>
-  </data>
-  <data name="Skoda_VehicleNotFound" xml:space="preserve">
-    <value>Škoda nemá auto s VIN {0} — zkontrolujte Vehicle:Skoda:Vin.</value>
-  </data>
-  <data name="Skoda_NoAnswer" xml:space="preserve">
-    <value>Škoda neodpověděla; nic se neuložilo — zkuste to později znovu.</value>
-  </data>
-  <data name="Skoda_FeedKeyExpired" xml:space="preserve">
-    <value>Klíč API Škody vypršel — vytvořte v aplikaci nový a vložte ho na stránce Auto.</value>
-  </data>
-  <data name="Skoda_FeedKeyUnknown" xml:space="preserve">
-    <value>Škoda už uložený klíč API nerozpoznává — vložte nový na stránce Auto.</value>
-  </data>
-  <data name="Skoda_FeedKeyNotAuthorized" xml:space="preserve">
-    <value>Uložený klíč API Škody neplatí pro VIN {0} — vytvořte klíč, který zahrnuje toto auto, a vložte ho na stránce Auto.</value>
-  </data>
-  <data name="Skoda_NoKey" xml:space="preserve">
-    <value>Vložte klíč API na stránce Auto.</value>
-  </data>
-  <data name="Skoda_KeyExpiresSoon" xml:space="preserve">
-    <value>Klíč API Škody vyprší {0} — vytvořte nový v aplikaci MySkoda a vložte ho na stránce Auto.</value>
-  </data>
-  <data name="Skoda_QuotaUsedUp" xml:space="preserve">
-    <value>Limit požadavků na Škodu pro tuto hodinu je vyčerpán; další bude možný v {0}. Platí poslední údaj.</value>
-  </data>
-  <data name="Skoda_QuotaAskingAgain" xml:space="preserve">
-    <value>Hodinový limit požadavků Škody je vyčerpán; další dotaz v {0}. Platí poslední údaj.</value>
-  </data>
-  <data name="Skoda_CarDeclining" xml:space="preserve">
-    <value>Požadavky odmítá samo auto — obvykle kvůli slabé 12V baterii nebo hlubokému spánku, ne kvůli Gleanvoltu nebo klíči. Další dotaz v {0}. Platí poslední údaj.</value>
-  </data>
-  <data name="Skoda_FeedNoAnswer" xml:space="preserve">
-    <value>Škoda neodpověděla ({0}); platí poslední údaj.</value>
-  </data>
-  <data name="Skoda_Unusable" xml:space="preserve">
-    <value>Škoda odpověděla, ale {0}. Platí poslední údaj.</value>
-  </data>
-  <data name="Skoda_Answering" xml:space="preserve">
-    <value>Funguje; auto hlásilo v {0}.</value>
-  </data>
-  <data name="Feed_Answering" xml:space="preserve">
-    <value>Funguje; poslední údaj pořízen {0} {1}.</value>
-  </data>
-  <data name="Feed_VwStoppedForCode" xml:space="preserve">
-    <value>volkswagen.de vyžaduje jednorázový kód. Přihlaste se znovu na stránce Auto; zdroj se pak obnoví. Nabíjení to neovlivní.</value>
-  </data>
-  <data name="Feed_VwStoppedNoReading" xml:space="preserve">
-    <value>volkswagen.de nevrátil žádný údaj. Přihlaste se znovu na stránce Auto; zdroj se pak obnoví. Nabíjení to neovlivní.</value>
-  </data>
-  <data name="Feed_VwStoppedUnreachable" xml:space="preserve">
-    <value>volkswagen.de nebyl dostupný ({0}). Přihlaste se znovu na stránce Auto; zdroj se pak obnoví. Nabíjení to neovlivní.</value>
-  </data>
-  <data name="Feed_PortalNeeds" xml:space="preserve">
-    <value>Zdroj z portálu VW je zapnutý, ale chybí {0}.</value>
-  </data>
-  <data name="Feed_PortalAnswered" xml:space="preserve">
-    <value>Portál odpověděl; auto hlásilo v {0}.</value>
-  </data>
-  <data name="Portal_SignInRejected" xml:space="preserve">
-    <value>Portál odmítl přihlášení: {0}. Zkontrolujte heslo v .env — přihlášení se automaticky neopakuje, protože opakovaná selhání ohrožují účet.</value>
-  </data>
-  <data name="Portal_OwnerAction" xml:space="preserve">
-    <value>Portál vyžaduje něco, co můžete vyřešit jen vy ({0}) — souhlas, podmínky, OTP nebo CAPTCHA. Otevřete ho v prohlížeči a vyřešte to.</value>
-  </data>
-  <data name="Portal_Detail" xml:space="preserve">
-    <value>{0}</value>
-  </data>
-  <data name="Portal_NoData" xml:space="preserve">
-    <value>Přihlášeno, ale {0}.</value>
-  </data>
-  <data name="Portal_Unusable" xml:space="preserve">
-    <value>Přišla dodávka dat, kterou nešlo přečíst: {0}. Platí poslední platný údaj, který postupně zastarává.</value>
-  </data>
-  <data name="Portal_NoReading" xml:space="preserve">
-    <value>Poslední čtení nevrátilo žádný údaj: {0}.</value>
-  </data>
-  <data name="Account_Volkswagen" xml:space="preserve">
-    <value>Živý zdroj údajů o autu. Přihlášením tady umožníte auto sledovat; pokud Volkswagen znovu požádá o kód, zdroj se zastaví, dokud se tu znovu nepřihlásíte. Kód, který Volkswagen posílá e-mailem, můžete zadat jen vy, proto je to tato stránka, a ne úloha na pozadí.</value>
-  </data>
-  <data name="Account_Skoda" xml:space="preserve">
-    <value>Živý zdroj údajů o této Škodě, čtený mezi nabíjeními i během nich. Škoda místo hesla používá klíč API: vytvoříte ho v aplikaci MySkoda pro toto auto a jednou ho sem vložíte. Klíč se ověří u Škody, uloží se jen ve správci nabíjení a už se nikdy nezobrazí.</value>
-  </data>
-  <data name="Portal_Missing" xml:space="preserve">
-    <value>{0}</value>
-  </data>
-  <data name="Portal_MissingBrand" xml:space="preserve">
-    <value>značka (jedna z {0}) nebo vlastní ID klienta</value>
-  </data>
-  <data name="Portal_UnknownBrand" xml:space="preserve">
-    <value>známá značka — „{0}“ není jedna z {1}; pokud vaše chybí, nastavte vlastní ID klienta</value>
-  </data>
-  <data name="Portal_MissingVwId" xml:space="preserve">
-    <value>VW ID</value>
-  </data>
-  <data name="Portal_MissingPassword" xml:space="preserve">
-    <value>heslo</value>
-  </data>
-  <data name="Portal_ClientNeeds" xml:space="preserve">
-    <value>Klientovi portálu chybí {0}.</value>
   </data>
   <data name="Refresh_NoFeed" xml:space="preserve">
     <value>Není nastaven žádný zdroj dat vozidla, takže není koho se zeptat.</value>
@@ -408,23 +243,8 @@
   <data name="Config_NotWritten" xml:space="preserve">
     <value>Nepodařilo se zapsat {0}: {1}</value>
   </data>
-  <data name="Config_PasswordNotRemoved" xml:space="preserve">
-    <value>Uložené heslo se nepodařilo odstranit. Zkontrolujte oprávnění datového adresáře.</value>
-  </data>
-  <data name="Config_TwoPasswords" xml:space="preserve">
-    <value>Najednou byla odeslána dvě různá hesla; uložit lze jen jeden účet vozidla.</value>
-  </data>
-  <data name="Config_PasswordNotStored" xml:space="preserve">
-    <value>Heslo se nepodařilo uložit ({0}). Nic jiného se nezměnilo.</value>
-  </data>
-  <data name="Config_TwoFeeds" xml:space="preserve">
-    <value>Vehicle:Website i Vehicle:Skoda by byly zapnuté zároveň, ale čtou dvě různá auta (volkswagen.de a MyŠkoda API). Instalace má jen jedno auto.</value>
-  </data>
   <data name="Config_FeedNeeds" xml:space="preserve">
     <value>Zapnutý zdroj potřebuje {0}, ale hodnota je prázdná.</value>
-  </data>
-  <data name="Config_UnknownBrand" xml:space="preserve">
-    <value>Vehicle:DataAct:Brand ('{0}') není jedna z {1}. Vyberte jednu, nebo zadejte přímo Vehicle:DataAct:ClientId, pokud vaše značka chybí.</value>
   </data>
   <data name="Solcast_EnterKey" xml:space="preserve">
     <value>Zadejte klíč API ze svého účtu Solcast.</value>
@@ -676,9 +496,6 @@
   <data name="Vehicle_Empty" xml:space="preserve">
     <value>Údaj nic neříká: potřebuje aspoň jedno z SOC, dojezdu, stavu nabíjení nebo stavu kabelu.</value>
   </data>
-  <data name="Config_ExternalAndLiveFeed" xml:space="preserve">
-    <value>Vehicle:External by byl zapnutý vedle živého zdroje výrobce. Instalace čte auto z jednoho zdroje.</value>
-  </data>
   <data name="ProviderStatus_NotSetUp" xml:space="preserve">
     <value>účet ještě není zadaný; zadejte ho na stránce pluginu</value>
   </data>
@@ -807,5 +624,8 @@
   </data>
   <data name="Config_SetupChargerKey" xml:space="preserve">
     <value>{0}: nabíječka už není součástí nastavení. Nabíječka je plugin s vlastní stránkou nastavení, který přijmete v Nastavení → Pluginy. Klíče nabíječky z instalačního souboru odstraňte.</value>
+  </data>
+  <data name="Config_SetupRetiredCarKey" xml:space="preserve">
+    <value>{0}: Gleanvolt už auto sám nečte. Čte ho plugin {1}: spusťte ho, přijměte ho v Nastavení → Pluginy, na jeho stránce nastavte účet a na stránce Auto zvolte Plugin. Klíč z instalačního souboru odstraňte.</value>
   </data>
 </root>

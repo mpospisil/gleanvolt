@@ -5,33 +5,16 @@
 @inject ChargingLimits Limits
 @inject ConfiguredVehicleFeed Feed
 @inject IEvEditor Editor
-@inject IVehiclePortalReader Portal
 @inject IVehicleStateRefresh Refresh
 @inject IVehicleTelemetry Telemetry
 @inject TimeProvider Time
 
 @*
-    The car: the whole of it, on one page (issues #214, #227).
+    The car: the whole of it, on one page (issues #214, #227). The form at the top edits what the NEXT start
+    reads; everything under it is what this process resolved at startup and is running with. Since #477
+    Gleanvolt reads no manufacturer itself: a car plugin does, and its account is on the plugin's page.
 
-    #214 gave the car a form and put "does that account work" on a second page, /vehicle-portal, on the
-    grounds that this page was "which car, and which account" and that one was "does it work". That
-    reads well as a sentence and badly as a journey: the sequence #214 itself prescribes is save →
-    restart → sign in → ask the car, and it crossed the navigation twice for one sitting. Neither page
-    was useful without the other, and nothing on either was long enough to need a page of its own.
-
-    So the sections are in the order the work is done: Edit → Account → Ask the car → Running → Feed →
-    Diagnostics. The form at the top edits what the NEXT start reads; everything under it is what this
-    process resolved at startup and is running with.
-
-    /vehicle-portal survives as a redirect (VehiclePortalRedirect.razor) rather than a 404, because
-    docs/VW_PORTAL_SETUP.md has been telling owners to go there since #137.
-
-    The other half of #227: what an owner saw on the old page depended on the manufacturer, and no
-    choice got both halves of it. The sign-in was registered only for volkswagen.de and MyŠkoda, so
-    for the other three the block vanished silently; the read button was the Data Act portal's alone,
-    so the other four landed on a red "not configured" and a hint telling them to set VW_* keys — which
-    for a live feed would arrange a Data Act portal that #212 then sets aside. Both halves now key on
-    the feed this installation actually runs, and both say something for every one of the five.
+    /vehicle-portal survives as a redirect (VehiclePortalRedirect.razor) rather than a 404.
 *@
 
 <SiteTitle Page="@CarText.CarPageTitle" />
@@ -46,93 +29,13 @@
 
 <CarEditorForm />
 
-<VehicleAccount Feed="_runningFeed" />
-
 <h2>@CarText.AskTheCarHeading</h2>
 
 @*
-    One button, against whatever feed this installation has (#227).
-
-    It used to be the Data Act portal's reader and nothing else, which is why four of the five choices
-    met a red error. What generalises it is that IVehicleUpdateService.FetchAsync -- the call the
-    polling worker makes on a clock -- is the same call made because somebody asked, which is exactly
-    what IVehicleStateRefresh already is (#168).
-
-    The two differ in one way that has to be said out loud rather than papered over: a Data Act read is
-    fed to nothing, and a live feed's fetch writes to the holder like any other fetch. That is the
-    better behaviour -- an owner pressing a button wants the dashboard to catch up -- but it makes one
-    sentence about "what this shows is fed to nothing" false for two of the five, so each source says
-    what its own press does.
-
-    Neither one happens on a render. Opening this page must never replay a password or email anybody a
-    code.
+    One button, against whatever feed this installation has (#227): IVehicleStateRefresh, the call the polling
+    worker makes on a clock, made because somebody asked. Never on a render.
 *@
-@if (_runningFeed == VehicleFeed.DataAct)
-{
-    <p class="muted">
-        @Localized.Rich(CarText.PortalIntro, @<text>@(Portal.PortalName)</text>, @<text>@(CarName)</text>, @<em>@CarText.PortalIntro_2</em>)
-    </p>
-
-    @if (!Portal.IsConfigured)
-    {
-        @*
-            Red here and nowhere else: this is the one installation that asked for this portal, so
-            something missing from it really is missing. The old hint named VW_BRAND, VW_USERNAME and
-            VW_PASSWORD in .env; since #214 those are fields in the form above, which is where an owner
-            who has just read this can actually go.
-        *@
-        <p class="error" id="portal-unconfigured">
-            @Localized.Format(CarText.NotConfiguredNeeds, Localized.Say(Portal.DescribeWhatIsMissingPhrase(), Portal.DescribeWhatIsMissing()))
-        </p>
-
-        <p class="hint">
-            @Localized.Rich(CarText.PortalFieldsHint, @<em>@CarText.PortalFieldsHint_0</em>, @<em>@CarText.PortalFieldsHint_1</em>, @<em>@CarText.PortalFieldsHint_2</em>, @<em>@CarText.PortalFieldsHint_3</em>, @<em>@CarText.PortalFieldsHint_4</em>, @<code>docs/VW_PORTAL_SETUP.md</code>)
-        </p>
-    }
-    else
-    {
-        <div class="actions">
-            <button type="button" class="secondary" id="car-ask" disabled="@_busy" @onclick="ReadPortalAsync">
-                @(_busy ? CarText.AskingTheCar : CarText.AskTheCar)
-            </button>
-        </div>
-
-        <p class="hint">
-            @CarText.SignsInAfresh
-        </p>
-    }
-}
-else if (_runningFeed is VehicleFeed.Volkswagen or VehicleFeed.Skoda)
-{
-    @if (Feed.Service is { } service)
-    {
-        <p class="muted">
-            @Localized.Rich(CarText.FeedIntro, @<text>@(service.DisplayName)</text>, @<text>@(CarName)</text>, @<em>@CarText.FeedIntro_2</em>)
-        </p>
-
-        <div class="actions">
-            <button type="button" class="secondary" id="car-ask" disabled="@_busy" @onclick="AskFeedAsync">
-                @(_busy ? CarText.AskingTheCar : CarText.AskTheCar)
-            </button>
-        </div>
-
-        <p class="hint">
-            @CarText.FeedAskHint
-        </p>
-    }
-    else
-    {
-        @*
-            The feed is switched on and did not start — its fields are not all filled in, so nothing
-            was registered to ask. Not an error about a portal nobody chose, which is what this page
-            used to show: a sentence about the feed that was chosen.
-        *@
-        <p class="muted" id="car-ask-unavailable">
-            @CarText.NothingToAskYet
-        </p>
-    }
-}
-else if (_runningFeed == VehicleFeed.External)
+@if (_runningFeed == VehicleFeed.External)
 {
     @*
         An external provider (#408): it publishes on its own, so the button is the exception rather
@@ -182,54 +85,6 @@ else
 }
 
 @*
-    A Data Act read's failure, and its card. Kept apart from the live feed's below because the two
-    carry different things: the portal's reading knows the bundle it came out of and whether pressing
-    again could help, and a feed's fetch knows neither.
-*@
-@if (_reading is { Succeeded: false } failed)
-{
-    <p class="error">
-        <strong>@FailureKind(failed.FailureKind)</strong> — @Localized.Say(failed.MessagePhrase, failed.Message ?? string.Empty, Time.LocalTimeZone)
-    </p>
-
-    <p class="hint">
-        @(failed.IsWorthRetrying
-            ? CarText.WorthRetrying
-            : CarText.NotWorthRetrying)
-    </p>
-}
-else if (_reading is { Succeeded: true, State: { } state })
-{
-    @Card(state, _reading.TargetSocPercent)
-
-    @*
-        This press against what the feed is holding (#178).
-
-        They are different sessions, asking at different moments, and the point of saying so out loud
-        is that a small disagreement here is the expected outcome rather than evidence of a fault.
-        A large or persistent one is a real finding, and the feeds page is where it gets counted
-        rather than eyeballed.
-    *@
-    @if (Telemetry.GetCurrentState() is { } held)
-    {
-        <p class="muted" id="against-the-feed">
-            @Localized.Format(
-                CarText.CardShowing,
-                Units.Percent(held.SocPercent),
-                string.IsNullOrWhiteSpace(held.SourceId) ? CarText.TheFeed : held.SourceId,
-                Age(held),
-                Difference(state, held))
-        </p>
-    }
-    else
-    {
-        <p class="muted" id="against-the-feed">
-            @CarText.NothingOnTheCard
-        </p>
-    }
-}
-
-@*
     A live feed's press. A failure here keeps whatever the holder had on screen rather than blanking
     it -- an answer now known to be old is worth more than no answer, provided its age is beside it.
 *@
@@ -242,7 +97,7 @@ else if (_reading is { Succeeded: true, State: { } state })
 
     @if (answer.State is { } reading)
     {
-        @Card(reading, null)
+        @Card(reading)
 
         <p class="muted table-note" id="car-ask-source">
             @(answer.IsFresh
@@ -316,11 +171,7 @@ else
 
 <h2>@CarText.Feed</h2>
 
-@*
-    Which feed this process actually started, as opposed to which one the configuration asks for. They
-    differ in exactly one case worth showing: the Data Act portal beside a live feed, which #212 sets
-    aside with a log line nobody reads twice.
-*@
+@* Which feed this process actually started, as opposed to which one the configuration asks for. *@
 @if (Feed.Service is { } running)
 {
     <dl class="facts">
@@ -341,19 +192,12 @@ else
     </p>
 }
 
-@if (Feed.SetAside is { } setAside)
-{
-    <p class="table-note muted" id="feed-set-aside">@setAside</p>
-}
-
 @if (!string.IsNullOrWhiteSpace(Vehicle.TelemetryTopic))
 {
     <p class="table-note muted" id="own-topic">
         @Localized.Rich(CarText.OwnTopicToo, @<code>@Vehicle.TelemetryTopic</code>)
     </p>
 }
-
-<PortalDiagnostics Reading="_reading" />
 
 @code {
     private const string Missing = Units.Missing;
@@ -362,7 +206,7 @@ else
         System.Globalization.CultureInfo.InvariantCulture;
 
     /// <summary>
-    /// The feed this process started, which is what the account and the button key on. Read once:
+    /// The feed this process started, which is what the button keys on. Read once:
     /// nothing can change it while the page is open, because changing it is a restart.
     ///
     /// <para>The running feed rather than the saved one, deliberately. A save that has not been
@@ -370,9 +214,6 @@ else
     /// <i>Saved, not applied</i> banner is where that difference belongs.</para>
     /// </summary>
     private VehicleFeed _runningFeed;
-
-    /// <summary>What a Data Act press came back with, or null before one.</summary>
-    private VehiclePortalReading? _reading;
 
     /// <summary>What a live feed's press came back with, or null before one.</summary>
     private VehicleRefreshResult? _asked;
@@ -389,10 +230,9 @@ else
     ///
     /// <para>Same Stat component and the same formatters as the dashboard, deliberately: the reason to
     /// look at this page beside that one is to compare them, and a difference in rounding would read
-    /// as a difference in the reading. <paramref name="targetSoc"/> is the Data Act portal's — no live
-    /// feed carries one — and a dash there means this source did not say.</para>
+    /// as a difference in the reading.</para>
     /// </summary>
-    private RenderFragment Card(VehicleState state, double? targetSoc) => @<text>
+    private RenderFragment Card(VehicleState state) => @<text>
         <h3>@CarName</h3>
 
         <section class="stat-grid" id="car">
@@ -406,8 +246,6 @@ else
                   Hint="@CarText.CarChargeStateHint" />
             <Stat Label="@CarText.CarPlugState" Value="@Localized.Name(state.PlugState)"
                   Hint="@CarText.CarPlugStateHint" />
-            <Stat Label="@CarText.TargetSoc" Value="@Units.Percent(targetSoc)"
-                  Hint="@CarText.TargetSocHint" />
             <Stat Label="@CarText.TimeLeft" Value="@VehicleFormatting.ChargeTime(state)"
                   Hint="@CarText.TimeLeftHint" />
         </section>
@@ -418,31 +256,6 @@ else
     </text>;
 
     /// <summary>
-    /// The Data Act portal, once. Its reading is not written to the holder: that is the one thing
-    /// about this source that has not changed, and the sentence above the button says so.
-    /// </summary>
-    private async Task ReadPortalAsync()
-    {
-        _busy = true;
-        _reading = null;
-        _asked = null;
-        StateHasChanged();
-
-        try
-        {
-            // The reader does not throw for an expected failure -- a refused password, a consent
-            // screen, a portal with nothing to give all come back as an unsuccessful reading. Only a
-            // genuine bug would escape, and swallowing that here would hide it.
-            _reading = await Portal.ReadAsync();
-        }
-        finally
-        {
-            _busy = false;
-            StateHasChanged();
-        }
-    }
-
-    /// <summary>
     /// The configured live feed, once, now. The same call the worker makes, so what comes back reaches
     /// the holder and with it the dashboard — which is what an owner pressing a button is asking for.
     /// </summary>
@@ -450,7 +263,6 @@ else
     {
         _busy = true;
         _asked = null;
-        _reading = null;
         StateHasChanged();
 
         try
@@ -465,40 +277,6 @@ else
     }
 
     private string Age(VehicleState state) => VehicleFormatting.Age(state, Time.GetUtcNow());
-
-    /// <summary>
-    /// How far this press and the feed's held reading are apart, as a clause to hang off the end of
-    /// the sentence. Empty when there is nothing to compare — one of the two carrying no state of
-    /// charge is a fact about the sources, not a disagreement between them.
-    /// </summary>
-    private static string Difference(VehicleState pressed, VehicleState held)
-    {
-        if (pressed.SocPercent is not { } here || held.SocPercent is not { } there)
-        {
-            return string.Empty;
-        }
-
-        // Compared at the precision both are displayed at. Two readings that print as 64% must not be
-        // described as differing, whatever their third decimal places are doing.
-        var gap = Math.Round(here) - Math.Round(there);
-
-        if (gap == 0)
-        {
-            return " " + CarText.SameSoc;
-        }
-
-        var size = Math.Abs(gap);
-        var points = (long)size;
-        return " " + Localized.Format(
-            gap > 0
-                ? Localized.Plural(points, CarText.PointsBelow_One, CarText.PointsBelow_Few, CarText.PointsBelow_Other)
-                : Localized.Plural(points, CarText.PointsAbove_One, CarText.PointsAbove_Few, CarText.PointsAbove_Other),
-            points);
-    }
-
-    // The portal's failure kinds, by name; a kind this build does not name shows as it came.
-    private static string? FailureKind(string? kind) =>
-        kind is null ? null : CarText.ResourceManager.GetString($"PortalFailure_{kind}", System.Globalization.CultureInfo.CurrentUICulture) ?? kind;
 
     private static string Text(string value) => string.IsNullOrWhiteSpace(value) ? Missing : value;
 

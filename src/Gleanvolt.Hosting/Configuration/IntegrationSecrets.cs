@@ -13,7 +13,7 @@ namespace Gleanvolt.Hosting.Configuration;
 /// <para>Configuration rather than a service reading the store, because both are consumed as options
 /// bound once at startup (<c>HomeAssistantOptions</c>, <c>ApiOptions</c>) by code that has no reason to
 /// know where a value came from. The vehicle account password arrives the same way; see
-/// <see cref="VehicleAccountSecret"/>.</para>
+/// <see cref="SecretStoreLocation"/>.</para>
 /// </summary>
 public static class IntegrationSecrets
 {
@@ -21,7 +21,7 @@ public static class IntegrationSecrets
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var source = new IntegrationSecretsSource(VehicleAccountSecret.Open(configuration, contentRoot));
+        var source = new IntegrationSecretsSource(SecretStoreLocation.Open(configuration, contentRoot));
 
         var commandLine = configuration.Sources
             .Select((candidate, index) => (candidate, index))

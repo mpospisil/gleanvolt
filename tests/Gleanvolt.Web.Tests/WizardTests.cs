@@ -36,7 +36,6 @@ public class WizardTests : PageTest
         Services.AddSingleton<IIntegrationsEditor>(new FakeIntegrationsEditor());
         Services.AddSingleton<ITariffEditor>(new FakeTariffEditor());
         Services.AddSingleton(new TariffPanelRegistration(TariffProviderIds.Table, typeof(TariffTablePanel)));
-        Services.AddSingleton<IVehicleAccountSignIn>(new FakeVehicleAccountSignIn(configured: false));
         Services.AddSingleton<TimeProvider>(TimeProvider.System);
         Services.AddSingleton(Options.Create(new WebOptions { PasswordHash = "hash" }));
         Services.AddSingleton(new WebPasswordState("hash"));

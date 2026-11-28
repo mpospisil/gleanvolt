@@ -169,7 +169,7 @@ public static class PvSystemOverrides
         var temporary = path + ".tmp";
         var open = new FileStreamOptions { Mode = FileMode.Create, Access = FileAccess.Write };
 
-        // Owner-only, as SkodaApiKeyStore writes: nothing in it is secret, but device addresses decide
+        // Owner-only, as the secret store writes: nothing in it is secret, but device addresses decide
         // where Modbus writes go, and nobody else on the box has a reason to change them. Windows has
         // no such mode.
         if (!OperatingSystem.IsWindows())

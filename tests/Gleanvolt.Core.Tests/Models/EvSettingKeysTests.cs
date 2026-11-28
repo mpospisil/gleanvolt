@@ -33,15 +33,13 @@ public class EvSettingKeysTests
     }
 
     [Fact]
-    public void The_passwords_are_the_only_secrets()
+    public void The_built_in_feeds_keys_are_not_editable()
     {
-        Assert.Equal(
-            [EvSettingKeys.WebsitePassword, EvSettingKeys.DataActPassword],
-            EvSettingKeys.Secrets);
-
-        Assert.True(EvSettingKeys.IsSecret(EvSettingKeys.WebsitePassword));
-        Assert.False(EvSettingKeys.IsSecret(EvSettingKeys.WebsiteUsername));
-        Assert.All(EvSettingKeys.Secrets, key => Assert.Contains(key, EvSettingKeys.All));
+        // Removed in #477: a car plugin keeps the account on its own page.
+        Assert.False(EvSettingKeys.IsEditable("Vehicle:Website:Enabled"));
+        Assert.False(EvSettingKeys.IsEditable("Vehicle:Website:Password"));
+        Assert.False(EvSettingKeys.IsEditable("Vehicle:Skoda:Vin"));
+        Assert.False(EvSettingKeys.IsEditable("Vehicle:DataAct:Brand"));
     }
 
     [Fact]
@@ -57,7 +55,7 @@ public class EvSettingKeysTests
 
     [Fact]
     public void The_environment_variable_is_the_one_an_operator_will_grep_for() =>
-        Assert.Equal("Vehicle__Skoda__Vin", EvSettingKeys.EnvironmentVariable(EvSettingKeys.SkodaVin));
+        Assert.Equal("Vehicle__External__Enabled", EvSettingKeys.EnvironmentVariable(EvSettingKeys.ExternalEnabled));
 }
 
 /// <summary>
@@ -88,38 +86,22 @@ public class VehicleFeedsTests
             feed => Assert.All(VehicleFeeds.Required(feed), key => Assert.Contains(key, VehicleFeeds.Fields(feed))));
 
     [Fact]
-    public void The_client_id_is_offered_but_never_required()
-    {
-        // The escape hatch for a brand whose sign-in id has changed: documentation for a failure, not
-        // a field to fill, so requiring it would refuse every ordinary Data Act installation.
-        Assert.Contains(EvSettingKeys.DataActClientId, VehicleFeeds.Fields(VehicleFeed.DataAct));
-        Assert.DoesNotContain(EvSettingKeys.DataActClientId, VehicleFeeds.Required(VehicleFeed.DataAct));
-    }
+    public void The_choices_are_a_plugin_the_own_topic_or_charge_only() =>
+        Assert.Equal([VehicleFeed.External, VehicleFeed.OwnTopic, VehicleFeed.ChargeOnly], VehicleFeeds.All);
 
     [Fact]
     public void Nothing_enabled_is_charge_only() =>
         Assert.Equal(VehicleFeed.ChargeOnly, VehicleFeeds.Selected(_ => false));
 
     [Theory]
-    [InlineData(VehicleFeed.Volkswagen)]
-    [InlineData(VehicleFeed.Skoda)]
-    [InlineData(VehicleFeed.DataAct)]
+    [InlineData(VehicleFeed.External)]
     [InlineData(VehicleFeed.OwnTopic)]
     public void One_enabled_key_selects_its_feed(VehicleFeed feed) =>
         Assert.Equal(feed, VehicleFeeds.Selected(key => key == VehicleFeeds.EnabledKey(feed)));
 
     [Fact]
-    public void A_live_feed_beside_the_portal_is_the_one_named()
-    {
-        // The order the composition root resolves in (#212): the portal is set aside, not run beside
-        // a live feed, so a file carrying both since before this page existed reads as the feed that
-        // is actually running.
+    public void A_plugin_beside_the_own_topic_is_the_one_named() =>
         Assert.Equal(
-            VehicleFeed.Volkswagen,
-            VehicleFeeds.Selected(key => key is EvSettingKeys.WebsiteEnabled or EvSettingKeys.DataActEnabled));
-
-        Assert.Equal(
-            VehicleFeed.Skoda,
-            VehicleFeeds.Selected(key => key is EvSettingKeys.SkodaEnabled or EvSettingKeys.DataActEnabled));
-    }
+            VehicleFeed.External,
+            VehicleFeeds.Selected(key => key is EvSettingKeys.ExternalEnabled or EvSettingKeys.MqttEnabled));
 }

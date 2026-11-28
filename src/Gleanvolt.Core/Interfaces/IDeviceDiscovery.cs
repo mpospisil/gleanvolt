@@ -5,7 +5,7 @@ namespace Gleanvolt.Core.Interfaces;
 /// <summary>
 /// Looks for the inverter and the charger on the local network, for the setup wizard (#302).
 ///
-/// <para>Declared here and implemented by the host, like <see cref="IVehicleAccountSignIn"/>: the web UI
+/// <para>Declared here and implemented by the host, like <see cref="IVehicleStateRefresh"/>: the web UI
 /// that asks has no business knowing how a scan is done, and a test can stand in for one without a
 /// network.</para>
 ///

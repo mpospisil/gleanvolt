@@ -1,9 +1,6 @@
 using System.Net;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Infrastructure.Secrets;
-using Gleanvolt.Infrastructure.Vehicles.Skoda;
-using Gleanvolt.Infrastructure.Vehicles.VwWebsite;
-using static Gleanvolt.Infrastructure.Tests.SkodaFixtures;
 
 namespace Gleanvolt.Infrastructure.Tests;
 
@@ -128,85 +125,6 @@ public sealed class FileSecretStoreTests : IDisposable
         File.WriteAllText(blocker, "a file where a directory was wanted");
 
         return Path.Combine(blocker, "data");
-    }
-
-    public void Dispose()
-    {
-        if (Directory.Exists(_store.Directory))
-        {
-            Directory.Delete(_store.Directory, recursive: true);
-        }
-    }
-}
-
-/// <summary>
-/// The upgrade path (issue #215). Both secrets were plain files in the data directory before the
-/// store existed, under the names the store now uses, so an upgrade finds them where it looks — and
-/// <b>an upgrade never demands a fresh sign-in</b> is the acceptance criterion this asserts.
-/// </summary>
-public sealed class SecretMigrationTests : IDisposable
-{
-    private readonly FileSecretStore _store = new(
-        Path.Combine(Path.GetTempPath(), $"gleanvolt-migrate-{Guid.NewGuid():N}"));
-
-    [Fact]
-    public void A_session_file_written_before_the_store_existed_still_signs_in()
-    {
-        // Exactly what VwWebsiteSessionStore wrote before it went through the seam.
-        WriteLegacy(
-            "vw-website-session.json",
-            """[{"Name":"auth0-mf","Value":"remember-this-browser","Domain":"identity.vwgroup.io","Path":"/","Secure":true,"HttpOnly":true}]""");
-
-        var session = new VwWebsiteSessionStore(_store);
-
-        Assert.True(session.Exists);
-        var cookie = Assert.Single(session.Load().GetAllCookies());
-        Assert.Equal("remember-this-browser", cookie.Value);
-    }
-
-    [Fact]
-    public void A_key_file_written_before_the_store_existed_is_still_the_key_in_use()
-    {
-        WriteLegacy(
-            "skoda-api-key.json",
-            """{"Key":"sk-live-0123456789abcdef","ExpiresAt":"2027-03-01T12:00:00+00:00","VehicleName":"My Enyaq"}""");
-
-        var keys = new SkodaApiKeyStore(_store);
-
-        Assert.Equal("sk-live-0123456789abcdef", keys.Current?.Key);
-        Assert.Equal("My Enyaq", keys.Current?.VehicleName);
-    }
-
-    /// <summary>
-    /// Truncated, half-written, or edited by hand. Every one of these is <i>sign in again</i>, which
-    /// the callers already know how to say, and never an exception out of a constructor that runs
-    /// during startup.
-    /// </summary>
-    [Theory]
-    [InlineData("")]
-    [InlineData("{ not json at all")]
-    [InlineData("""{"Key":""}""")]
-    public void A_damaged_key_is_no_key_rather_than_a_crash(string content)
-    {
-        WriteLegacy("skoda-api-key.json", content);
-
-        Assert.Null(new SkodaApiKeyStore(_store).Current);
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("[{ truncated")]
-    public void A_damaged_session_is_a_cold_login_rather_than_a_crash(string content)
-    {
-        WriteLegacy("vw-website-session.json", content);
-
-        Assert.Empty(new VwWebsiteSessionStore(_store).Load().GetAllCookies());
-    }
-
-    private void WriteLegacy(string file, string content)
-    {
-        Directory.CreateDirectory(_store.Directory);
-        File.WriteAllText(Path.Combine(_store.Directory, file), content);
     }
 
     public void Dispose()
@@ -419,72 +337,6 @@ public sealed class DpapiSecretStoreTests : IDisposable
         if (Directory.Exists(_files.Directory))
         {
             Directory.Delete(_files.Directory, recursive: true);
-        }
-    }
-}
-
-/// <summary>
-/// A secret never reaches a log line, a diagnostic view or an error message (issue #215) — including
-/// on the paths that exist precisely because something went wrong, which is where a value gets
-/// pasted into a message by accident.
-/// </summary>
-public sealed class SecretRedactionTests : IDisposable
-{
-    private readonly FileSecretStore _blocked = new(FileSecretStoreTests.BlockedDirectory());
-    private readonly FileSecretStore _working = new(
-        Path.Combine(Path.GetTempPath(), $"gleanvolt-redaction-{Guid.NewGuid():N}"));
-    private readonly FakeApi _api = new(_ => Json(HttpStatusCode.OK, "info.json", new DateTimeOffset(2027, 3, 1, 12, 0, 0, TimeSpan.Zero)));
-    private readonly CapturingLogger<SkodaApiSignIn> _log = new();
-    private readonly SkodaApiClient _client;
-
-    public SecretRedactionTests() => _client = new SkodaApiClient(Options(), transport: _api);
-
-    /// <summary>
-    /// The store cannot write, so the sign-in takes its "it could not be saved" branch — the one
-    /// sentence in the flow that has both the secret and a reason to mention where it went.
-    /// </summary>
-    [Fact]
-    public async Task An_unsaveable_key_is_reported_without_the_key_in_it()
-    {
-        var store = new SkodaApiKeyStore(_blocked);
-        var signIn = new SkodaApiSignIn(Options(), store, _client, _log);
-
-        var state = await signIn.SubmitAsync(Key);
-
-        // The key is in use although it could not be saved, and the owner is told that much.
-        Assert.Equal(Key, store.Current?.Key);
-        Assert.Contains("restart", state.Message);
-
-        Assert.DoesNotContain(Key, state.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain(Key, signIn.Explanation ?? string.Empty, StringComparison.Ordinal);
-        Assert.All(_log.Messages, message => Assert.DoesNotContain(Key, message, StringComparison.Ordinal));
-        Assert.NotEmpty(_log.Messages);
-    }
-
-    /// <summary>Nor on the path where everything worked.</summary>
-    [Fact]
-    public async Task A_key_that_is_accepted_and_stored_is_not_logged_either()
-    {
-        var keys = new SkodaApiKeyStore(_working);
-        var signIn = new SkodaApiSignIn(Options(), keys, _client, _log);
-
-        var state = await signIn.SubmitAsync(Key);
-
-        Assert.True(state.IsSignedIn);
-        Assert.DoesNotContain(Key, state.Message, StringComparison.Ordinal);
-        Assert.All(_log.Messages, message => Assert.DoesNotContain(Key, message, StringComparison.Ordinal));
-
-        // The record the debugger and any log template would reach for, too.
-        Assert.DoesNotContain(Key, keys.Current!.ToString(), StringComparison.Ordinal);
-    }
-
-    public void Dispose()
-    {
-        _client.Dispose();
-
-        if (Directory.Exists(_working.Directory))
-        {
-            Directory.Delete(_working.Directory, recursive: true);
         }
     }
 }
