@@ -30,6 +30,8 @@
     <ProjectReference Include="..\Gleanvolt.Providers.Client\Gleanvolt.Providers.Client.csproj" />
     <!-- PluginHarness and FakeModbusServer, for a plugin built on the charger plugin host (#443). -->
     <ProjectReference Include="..\Gleanvolt.Chargers.Hosting\Gleanvolt.Chargers.Hosting.csproj" />
+    <!-- CarPluginHarness, for a plugin built on the car plugin host (#473). -->
+    <ProjectReference Include="..\Gleanvolt.Cars.Hosting\Gleanvolt.Cars.Hosting.csproj" />
   </ItemGroup>
 
   <ItemGroup>

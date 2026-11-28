@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!--
+    What every Gleanvolt car plugin shares, whoever writes it and in whatever repository (#473): the car's base (one
+    request to the maker however many reasons to read, a block while the owner is needed, the status), its clock
+    (faster while Gleanvolt charges), the host on the shared plugin host, and the page's frame. A plugin keeps only
+    the talk with its car's maker and its own settings.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AddRazorSupportForMvc>false</AddRazorSupportForMvc>
+    <RootNamespace>Gleanvolt.Cars</RootNamespace>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Gleanvolt.Cars.Hosting</PackageId>
+    <Description>Write a Gleanvolt car plugin in a few files: the host, the page Gleanvolt frames, the car's base with its clock and status, on the Gleanvolt provider SDK. The plugin reads its car from the maker. MIT.</Description>
+    <PackageTags>gleanvolt;ev;car;vehicle;plugin;provider</PackageTags>
+
+    <!-- MIT, like the contracts: see Gleanvolt.Providers.Contracts.csproj. -->
+    <GleanvoltMitPackage>true</GleanvoltMitPackage>
+    <PackageLicenseFile></PackageLicenseFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="LICENSE" Pack="true" PackagePath="\" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <!-- The shared host's namespace for every plugin on this package, however it is referenced. A .targets: the Razor
+         SDK writes build/<PackageId>.props itself for a package with static web assets. -->
+    <None Include="build\Gleanvolt.Cars.Hosting.targets" Pack="true" PackagePath="build\;buildTransitive\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gleanvolt.Plugins.Hosting\Gleanvolt.Plugins.Hosting.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Gleanvolt.Plugins" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gleanvolt.Providers.Testing" />
+    <InternalsVisibleTo Include="Gleanvolt.Providers.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="..\CultureInvariant.globalconfig" />
+  </ItemGroup>
+
+</Project>
