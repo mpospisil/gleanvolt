@@ -23,9 +23,11 @@ say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 # The plugins released with Gleanvolt (#426): each is the compose service gleanvolt-plugin-<name> under
 # the profile <name>, with its data in plugins/<name>. GLEANVOLT_PLUGINS in the Pi's .env picks which run. The
 # charger plugins (#444) come from gleanvolt-chargers; at most one runs, and since 1.4 (#445) it is the only way the
-# controller reaches the charger.
+# controller reaches the charger. The car plugins (#476) come from gleanvolt-cars; at most one runs, read with "A plugin"
+# chosen on the Car page.
 CHARGER_PLUGINS="solax huawei goe shelly"
-KNOWN_PLUGINS="openweather $CHARGER_PLUGINS"
+CAR_PLUGINS="volkswagen skoda vwgroup"
+KNOWN_PLUGINS="openweather $CHARGER_PLUGINS $CAR_PLUGINS"
 
 # env_value <name>: the value the Pi's .env gives <name> on its last line for it, without quotes or a
 # trailing comment. Empty when it is not set.
@@ -197,6 +199,22 @@ EOF
 error: GLEANVOLT_PLUGINS in $REMOTE_DIR/.env names more than one charger plugin:$charger_plugins
 
 One charger is supported. Keep the one for your charger and deploy again.
+EOF
+        exit 1
+    fi
+
+    # One car plugin at most, for the same reason: one car is supported, and Gleanvolt reads it from one plugin.
+    local car_plugins=""
+    for plugin in $enabled; do
+        case " $CAR_PLUGINS " in
+            *" $plugin "*) car_plugins="$car_plugins $plugin" ;;
+        esac
+    done
+    if [ "$(echo $car_plugins | wc -w)" -gt 1 ]; then
+        cat >&2 <<EOF
+error: GLEANVOLT_PLUGINS in $REMOTE_DIR/.env names more than one car plugin:$car_plugins
+
+One car is supported. Keep the one for your car and deploy again.
 EOF
         exit 1
     fi

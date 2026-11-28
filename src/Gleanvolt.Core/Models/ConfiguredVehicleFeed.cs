@@ -17,7 +17,11 @@ namespace Gleanvolt.Core.Models;
 /// A sentence for the startup log when a configured feed was not started because another one
 /// reads this car better — the Data Act portal beside <c>Vehicle:Website</c>. Null otherwise.
 /// </param>
-public sealed record ConfiguredVehicleFeed(IVehicleUpdateService? Service, string? SetAside = null)
+/// <param name="BuiltIn">
+/// The deprecated built-in manufacturer feed this installation runs (#476), for one startup warning naming the
+/// plugin that replaces it. Null for any other feed, or none.
+/// </param>
+public sealed record ConfiguredVehicleFeed(IVehicleUpdateService? Service, string? SetAside = null, VehicleFeed? BuiltIn = null)
 {
     /// <summary>No feed at all.</summary>
     public static ConfiguredVehicleFeed None { get; } = new(Service: null);

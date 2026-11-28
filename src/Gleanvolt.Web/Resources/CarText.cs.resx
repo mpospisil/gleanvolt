@@ -648,4 +648,22 @@
   <data name="ExternalPageFrameTitle" xml:space="preserve">
     <value>Stránka programu {0}</value>
   </data>
+  <data name="FeedDeprecatedName" xml:space="preserve">
+    <value>{0} (zastaralé)</value>
+  </data>
+  <data name="FeedDeprecated" xml:space="preserve">
+    <value>Tento vestavěný zdroj je zastaralý a v příští verzi zmizí. Místo něj spusťte plugin {0} a výše zvolte „{1}“.</value>
+  </data>
+  <data name="FeedDeprecatedHow" xml:space="preserve">
+    <value>Jak ho nastavit</value>
+  </data>
+  <data name="FeedDeprecatedCopy" xml:space="preserve">
+    <value>Pokud je stránka pluginu ještě neukazuje, zadejte je tam.</value>
+  </data>
+  <data name="FeedDeprecatedPassword" xml:space="preserve">
+    <value>Heslo zadejte na stránce pluginu: nikdy se nepřenáší.</value>
+  </data>
+  <data name="FeedDeprecatedApiKey" xml:space="preserve">
+    <value>Klíč API z aplikace MySkoda vložte na stránce pluginu: nikdy se nepřenáší.</value>
+  </data>
 </root>

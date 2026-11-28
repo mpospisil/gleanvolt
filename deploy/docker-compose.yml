@@ -474,6 +474,97 @@ services:
         max-size: "5m"
         max-file: "3"
 
+  # The Volkswagen car plugin (#474): a Volkswagen ID. read live from volkswagen.de, with the owner's VW ID. From gleanvolt-cars,
+  # released on its own tags, so its version is VOLKSWAGEN_PLUGIN_TAG, not IMAGE_TAG. At most one car plugin runs: the
+  # deploy scripts refuse two. It reads the car with "A plugin" chosen on the Car page.
+  gleanvolt-plugin-volkswagen:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-volkswagen:${VOLKSWAGEN_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-volkswagen
+    restart: unless-stopped
+    profiles: ["volkswagen"]
+    init: true
+    network_mode: host
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${VOLKSWAGEN_PORT:-8095}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${VOLKSWAGEN_PORT:-8095}/
+      Gleanvolt__FrameAncestors: ${VOLKSWAGEN_FRAME_ANCESTORS:-}
+      # The built-in volkswagen.de feed's VW ID and VIN (VW_WEBSITE_*), until the plugin's page saves an account. Never the password: it is entered on the page.
+      Volkswagen__Username: ${VW_WEBSITE_USERNAME:-}
+      Volkswagen__Vin: ${VW_WEBSITE_VIN:-}
+    volumes:
+      # The account, the sign-in session and the page's own keys. Owned by uid 1654, mode 700.
+      - ./plugins/volkswagen:/data
+    mem_limit: ${VOLKSWAGEN_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The MyŠkoda car plugin (#475): a Škoda read through the MyŠkoda Public API, with an API key from the MySkoda app. From gleanvolt-cars,
+  # released on its own tags, so its version is SKODA_PLUGIN_TAG, not IMAGE_TAG. At most one car plugin runs: the
+  # deploy scripts refuse two. It reads the car with "A plugin" chosen on the Car page.
+  gleanvolt-plugin-skoda:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-skoda:${SKODA_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-skoda
+    restart: unless-stopped
+    profiles: ["skoda"]
+    init: true
+    network_mode: host
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${SKODA_PORT:-8101}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${SKODA_PORT:-8101}/
+      Gleanvolt__FrameAncestors: ${SKODA_FRAME_ANCESTORS:-}
+      # The built-in MyŠkoda feed's VIN (SKODA_VIN); one saved on the plugin's page wins. The API key is pasted on the page, never here.
+      Skoda__Vin: ${SKODA_VIN:-}
+    volumes:
+      # The API key, the VIN and the page's own keys. Owned by uid 1654, mode 700.
+      - ./plugins/skoda:/data
+    mem_limit: ${SKODA_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The VW Group Data Act car plugin (#475): any VW Group brand read from the EU Data Act portal, with the brand account. From gleanvolt-cars,
+  # released on its own tags, so its version is VWGROUP_PLUGIN_TAG, not IMAGE_TAG. At most one car plugin runs: the
+  # deploy scripts refuse two. It reads the car with "A plugin" chosen on the Car page.
+  gleanvolt-plugin-vwgroup:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-vwgroup:${VWGROUP_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-vwgroup
+    restart: unless-stopped
+    profiles: ["vwgroup"]
+    init: true
+    network_mode: host
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${VWGROUP_PORT:-8102}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${VWGROUP_PORT:-8102}/
+      Gleanvolt__FrameAncestors: ${VWGROUP_FRAME_ANCESTORS:-}
+      # The built-in Data Act feed's VW ID, brand, client id and VIN (VW_*); a value saved on the plugin's page wins. Never VW_PASSWORD: it is entered on the page.
+      VwGroup__Username: ${VW_USERNAME:-}
+      VwGroup__Brand: ${VW_BRAND:-}
+      VwGroup__ClientId: ${VW_CLIENT_ID:-}
+      VwGroup__Vin: ${VW_VIN:-}
+    volumes:
+      # The password, the account and the page's own keys. Owned by uid 1654, mode 700.
+      - ./plugins/vwgroup:/data
+    mem_limit: ${VWGROUP_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
   homeassistant:
     image: ghcr.io/home-assistant/home-assistant:stable
     container_name: gleanvolt-homeassistant

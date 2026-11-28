@@ -35,7 +35,8 @@ services:
     image: busybox:1.37
     container_name: gleanvolt-init
     user: "0:0"
-    # The plugins' directories too (#426, #444), closed to everyone else: they hold an API key, a charger's password.
+    # The plugins' directories too (#426, #444, #476), closed to everyone else: they hold an API key, a charger's
+    # or a car account's password.
     command: ["sh", "-c", "chown -R 1654:1654 /data /logs /plugins && chmod 700 /plugins/*"]
     volumes:
       - ${GLEANVOLT_DIR:-.}/data:/data
@@ -45,6 +46,9 @@ services:
       - ${GLEANVOLT_DIR:-.}/plugins/huawei:/plugins/huawei
       - ${GLEANVOLT_DIR:-.}/plugins/goe:/plugins/goe
       - ${GLEANVOLT_DIR:-.}/plugins/shelly:/plugins/shelly
+      - ${GLEANVOLT_DIR:-.}/plugins/volkswagen:/plugins/volkswagen
+      - ${GLEANVOLT_DIR:-.}/plugins/skoda:/plugins/skoda
+      - ${GLEANVOLT_DIR:-.}/plugins/vwgroup:/plugins/vwgroup
     restart: "no"
     network_mode: none
 
@@ -223,6 +227,97 @@ services:
     volumes:
       - ${GLEANVOLT_DIR:-.}/plugins/shelly:/data
     mem_limit: ${SHELLY_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The Volkswagen car plugin (#474): a Volkswagen ID. read live from volkswagen.de, with the owner's VW ID. From gleanvolt-cars, opt-in with the
+  # `volkswagen` profile; at most one car plugin. Its version is VOLKSWAGEN_PLUGIN_TAG.
+  gleanvolt-plugin-volkswagen:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-volkswagen:${VOLKSWAGEN_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-volkswagen
+    restart: unless-stopped
+    profiles: ["volkswagen"]
+    init: true
+    network_mode: host
+    depends_on:
+      gleanvolt-init:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${VOLKSWAGEN_PORT:-8095}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${VOLKSWAGEN_PORT:-8095}/
+      # The built-in volkswagen.de feed's VW ID and VIN (VW_WEBSITE_*), until the plugin's page saves an account. Never the password.
+      Volkswagen__Username: ${VW_WEBSITE_USERNAME:-}
+      Volkswagen__Vin: ${VW_WEBSITE_VIN:-}
+    volumes:
+      - ${GLEANVOLT_DIR:-.}/plugins/volkswagen:/data
+    mem_limit: ${VOLKSWAGEN_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The MyŠkoda car plugin (#475): a Škoda read through the MyŠkoda Public API, with an API key from the MySkoda app. From gleanvolt-cars, opt-in with the
+  # `skoda` profile; at most one car plugin. Its version is SKODA_PLUGIN_TAG.
+  gleanvolt-plugin-skoda:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-skoda:${SKODA_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-skoda
+    restart: unless-stopped
+    profiles: ["skoda"]
+    init: true
+    network_mode: host
+    depends_on:
+      gleanvolt-init:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${SKODA_PORT:-8101}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${SKODA_PORT:-8101}/
+      # The built-in MyŠkoda feed's VIN (SKODA_VIN); one saved on the plugin's page wins. The API key is pasted on the page.
+      Skoda__Vin: ${SKODA_VIN:-}
+    volumes:
+      - ${GLEANVOLT_DIR:-.}/plugins/skoda:/data
+    mem_limit: ${SKODA_MEM_LIMIT:-160m}
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # The VW Group Data Act car plugin (#475): any VW Group brand read from the EU Data Act portal, with the brand account. From gleanvolt-cars, opt-in with the
+  # `vwgroup` profile; at most one car plugin. Its version is VWGROUP_PLUGIN_TAG.
+  gleanvolt-plugin-vwgroup:
+    image: ghcr.io/mpospisil/gleanvolt-plugin-vwgroup:${VWGROUP_PLUGIN_TAG:-latest}
+    container_name: gleanvolt-plugin-vwgroup
+    restart: unless-stopped
+    profiles: ["vwgroup"]
+    init: true
+    network_mode: host
+    depends_on:
+      gleanvolt-init:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ:-Europe/Prague}
+      Urls: http://0.0.0.0:${VWGROUP_PORT:-8102}
+      Gleanvolt__Endpoint: http://localhost:${WEB_PORT:-8090}
+      Gleanvolt__Token: ${GLEANVOLT_PROVIDER_TOKEN:-}
+      Gleanvolt__PageUrl: http://localhost:${VWGROUP_PORT:-8102}/
+      # The built-in Data Act feed's VW ID, brand, client id and VIN (VW_*); a value saved on the plugin's page wins. Never VW_PASSWORD.
+      VwGroup__Username: ${VW_USERNAME:-}
+      VwGroup__Brand: ${VW_BRAND:-}
+      VwGroup__ClientId: ${VW_CLIENT_ID:-}
+      VwGroup__Vin: ${VW_VIN:-}
+    volumes:
+      - ${GLEANVOLT_DIR:-.}/plugins/vwgroup:/data
+    mem_limit: ${VWGROUP_MEM_LIMIT:-160m}
     logging:
       driver: json-file
       options:

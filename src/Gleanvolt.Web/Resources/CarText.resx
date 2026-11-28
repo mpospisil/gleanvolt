@@ -659,4 +659,22 @@
     <value>The page of {0}</value>
     <comment>{0} the provider's name.</comment>
   </data>
+  <data name="FeedDeprecatedName" xml:space="preserve">
+    <value>{0} (deprecated)</value>
+  </data>
+  <data name="FeedDeprecated" xml:space="preserve">
+    <value>This built-in feed is deprecated and goes in the next release. Run the {0} plugin instead, and choose “{1}” above.</value>
+  </data>
+  <data name="FeedDeprecatedHow" xml:space="preserve">
+    <value>How to set it up</value>
+  </data>
+  <data name="FeedDeprecatedCopy" xml:space="preserve">
+    <value>If the plugin's page doesn't show these yet, enter them there.</value>
+  </data>
+  <data name="FeedDeprecatedPassword" xml:space="preserve">
+    <value>Enter the password on the plugin's page: it never carries over.</value>
+  </data>
+  <data name="FeedDeprecatedApiKey" xml:space="preserve">
+    <value>Paste the API key from the MySkoda app on the plugin's page: it never carries over.</value>
+  </data>
 </root>

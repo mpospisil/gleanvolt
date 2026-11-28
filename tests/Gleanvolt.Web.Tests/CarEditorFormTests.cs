@@ -64,6 +64,43 @@ public class CarEditorFormTests : BunitContext
         Assert.Empty(form.FindAll(Field(EvSettingKeys.WebsiteVin)));
     }
 
+    [Fact]
+    public void ABuiltInFeedIsLabelledDeprecatedWithItsPluginAndTheValuesToCopy()
+    {
+        // #476: the built-in goes in the next release. The notice names the plugin and lists what to enter on its
+        // page: a value saved here, in the overrides file, is one compose cannot hand over.
+        _editor.Running[EvSettingKeys.WebsiteUsername] = "owner@example.com";
+        _editor.Running[EvSettingKeys.WebsiteVin] = "WVGZZZE2ZPE000001";
+        var form = Form(VehicleFeed.Volkswagen);
+
+        var notice = form.Find("#car-feed-deprecated").TextContent;
+        Assert.Contains("Volkswagen plugin", notice);
+        Assert.Contains("owner@example.com", notice);
+        Assert.Contains("WVGZZZE2ZPE000001", notice);
+        Assert.Contains("deprecated", form.Find("#car-feed option[value='Volkswagen']").TextContent);
+        Assert.DoesNotContain("deprecated", form.Find("#car-feed option[value='External']").TextContent);
+    }
+
+    [Fact]
+    public void The_Skoda_notice_asks_for_the_API_key_not_a_password()
+    {
+        _editor.Running[EvSettingKeys.SkodaVin] = "TMBZZZNY0RP000001";
+        var notice = Form(VehicleFeed.Skoda).Find("#car-feed-deprecated").TextContent;
+
+        Assert.Contains("API key", notice);
+        Assert.DoesNotContain("password", notice);
+    }
+
+    [Theory]
+    [InlineData(VehicleFeed.External)]
+    [InlineData(VehicleFeed.ChargeOnly)]
+    public void ThePluginChoiceShowsNoDeprecationNotice(VehicleFeed feed)
+    {
+        var form = Form(feed);
+
+        Assert.Empty(form.FindAll("#car-feed-deprecated"));
+    }
+
     [Theory]
     [InlineData(VehicleFeed.Volkswagen, EvSettingKeys.WebsiteVin)]
     [InlineData(VehicleFeed.Skoda, EvSettingKeys.SkodaVin)]

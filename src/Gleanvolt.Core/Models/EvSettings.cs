@@ -149,6 +149,21 @@ public static class VehicleFeeds
         VehicleFeed.External, VehicleFeed.OwnTopic, VehicleFeed.ChargeOnly,
     ];
 
+    /// <summary>
+    /// The car plugin from gleanvolt-cars that replaces a built-in manufacturer feed (#476), with the settings that
+    /// carry over to it; null for a feed that is not a built-in one. None of the carried keys is a secret: a password
+    /// or a key is entered on the plugin's page.
+    /// </summary>
+    public static VehicleFeedPlugin? Plugin(VehicleFeed feed) => feed switch
+    {
+        VehicleFeed.Volkswagen => new("volkswagen", "Volkswagen", [EvSettingKeys.WebsiteUsername, EvSettingKeys.WebsiteVin]),
+        VehicleFeed.Skoda => new("skoda", "MyŠkoda", [EvSettingKeys.SkodaVin]),
+        VehicleFeed.DataAct => new(
+            "vwgroup", "VW Group Data Act",
+            [EvSettingKeys.DataActUsername, EvSettingKeys.DataActBrand, EvSettingKeys.DataActClientId, EvSettingKeys.DataActVin]),
+        _ => null,
+    };
+
     /// <summary>The key that switches this feed on, or null for <see cref="VehicleFeed.ChargeOnly"/>.</summary>
     public static string? EnabledKey(VehicleFeed feed) => feed switch
     {
@@ -298,3 +313,9 @@ public sealed record EvSettings(
     /// <summary>Whether the feed the next start would run differs from the one running now.</summary>
     public bool FeedIsPending => Feed != RunningFeed;
 }
+
+/// <summary>A car plugin that replaces a deprecated built-in feed (#476).</summary>
+/// <param name="Id">Its provider id, compose profile and folder in gleanvolt-cars.</param>
+/// <param name="Name">What the owner reads: "the {Name} plugin".</param>
+/// <param name="CarriedKeys">The built-in's settings the plugin takes over; never a secret.</param>
+public sealed record VehicleFeedPlugin(string Id, string Name, IReadOnlyList<string> CarriedKeys);
