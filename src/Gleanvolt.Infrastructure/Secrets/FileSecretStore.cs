@@ -15,7 +15,7 @@ namespace Gleanvolt.Infrastructure.Secrets;
 ///
 /// <para><b>One file per secret, named after it,</b> so the store's directory is readable by a person
 /// and an upgrade finds the files exactly where the two hand-rolled stores it replaces left
-/// them — <c>vw-website-session.json</c>, <c>skoda-api-key.json</c>. Nothing has to be migrated
+/// them (the built-in car feeds' <c>vw-website-session.json</c> and <c>skoda-api-key.json</c>, until #477). Nothing had to be migrated
 /// because nothing moved.</para>
 /// </summary>
 /// <param name="directory">The data directory. Absolute by the time it gets here.</param>

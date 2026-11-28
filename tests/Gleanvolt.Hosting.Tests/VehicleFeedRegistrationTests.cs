@@ -3,16 +3,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
-using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.Vehicles;
-using Gleanvolt.Infrastructure.Vehicles.Skoda;
-using Gleanvolt.Infrastructure.Vehicles.VwGroup;
 
 namespace Gleanvolt.Hosting.Tests;
 
 /// <summary>
-/// Which vehicle feed the composition root turns on (issues #140, #212): <b>one car, one feed</b> —
-/// volkswagen.de for a VW, MyŠkoda for a Škoda, and the Data Act portal only for a car with neither.
+/// Which vehicle feed the composition root turns on (issues #140, #212): <b>one car, one feed</b> — a car plugin
+/// (<c>Vehicle:External</c>), or none, with the owner's own MQTT topic beside either. The built-in manufacturer feeds
+/// are gone (#477).
 ///
 /// <para>Asserted on the registrations rather than by resolving hosted services, because resolving
 /// them all would build a Modbus stack this test has no use for.</para>
@@ -21,14 +19,6 @@ public class VehicleFeedRegistrationTests
 {
     private static readonly (string Key, string? Value)[] MinimalDevices =
     [.. UsableSite.Settings];
-
-    /// <summary>Enough for the portal client to be considered configured.</summary>
-    private static readonly (string Key, string? Value)[] Credentials =
-    [
-        ("Vehicle:DataAct:Brand", "vw"),
-        ("Vehicle:DataAct:Username", "owner@example.com"),
-        ("Vehicle:DataAct:Password", "hunter2"),
-    ];
 
     private static readonly (string Key, string? Value)[] TheCar =
     [
@@ -51,37 +41,10 @@ public class VehicleFeedRegistrationTests
     private static bool Registers<T>(IServiceCollection services) =>
         services.Any(descriptor => descriptor.ImplementationType == typeof(T));
 
-    [Theory]
-    [InlineData("Vehicle:Website:Enabled", VehicleFeed.Volkswagen)]
-    [InlineData("Vehicle:Skoda:Enabled", VehicleFeed.Skoda)]
-    [InlineData("Vehicle:DataAct:Enabled", VehicleFeed.DataAct)]
-    [InlineData("Vehicle:External:Enabled", null)]
-    public async Task The_configured_feed_says_which_deprecated_built_in_it_is(string enabled, VehicleFeed? builtIn)
-    {
-        // #476: the worker warns at startup for a built-in feed, and only for one.
-        var services = Services(Credentials.Concat(TheCar).Concat([(enabled, "true")]).ToArray());
-        await using var provider = services.BuildServiceProvider();
-
-        Assert.Equal(builtIn, provider.GetRequiredService<ConfiguredVehicleFeed>().BuiltIn);
-    }
-
-    [Fact]
-    public async Task The_portal_that_runs_is_the_built_in_named_even_beside_an_unconfigured_website_feed()
-    {
-        // VW_WEBSITE_ENABLED without a username or VIN registers no website feed, so the portal is the one that
-        // runs; the warning names the plugin for what runs.
-        var services = Services(Credentials.Concat(TheCar)
-            .Concat([("Vehicle:DataAct:Enabled", "true"), ("Vehicle:Website:Enabled", "true")]).ToArray());
-        await using var provider = services.BuildServiceProvider();
-
-        Assert.Equal(VehicleFeed.DataAct, provider.GetRequiredService<ConfiguredVehicleFeed>().BuiltIn);
-    }
-
     [Fact]
     public void Off_by_default_the_MQTT_feed_is_the_one_that_runs()
     {
-        // Nothing that leaves the LAN starts itself, and an installation that has never heard of the
-        // portal must behave exactly as it did before #140.
+        // Nothing that leaves the LAN starts itself.
         var services = Services();
 
         Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
@@ -90,189 +53,39 @@ public class VehicleFeedRegistrationTests
     }
 
     [Fact]
-    public void Credentials_alone_do_not_start_a_feed()
+    public void A_built_in_feeds_old_settings_alone_start_nothing()
     {
-        // A .env that carries a VW ID because somebody pressed Ask the car once must not
-        // become an unattended feed at the next restart. Signing in on a clock is a separate decision.
-        var services = Services(Credentials.Concat(TheCar).ToArray());
+        // #477: a VIN or a username left in .env from a built-in, without its flag, is not a feed.
+        var services = Services(TheCar.Concat([("Vehicle:Website:Vin", "WVWZZZE2ZMP000001"), ("Vehicle:DataAct:Username", "owner@example.com")]).ToArray());
 
         Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
-        Assert.True(Registers<VehicleMqttWorker>(services));
-    }
-
-    [Fact]
-    public async Task Switched_on_it_serves_the_configured_car_and_the_MQTT_feed_keeps_running()
-    {
-        // Both feeds run, and VehicleStateHolder keeps whichever reading is newest. This used to
-        // exclude the MQTT worker outright, on the issue's "the manufacturer service wins" -- until
-        // the reference install showed the portal's state of charge to be coarser and later than the
-        // same manufacturer's app API arriving over MQTT. Which source is better is a fact about a car
-        // and a moment, not something a registration can be right about once.
-        var services = Services(
-            Credentials.Concat(TheCar).Concat([("Vehicle:DataAct:Enabled", "true")]).ToArray());
-
-        Assert.True(Registers<VehicleMqttWorker>(services));
-
-        await using var provider = services.BuildServiceProvider();
-        var feed = provider.GetRequiredService<IVehicleUpdateService>();
-
-        Assert.Equal("vw-group", feed.Manufacturer);
-        Assert.Equal("id4", feed.VehicleId);
-
-        // The portal button is untouched by any of this: it is what proves the credentials before the
-        // feed is switched on, so it stays available on exactly the same terms.
-        Assert.True(provider.GetRequiredService<IVehiclePortalReader>().IsConfigured);
-    }
-
-    /// <summary>A Škoda installation (issue #193): its own section, its own sign-in, its own feed.</summary>
-    private static readonly (string Key, string? Value)[] TheSkoda =
-    [
-        ("Ev:Vehicles:0:Id", "enyaq"),
-        ("Ev:Vehicles:0:Make", "Škoda"),
-        ("Ev:Vehicles:0:BatteryCapacityKWh", "77"),
-        ("Vehicle:Skoda:Vin", "TMBJB9NY5RF999999"),
-        // Somewhere that does not exist: registration must not write a secret, and a store pointed at
-        // a missing directory reads nothing rather than failing (issue #215).
-        ("Secrets:Directory", Path.Combine(Path.GetTempPath(), "gleanvolt-no-such-dir")),
-    ];
-
-    [Fact]
-    public async Task A_skoda_installation_registers_its_feed_and_its_key_sign_in_without_a_key()
-    {
-        // Enabled and a VIN are enough: the key is pasted on the page afterwards, and until then the
-        // feed is present, sends nothing, and says so.
-        var services = Services(TheSkoda.Concat([("Vehicle:Skoda:Enabled", "true")]).ToArray());
-
-        await using var provider = services.BuildServiceProvider();
-        var feed = provider.GetRequiredService<IVehicleUpdateService>();
-
-        Assert.Equal("skoda", feed.Manufacturer);
-        Assert.Equal("enyaq", feed.VehicleId);
-        Assert.True(feed.Health.IsBlocked);
-
-        var signIn = Assert.IsType<SkodaApiSignIn>(provider.GetRequiredService<IVehicleAccountSignIn>());
-        Assert.True(signIn.State.WantsKey);
     }
 
     [Fact]
     public void Make_alone_chooses_no_feed()
     {
-        // "Škoda" in Ev:Vehicles is reported, never acted on. The section is the switch.
-        var services = Services(TheSkoda);
+        var services = Services(TheCar.Concat([("Ev:Vehicles:0:Make", "Škoda")]).ToArray());
 
         Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
-        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(SkodaApiKeyStore));
     }
 
-    [Fact]
-    public void Website_and_Skoda_both_enabled_is_refused_naming_both()
+    [Theory]
+    [InlineData("Vehicle:Website:Enabled")]
+    [InlineData("Vehicle:Skoda:Enabled")]
+    public void A_built_in_beside_a_plugin_is_no_longer_refused(string builtIn)
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Services(
-            TheSkoda.Concat(
-            [
-                ("Vehicle:Skoda:Enabled", "true"),
-                ("Vehicle:Website:Enabled", "true"),
-            ]).ToArray()));
-
-        Assert.Contains("Vehicle:Website", error.Message);
-        Assert.Contains("Vehicle:Skoda", error.Message);
-    }
-
-    /// <summary>A Volkswagen read from volkswagen.de (issue #170).</summary>
-    private static readonly (string Key, string? Value)[] TheWebsite =
-    [
-        ("Vehicle:Website:Enabled", "true"),
-        ("Vehicle:Website:Username", "owner@example.com"),
-        ("Vehicle:Website:Password", "hunter2"),
-        ("Vehicle:Website:Vin", "WVGZZZE2ZPE999999"),
-        ("Secrets:Directory", Path.Combine(Path.GetTempPath(), "gleanvolt-no-such-dir")),
-    ];
-
-    private static readonly (string Key, string? Value)[] ThePortalSwitchedOn =
-        Credentials.Concat([("Vehicle:DataAct:Enabled", "true")]).ToArray();
-
-    [Fact]
-    public async Task A_VW_with_volkswagen_de_runs_that_feed_alone_and_says_why_the_portal_is_not_used()
-    {
-        // One car, one feed (#212). An ID.4 .env that has carried both since #170 keeps booting: the
-        // portal is set aside, not refused, and the reason is on the startup log.
-        var services = Services(TheCar.Concat(TheWebsite).Concat(ThePortalSwitchedOn).ToArray());
-
-        var feed = Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
-
-        await using var provider = services.BuildServiceProvider();
-        var configured = provider.GetRequiredService<ConfiguredVehicleFeed>();
-
-        Assert.Equal("vw-website", configured.Service!.Manufacturer);
-        Assert.Same(provider.GetRequiredService<IVehicleUpdateService>(), configured.Service);
-        Assert.Equal(
-            "Vehicle:Website is configured, so the Data Act portal is not used: volkswagen.de reads this car "
-            + "live. Vehicle:DataAct:Enabled (VW_ENABLED) can be switched off.",
-            configured.SetAside);
-
-        // The portal button stays: it is on /car whatever runs on the clock.
-        Assert.True(provider.GetRequiredService<IVehiclePortalReader>().IsConfigured);
-    }
-
-    [Fact]
-    public async Task A_Skoda_with_MySkoda_runs_that_feed_alone()
-    {
-        var services = Services(
-            TheSkoda.Concat([("Vehicle:Skoda:Enabled", "true")]).Concat(ThePortalSwitchedOn).ToArray());
+        // It used to be "one car, two feeds"; the built-in is gone, so the plugin is the one feed.
+        var services = Services(TheCar.Concat(TheExternalProvider).Concat([(builtIn, "true")]).ToArray());
 
         Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
-
-        await using var provider = services.BuildServiceProvider();
-        var configured = provider.GetRequiredService<ConfiguredVehicleFeed>();
-
-        Assert.Equal("skoda", configured.Service!.Manufacturer);
-        Assert.StartsWith("Vehicle:Skoda is configured, so the Data Act portal is not used", configured.SetAside);
-    }
-
-    [Fact]
-    public async Task A_car_with_no_live_feed_reads_the_portal_as_before()
-    {
-        // A Cupra, or another Group brand: the portal is the feed, and nothing is set aside.
-        var services = Services(TheCar.Concat(ThePortalSwitchedOn).ToArray());
-
-        await using var provider = services.BuildServiceProvider();
-        var configured = provider.GetRequiredService<ConfiguredVehicleFeed>();
-
-        Assert.Equal("vw-group", configured.Service!.Manufacturer);
-        Assert.Null(configured.SetAside);
-    }
-
-    [Fact]
-    public async Task A_live_feed_without_the_portal_switched_on_sets_nothing_aside()
-    {
-        var services = Services(TheCar.Concat(TheWebsite).ToArray());
-
-        await using var provider = services.BuildServiceProvider();
-        var configured = provider.GetRequiredService<ConfiguredVehicleFeed>();
-
-        Assert.Equal("vw-website", configured.Service!.Manufacturer);
-        Assert.Null(configured.SetAside);
     }
 
     private static readonly (string Key, string? Value)[] TheExternalProvider = [("Vehicle:External:Enabled", "true")];
 
-    [Theory]
-    [InlineData("Vehicle:Website:Enabled", "Vehicle:Website")]
-    [InlineData("Vehicle:Skoda:Enabled", "Vehicle:Skoda")]
-    public void An_external_provider_beside_a_live_feed_is_refused(string liveFeed, string named)
-    {
-        // One car, one feed (#408), as for the two live feeds.
-        var error = Assert.Throws<InvalidOperationException>(() => Services(
-            TheCar.Concat(TheExternalProvider).Concat([(liveFeed, "true")]).ToArray()));
-
-        Assert.Contains("Vehicle:External", error.Message);
-        Assert.Contains(named, error.Message);
-    }
-
     [Fact]
-    public async Task An_external_provider_is_the_feed_and_sets_the_portal_aside()
+    public async Task An_external_provider_is_the_feed()
     {
-        var services = Services(TheCar.Concat(TheExternalProvider).Concat(ThePortalSwitchedOn).ToArray());
+        var services = Services(TheCar.Concat(TheExternalProvider).ToArray());
 
         Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
 
@@ -282,7 +95,6 @@ public class VehicleFeedRegistrationTests
         var feed = Assert.IsType<Gleanvolt.Hosting.Vehicles.External.ExternalVehicleFeed>(configured.Service);
         Assert.Equal("external", feed.Manufacturer);
         Assert.True(feed.IsPushed);
-        Assert.StartsWith("Vehicle:External is enabled, so the Data Act portal is not used", configured.SetAside);
 
         // The kind is on, and listed beside the tariff and the forecast.
         var providers = provider.GetRequiredService<IExternalProviders>();
@@ -324,88 +136,4 @@ public class VehicleFeedRegistrationTests
 
         Assert.Equal("id4", reading.SourceId);
     }
-
-    [Fact]
-    public void The_short_env_name_switches_it_on_too()
-    {
-        // A hand-edited .env is where these get typed, and VW_* is what docs/VW_PORTAL_SETUP.md has
-        // documented since #139.
-        Environment.SetEnvironmentVariable("VW_ENABLED", "true");
-
-        try
-        {
-            var services = Services(Credentials.Concat(TheCar).ToArray());
-
-            Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("VW_ENABLED", null);
-        }
-    }
-
-    [Fact]
-    public void The_section_wins_over_the_env_name()
-    {
-        // The rule the resolver already applies to the credentials: a deployment's own configuration
-        // is not quietly overridden by a developer's leftover .env.
-        Environment.SetEnvironmentVariable("VW_ENABLED", "true");
-
-        try
-        {
-            var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection([new KeyValuePair<string, string?>("Vehicle:DataAct:Enabled", "false")])
-                .Build();
-
-            Assert.False(VwGroupPortalOptionsResolver.IsFeedEnabled(configuration));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("VW_ENABLED", null);
-        }
-    }
-    [Fact]
-    public void The_merge_budget_is_bound_from_configuration()
-    {
-        // The page and the log both tell an owner to raise this when a reading is short of something.
-        // That advice did nothing at all while the number was a constant the configuration could not
-        // reach -- the worst kind of wrong, because following it looks like the answer failing.
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(
-                [new KeyValuePair<string, string?>("Vehicle:DataAct:MaxDatasetsPerRead", "12")])
-            .Build();
-
-        Assert.Equal(12, VwGroupPortalOptionsResolver.Resolve(configuration).MaxDatasetsPerRead);
-    }
-
-    [Fact]
-    public void An_unstated_budget_keeps_the_default()
-    {
-        var configuration = new ConfigurationBuilder().Build();
-
-        Assert.Equal(
-            new VwGroupPortalOptions().MaxDatasetsPerRead,
-            VwGroupPortalOptionsResolver.Resolve(configuration).MaxDatasetsPerRead);
-    }
-
-    [Theory]
-    [InlineData("nonsense")]
-    [InlineData("0")]
-    [InlineData("-2")]
-    public void A_budget_that_is_not_a_count_is_refused_rather_than_ignored(string stated)
-    {
-        // Clamping a typo back to the default is how somebody spends an afternoon wondering why
-        // raising it changed nothing.
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(
-                [new KeyValuePair<string, string?>("Vehicle:DataAct:MaxDatasetsPerRead", stated)])
-            .Build();
-
-        var error = Assert.Throws<InvalidOperationException>(
-            () => VwGroupPortalOptionsResolver.Resolve(configuration));
-
-        Assert.Contains("MaxDatasetsPerRead", error.Message);
-    }
-
-
 }

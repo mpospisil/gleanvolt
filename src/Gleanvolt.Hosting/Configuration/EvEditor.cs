@@ -3,32 +3,28 @@ using Microsoft.Extensions.Configuration.CommandLine;
 using Microsoft.Extensions.Configuration.EnvironmentVariables;
 using Gleanvolt.Core.Interfaces;
 using Gleanvolt.Core.Models;
-using Gleanvolt.Infrastructure.Vehicles.VwGroup;
 
 namespace Gleanvolt.Hosting.Configuration;
 
 /// <summary>
 /// The web UI's edits to the car (issue #214): <see cref="PvSystemEditor"/>'s arrangement, applied to
-/// the other side of the cable. The same overrides file, the same precedence, the same provenance —
-/// and one thing that file must never hold, the manufacturer account's password, which goes to
-/// <see cref="ISecretStore"/> instead. See <see cref="IEvEditor"/> for the contract.
+/// the other side of the cable. The same overrides file, the same precedence, the same provenance. No
+/// secret: since #477 a car plugin keeps the manufacturer account on its own page. See <see cref="IEvEditor"/>
+/// for the contract.
 ///
 /// <para><b>Why a second editor rather than more keys on the first.</b> Each refuses a key that is not
 /// on its own allowlist, and the two lists are what say where the boundary of each page is. One
-/// editor with both lists would make <c>/pv-system</c> able to write a VW password by construction,
-/// and the fact that it cannot is worth keeping in the type system rather than in the markup.</para>
+/// editor with both lists would make <c>/pv-system</c> able to write the car's keys by construction.</para>
 ///
 /// <para><b>The manufacturer choice writes keys; it is not read back as one.</b> A save enables one
-/// feed's section and disables the others' in the same write, because a half-applied switch — two live
-/// feeds — is exactly the state the composition root throws on. Nothing reads
-/// <c>Ev:Vehicles:0:Make</c>, here or anywhere.</para>
+/// feed's section and disables the others' in the same write. Nothing reads <c>Ev:Vehicles:0:Make</c>, here or
+/// anywhere.</para>
 /// </summary>
 public sealed class EvEditor : IEvEditor
 {
     private readonly IConfigurationRoot? _configuration;
     private readonly PvSystemOverridesProvider? _overrides;
     private readonly EvRunningState _running;
-    private readonly ISecretStore _secrets;
     private readonly int _chargerMinAmps;
     private readonly int _chargerMaxAmps;
     private readonly ILogger<EvEditor> _logger;
@@ -39,14 +35,12 @@ public sealed class EvEditor : IEvEditor
 
     /// <param name="configuration">The process's configuration, whose providers are walked.</param>
     /// <param name="running">The car as this process started, taken before anything could change it.</param>
-    /// <param name="secrets">Where a password typed on the page is kept — never the overrides file.</param>
     /// <param name="chargerMinAmps">The installation's floor, for the band check a save runs.</param>
     /// <param name="chargerMaxAmps">The installation's ceiling, for the same check.</param>
     /// <param name="logger">Where saves are recorded — by key, never by value.</param>
     public EvEditor(
         IConfiguration configuration,
         EvRunningState running,
-        ISecretStore secrets,
         int chargerMinAmps,
         int chargerMaxAmps,
         ILogger<EvEditor> logger)
@@ -54,39 +48,28 @@ public sealed class EvEditor : IEvEditor
         _configuration = configuration as IConfigurationRoot;
         _overrides = PvSystemOverrides.Find(configuration);
         _running = running;
-        _secrets = secrets;
         _chargerMinAmps = chargerMinAmps;
         _chargerMaxAmps = chargerMaxAmps;
         _logger = logger;
     }
 
     /// <summary>
-    /// The car as <paramref name="configuration"/> and <paramref name="secrets"/> have it now, for the
-    /// <c>running</c> argument. Taken at startup, so that "running" means what this process started
-    /// with rather than whatever the file says later.
+    /// The car as <paramref name="configuration"/> has it now, for the <c>running</c> argument. Taken at startup, so
+    /// that "running" means what this process started with rather than whatever the file says later.
     /// </summary>
-    public static EvRunningState Snapshot(IConfiguration configuration, ISecretStore secrets)
+    public static EvRunningState Snapshot(IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        ArgumentNullException.ThrowIfNull(secrets);
 
-        var values = EvSettingKeys.All
-            .Where(key => !EvSettingKeys.IsSecret(key))
-            .ToDictionary(key => key, key => configuration[key], StringComparer.OrdinalIgnoreCase);
+        var values = EvSettingKeys.All.ToDictionary(key => key, key => configuration[key], StringComparer.OrdinalIgnoreCase);
 
-        // Whether a password was available, never which one. A bool is all any caller of this ever
-        // needs, and a string here would be a copy of the secret living for the life of the process.
-        var held = !string.IsNullOrWhiteSpace(secrets.Read(SecretNames.VehicleAccountPassword));
-
-        var secretsSet = EvSettingKeys.Secrets.ToDictionary(
-            key => key,
-            key => held || !string.IsNullOrWhiteSpace(configuration[key]),
-            StringComparer.OrdinalIgnoreCase);
+        // A built-in moved to a plugin at this start (#477) runs the plugin's feed, whether or not the overrides file
+        // has been read back since it was written.
+        var moved = Vehicles.RetiredCarFeed.Moving(configuration) is not null;
 
         return new EvRunningState(
             values,
-            secretsSet,
-            VehicleFeeds.Selected(key => Flag(configuration[key])));
+            VehicleFeeds.Selected(key => Flag(configuration[key]) || (moved && key == EvSettingKeys.ExternalEnabled)));
     }
 
     public EvSettings Read()
@@ -126,24 +109,7 @@ public sealed class EvEditor : IEvEditor
             return SettingsSaveResult.Refused(ConfigurationProblems.NotEditable([key]));
         }
 
-        if (EvSettingKeys.IsSecret(canonical))
-        {
-            // Removing means removing: the value is gone from the store, and the key falls back to
-            // whatever the environment says -- which the page's provenance line then reports, rather
-            // than claiming a password has been cleared when .env still holds one.
-            if (!_secrets.Delete(SecretNames.VehicleAccountPassword))
-            {
-                return SettingsSaveResult.Refused(
-                    new ConfigurationProblems(
-                        "The saved password could not be removed. Check the data directory's permissions.",
-                        Phrase.Of("Config.PasswordNotRemoved")));
-            }
-
-            _logger.LogInformation("The vehicle account password was removed from the secret store by the web UI.");
-            return SettingsSaveResult.Success;
-        }
-
-        return Change(stored => stored.Remove(canonical), password: null, "reverted");
+        return Change(stored => stored.Remove(canonical), "reverted");
     }
 
     // One save, whether or not it also switches feed: a switch and the new feed's fields have to be
@@ -158,24 +124,6 @@ public sealed class EvEditor : IEvEditor
         {
             return SettingsSaveResult.Refused(
                 ConfigurationProblems.NotEditable(refused));
-        }
-
-        // An empty secret means "unchanged", never "clear": a password box renders empty on every
-        // load, so submitting the form without retyping must not wipe the account.
-        var secrets = values
-            .Where(entry => EvSettingKeys.IsSecret(entry.Key) && !string.IsNullOrWhiteSpace(entry.Value))
-            .Select(entry => entry.Value)
-            .ToList();
-
-        if (secrets.Count > 1 && secrets.Distinct(StringComparer.Ordinal).Count() > 1)
-        {
-            // One account, one stored password (SecretNames.VehicleAccountPassword): volkswagen.de and
-            // the Data Act portal are entered with the same VW ID. Two different ones in one save is a
-            // form bug rather than something to resolve by picking one.
-            return SettingsSaveResult.Refused(
-                new ConfigurationProblems(
-                    "Two different passwords were submitted at once; only one vehicle account is kept.",
-                    Phrase.Of("Config.TwoPasswords")));
         }
 
         return Change(
@@ -195,12 +143,6 @@ public sealed class EvEditor : IEvEditor
                 foreach (var (key, raw) in values)
                 {
                     var canonical = EvSettingKeys.Canonical(key)!;
-
-                    if (EvSettingKeys.IsSecret(canonical))
-                    {
-                        continue;
-                    }
-
                     var value = raw.Trim();
 
                     // The same as what the key would be anyway is not an edit: storing it would pin a
@@ -216,13 +158,11 @@ public sealed class EvEditor : IEvEditor
                     }
                 }
             },
-            secrets.Count > 0 ? secrets[0] : null,
             "saved");
     }
 
-    // One read-modify-write of the file: apply the change, check the result would start, write it --
-    // and only then the secret, so that a refused save leaves nothing behind anywhere.
-    private SettingsSaveResult Change(Action<Dictionary<string, string>> change, string? password, string verb)
+    // One read-modify-write of the file: apply the change, check the result would start, write it.
+    private SettingsSaveResult Change(Action<Dictionary<string, string>> change, string verb)
     {
         if (_configuration is null || _overrides is null)
         {
@@ -249,54 +189,41 @@ public sealed class EvEditor : IEvEditor
             var unchanged = stored.Count == before.Count
                 && stored.All(entry => before.TryGetValue(entry.Key, out var old) && old == entry.Value);
 
-            if (unchanged && password is null)
+            if (unchanged)
             {
                 return SettingsSaveResult.Success;
             }
 
-            var problems = Check(stored, password);
+            var problems = Check(stored);
 
             if (problems.Count > 0)
             {
                 return SettingsSaveResult.Refused(problems);
             }
 
-            if (!unchanged)
+            try
             {
-                try
-                {
-                    PvSystemOverrides.Write(_overrides.Path, stored);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    return SettingsSaveResult.Refused(ConfigurationProblems.NotWritten(_overrides.Path, ex.Message));
-                }
+                PvSystemOverrides.Write(_overrides.Path, stored);
             }
-
-            if (password is not null && !_secrets.Write(SecretNames.VehicleAccountPassword, password))
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                return SettingsSaveResult.Refused(
-                    new ConfigurationProblems(
-                        $"The password could not be stored ({_secrets.Describe()}). Nothing else was changed.",
-                        Phrase.Of("Config.PasswordNotStored", new PhraseArg.Said(_secrets.DescribePhrase(), _secrets.Describe()))));
+                return SettingsSaveResult.Refused(ConfigurationProblems.NotWritten(_overrides.Path, ex.Message));
             }
 
             _logger.LogInformation(
                 "Vehicle configuration {Verb} from the web UI in {Path}; it takes effect on the next start. "
-                + "Keys now overridden: {Keys}.{Password}",
+                + "Keys now overridden: {Keys}.",
                 verb,
                 _overrides.Path,
-                stored.Count == 0 ? "none" : string.Join(", ", stored.Keys),
-                password is null ? string.Empty : " The account password was stored separately.");
+                stored.Count == 0 ? "none" : string.Join(", ", stored.Keys));
 
             return SettingsSaveResult.Success;
         }
     }
 
     // Everything a start would refuse, run against the configuration the next start would read. The
-    // Ev section goes through the startup resolver itself; the feed rules are stated here because the
-    // composition root states them as a throw rather than as a validator.
-    private ConfigurationProblems Check(IReadOnlyDictionary<string, string> stored, string? password)
+    // Ev section goes through the startup resolver itself; a feed's required fields are stated here.
+    private ConfigurationProblems Check(IReadOnlyDictionary<string, string> stored)
     {
         var problems = new ConfigurationProblems();
         var candidate = Candidate(stored);
@@ -322,53 +249,16 @@ public sealed class EvEditor : IEvEditor
             .Where(feed => VehicleFeeds.EnabledKey(feed) is { } key && Flag(Next(key, stored)?.Value))
             .ToList();
 
-        // The startup exception, refused at the form instead: two live feeds read two different cars
-        // and an installation has one.
-        if (enabled.Contains(VehicleFeed.Volkswagen) && enabled.Contains(VehicleFeed.Skoda))
-        {
-            problems.Add(
-                "Vehicle:Website and Vehicle:Skoda would both be enabled, and they read two different "
-                + "cars (volkswagen.de and the MyŠkoda API). An installation has one car.",
-                Phrase.Of("Config.TwoFeeds"));
-        }
-
-        // The same for an external provider beside a live feed (#408): one car, one feed.
-        if (enabled.Contains(VehicleFeed.External) && (enabled.Contains(VehicleFeed.Volkswagen) || enabled.Contains(VehicleFeed.Skoda)))
-        {
-            problems.Add(
-                "Vehicle:External would be enabled beside a manufacturer's live feed. An installation reads "
-                + "its car from one feed.",
-                Phrase.Of("Config.ExternalAndLiveFeed"));
-        }
-
         foreach (var feed in enabled)
         {
             foreach (var key in VehicleFeeds.Required(feed))
             {
-                var present = EvSettingKeys.IsSecret(key)
-                    ? password is not null || HasSecret(key, stored)
-                    : !string.IsNullOrWhiteSpace(Next(key, stored)?.Value);
-
-                if (!present)
+                if (string.IsNullOrWhiteSpace(Next(key, stored)?.Value))
                 {
                     problems.Add(
                         $"{key} is needed by the feed that is switched on, and is empty.",
                         Phrase.Of("Config.FeedNeeds", new PhraseArg.Text(key)));
                 }
-            }
-        }
-
-        if (enabled.Contains(VehicleFeed.DataAct))
-        {
-            var brand = Next(EvSettingKeys.DataActBrand, stored)?.Value;
-            var clientId = Next(EvSettingKeys.DataActClientId, stored)?.Value;
-
-            if (string.IsNullOrWhiteSpace(clientId) && !VwGroupBrands.IsKnown(brand))
-            {
-                problems.Add(
-                    $"Vehicle:DataAct:Brand ('{brand}') is not one of {VwGroupBrands.Known}. Pick one, or "
-                    + "state Vehicle:DataAct:ClientId outright if yours is missing.",
-                    Phrase.Of("Config.UnknownBrand", new PhraseArg.Text(brand ?? string.Empty), new PhraseArg.Text(VwGroupBrands.Known)));
             }
         }
 
@@ -391,13 +281,6 @@ public sealed class EvEditor : IEvEditor
 
         foreach (var key in keys)
         {
-            // A password is not put into this: the checks that need one ask whether there IS one, and
-            // a copy of a secret in a throwaway configuration is a copy nobody asked for.
-            if (EvSettingKeys.IsSecret(key))
-            {
-                continue;
-            }
-
             if (Next(key, stored) is { } found)
             {
                 values[key] = found.Value;
@@ -410,7 +293,6 @@ public sealed class EvEditor : IEvEditor
     private EvSettings Describe(IReadOnlyDictionary<string, string> stored, string? unavailable)
     {
         var settings = EvSettingKeys.All
-            .Where(key => !EvSettingKeys.IsSecret(key))
             .Select(key =>
             {
                 var next = Next(key, stored);
@@ -424,41 +306,20 @@ public sealed class EvEditor : IEvEditor
             })
             .ToList();
 
-        var held = !string.IsNullOrWhiteSpace(_secrets.Read(SecretNames.VehicleAccountPassword));
-
-        var secrets = EvSettingKeys.Secrets
-            .Select(key =>
-            {
-                var fromConfiguration = Next(key, stored);
-                var set = held || !string.IsNullOrWhiteSpace(fromConfiguration?.Value);
-
-                return new EvSecret(
-                    key,
-                    set,
-                    _running.Secrets.GetValueOrDefault(key),
-                    held ? SettingSource.SecretStore : fromConfiguration?.Source ?? SettingSource.Default,
-                    held ? _secrets.Describe() : fromConfiguration?.Detail ?? string.Empty);
-            })
-            .ToList();
-
         return new EvSettings(
             _overrides?.Path ?? string.Empty,
             settings,
-            secrets,
             VehicleFeeds.Selected(key => Flag(Next(key, stored)?.Value)),
             _running.Feed,
-            VwGroupBrands.Catalog,
-            _secrets.Describe(),
             _chargerMinAmps,
             _chargerMaxAmps,
-            unavailable,
-            _secrets.DescribePhrase());
+            unavailable);
     }
 
     private EvSettings Unavailable(string reason) => new(
         _overrides?.Path ?? string.Empty,
         [
-            .. EvSettingKeys.All.Where(key => !EvSettingKeys.IsSecret(key)).Select(key => new ConfiguredSetting(
+            .. EvSettingKeys.All.Select(key => new ConfiguredSetting(
                 key,
                 _running.Values.GetValueOrDefault(key),
                 _running.Values.GetValueOrDefault(key),
@@ -466,28 +327,11 @@ public sealed class EvEditor : IEvEditor
                 string.Empty,
                 _running.Values.GetValueOrDefault(key))),
         ],
-        [
-            .. EvSettingKeys.Secrets.Select(key => new EvSecret(
-                key,
-                _running.Secrets.GetValueOrDefault(key),
-                _running.Secrets.GetValueOrDefault(key),
-                SettingSource.Default,
-                string.Empty)),
-        ],
         _running.Feed,
         _running.Feed,
-        VwGroupBrands.Catalog,
-        _secrets.Describe(),
         _chargerMinAmps,
         _chargerMaxAmps,
-        reason,
-        _secrets.DescribePhrase());
-
-    // Whether a password would be available to the next start for `key` -- from the store, or from the
-    // environment beside it. Never what it is.
-    private bool HasSecret(string key, IReadOnlyDictionary<string, string> stored) =>
-        !string.IsNullOrWhiteSpace(_secrets.Read(SecretNames.VehicleAccountPassword))
-        || !string.IsNullOrWhiteSpace(Next(key, stored)?.Value);
+        reason);
 
     // A feed's Enabled key, written only when it would actually change what the next start reads: with
     // nothing underneath it, "false" is noise in a file that is meant to list exceptions.
@@ -544,14 +388,11 @@ public sealed class EvEditor : IEvEditor
 }
 
 /// <summary>
-/// The car as this process started: what every editable key was, whether a password was available, and
-/// which feed was selected. Taken once at startup, because "running" has to mean what the process is
+/// The car as this process started: what every editable key was, and which feed was selected. Taken once at startup, because "running" has to mean what the process is
 /// actually using and not what the file says the next start will.
 /// </summary>
-/// <param name="Values">Every non-secret editable key's value, or null where it was set nowhere.</param>
-/// <param name="Secrets">Whether each secret key had a value. Never the value itself.</param>
+/// <param name="Values">Every editable key's value, or null where it was set nowhere.</param>
 /// <param name="Feed">The feed this process started.</param>
 public sealed record EvRunningState(
     IReadOnlyDictionary<string, string?> Values,
-    IReadOnlyDictionary<string, bool> Secrets,
     VehicleFeed Feed);

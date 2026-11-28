@@ -529,7 +529,7 @@ pinning.
 Some features come as plugins (#426): their own container, connected to the controller as an
 [external provider](../docs/PROVIDERS.md#shipped-plugins), shown on **Settings → Plugins**. The OpenWeather plugin is released with Gleanvolt, from the
 same tag; the charger plugins (#444) come from [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers)
-and the car plugins (#476) from [gleanvolt-cars](https://github.com/mpospisil/gleanvolt-cars), each released on its
+and the car plugins (#476, #477) from [gleanvolt-cars](https://github.com/mpospisil/gleanvolt-cars), each released on its
 own (`SOLAX_PLUGIN_TAG`, `VOLKSWAGEN_PLUGIN_TAG` and so on; unset is the newest).
 
 | Plugin | What it does | Port |
@@ -570,22 +570,29 @@ GLEANVOLT_PLUGINS=openweather,solax     # or huawei, goe, shelly; at most one ch
 The deploy runs it with `EV_CHARGER_HOST` as its address. Gleanvolt takes the first charger plugin that connects and
 remembers it; **Settings → Plugins** shows it.
 
-**The car plugin** (#476). It reads the car's battery level with **A plugin** chosen on the **Car** page, and
-replaces the built-in feeds, which are deprecated and go in the next release. Add one to the list:
+**The car plugin** (#476, #477). Gleanvolt reads no car itself: a car plugin reads the car's battery level, with
+**A plugin** chosen on the **Car** page. Add one to the list:
 
 ```bash
 GLEANVOLT_PLUGINS=openweather,solax,volkswagen     # or skoda, vwgroup; at most one car plugin
 ```
 
-The deploy hands it the built-in feed's settings from `.env`, apart from the password: `VW_WEBSITE_USERNAME` and
-`VW_WEBSITE_VIN` to `volkswagen`, `SKODA_VIN` to `skoda`, and `VW_USERNAME`, `VW_BRAND`, `VW_CLIENT_ID` and `VW_VIN`
-to `vwgroup`. Enter the password, or the Škoda API key, on the plugin's page, which the **Car** page shows. A value
-saved only on the Car page is not in `.env`: the Car page lists the ones to copy. Then choose **A plugin** under
-*What reads this car* and save.
+The deploy hands it the account's settings from `.env`, never a password: `VW_WEBSITE_USERNAME` and `VW_WEBSITE_VIN`
+to `volkswagen`, `SKODA_VIN` to `skoda`, and `VW_USERNAME`, `VW_BRAND`, `VW_CLIENT_ID` and `VW_VIN` to `vwgroup`.
+Enter the password, or the Škoda API key, on the plugin's page, which the **Car** page shows.
 
-A Volkswagen plugin you started by hand before (`docker run … gleanvolt-volkswagen`) has port 8095 too: stop it before
-deploying with `volkswagen`. Its data volume can stay; the compose service uses `plugins/volkswagen` instead, so sign
-in once on the plugin's page.
+**Upgrading from a built-in car feed** (#477). volkswagen.de, MyŠkoda and the Data Act portal are no longer built in.
+An `.env` with `VW_WEBSITE_ENABLED`, `SKODA_ENABLED` or `VW_ENABLED` set to `true` (or a Car page that had one chosen)
+and no car plugin in `GLEANVOLT_PLUGINS` gets the plugin that replaced it, in that order, and the deploy says so. The
+controller chooses **A plugin** for you at its first start, names the plugin on the **Car** page until it connects,
+and deletes the password, session or key it kept: enter it again on the plugin's page. Once the plugin has its
+account, add it to `GLEANVOLT_PLUGINS` and remove the `*_ENABLED` flag; the controller warns at every start until
+then. `VW_WEBSITE_PASSWORD` and `VW_PASSWORD` are no longer read by anything: delete them.
+
+A Volkswagen plugin you started by hand before (`docker run … --name gleanvolt-volkswagen`) has port 8095 too. While a
+container of that name exists the deploy doesn't add the compose one, and says so: stop it, copy its volume's data
+into `plugins/volkswagen` to keep the sign-in (or sign in once on the plugin's page), then add `volkswagen` to
+`GLEANVOLT_PLUGINS`.
 
 **Upgrading from a built-in charger driver (1.3 → 1.4).** Nothing to change: an `.env` with `EV_CHARGER_HOST` and no
 charger plugin in `GLEANVOLT_PLUGINS` gets the plugin that replaced its `PV_CHARGER_DRIVER` (`solax` when unset), and

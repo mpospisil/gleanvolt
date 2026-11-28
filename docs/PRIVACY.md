@@ -81,15 +81,14 @@ Only these, and every one of them is **off until you configure it**.
 | Service | Host | What is sent | When |
 |---|---|---|---|
 | Solcast solar forecast | `api.solcast.com.au` | Your Solcast API key and the rooftop-site identifier you registered *with Solcast* | Only if you configure both. Every three hours by default |
-| Volkswagen Group portal | `identity.vwgroup.io`, `eu-data-act.drivesomethinggreater.com` | Your account credentials, to sign in; then requests for your car's charging state | Only if you configure a vehicle account |
-| Volkswagen website | `www.volkswagen.de` | Your account credentials, to sign in; your car's VIN, to ask about that car | Only if you configure it |
-| Škoda Connect | `public.api.connect.skoda-auto.cz` | Your account credentials, to sign in; your car's VIN | Only if you configure it |
 
-Requests to a car manufacturer send your credentials and your VIN **to that manufacturer**, under
-their privacy policy, not this one. Gleanvolt is acting as you, with credentials you supplied, against
-an account you already have. It keeps only what it needs from the reply: state of charge, estimated
-range, time remaining, whether the car is plugged in and charging, and when the car reported it. Your
-VIN is used to address the request and is not written to either database or published over MQTT.
+Gleanvolt calls no car manufacturer (#477). A car plugin does, if you run one: the Volkswagen, MyŠkoda and VW
+Group Data Act plugins in gleanvolt-cars send the account you gave the plugin, and the car's VIN, **to that
+manufacturer** (`www.volkswagen.de`, `public.api.connect.skoda-auto.cz`, `identity.vwgroup.io` and
+`eu-data-act.drivesomethinggreater.com`), under their privacy policy, not this one. Gleanvolt receives only
+what the vehicle contract carries: state of charge, estimated range, time remaining, whether the car is plugged
+in and charging, and when the car reported it. The VIN is not written to either database or published over
+MQTT.
 
 Gleanvolt sends your coordinates to no outside service. Solcast is addressed by a site identifier you
 created on their side.

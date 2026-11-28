@@ -189,46 +189,12 @@ services:
       Vehicle__Password: ${MQTT_PASSWORD:-}
       Vehicle__MaxAge: ${VEHICLE_MAX_AGE:-12:00:00}
       Vehicle__OnDemandOnly: ${VEHICLE_ON_DEMAND_ONLY:-false}
-      # volkswagen.de -- the live source, polled every 5 min while charging and every 15 otherwise
-      # (issues #170, #212). The session it signs in with is persisted under data/, which is already a
-      # bind mount, so a restart does not need another emailed code.
+      # The built-in car feeds' switches, which #477 removed: only their flags still reach the controller, so the
+      # first start after the upgrade moves an installation that used one to "A plugin" and names the plugin
+      # (volkswagen, skoda or vwgroup in GLEANVOLT_PLUGINS). Never a password: the plugin takes it on its own page.
       Vehicle__Website__Enabled: ${VW_WEBSITE_ENABLED:-false}
-      Vehicle__Website__Username: ${VW_WEBSITE_USERNAME:-}
-      Vehicle__Website__Password: ${VW_WEBSITE_PASSWORD:-}
-      Vehicle__Website__Vin: ${VW_WEBSITE_VIN:-}
-      Vehicle__Website__PollInterval: ${VW_WEBSITE_POLL_INTERVAL:-00:05:00}
-      Vehicle__Website__IdlePollInterval: ${VW_WEBSITE_IDLE_POLL_INTERVAL:-00:15:00}
-      # MyŠkoda's public API -- the live source for a Škoda, in place of the block above (issue #193).
-      # No key here: it is pasted on the Car page and kept in data/skoda-api-key.json.
-      # Enabling this and VW_WEBSITE_ENABLED together stops startup -- one installation, one car.
       Vehicle__Skoda__Enabled: ${SKODA_ENABLED:-false}
-      Vehicle__Skoda__Vin: ${SKODA_VIN:-}
-
-      # The car read from VW's own EU Data Act portal (issues #137/#139/#140) -- the other way to fill
-      # the same reading, and the only manufacturer integration in the codebase.
-      #
-      # VW_ENABLED is the feed: the portal read on the controller's own fifteen-minute clock. The
-      # credentials alone only enable the web UI's "Ask the car" button, which is deliberate --
-      # pressing it is how you prove them before anything signs in unattended.
-      #
-      # WITH VW_ENABLED=true THE MQTT VEHICLE FEED ABOVE IS NOT SUBSCRIBED. Two sources writing one
-      # reading is a race; the manufacturer's service wins and the startup log says so.
-      #
-      # VW_PASSWORD is not a read-only credential: the same account unlocks and locates the car. What
-      # protects it is that .env is gitignored and the client never logs or renders it. See
-      # docs/VW_PORTAL_SETUP.md, which also covers the two browser steps no setting can replace.
       Vehicle__DataAct__Enabled: ${VW_ENABLED:-false}
-      Vehicle__DataAct__Brand: ${VW_BRAND:-}
-      Vehicle__DataAct__ClientId: ${VW_CLIENT_ID:-}
-      Vehicle__DataAct__Username: ${VW_USERNAME:-}
-      Vehicle__DataAct__Password: ${VW_PASSWORD:-}
-      Vehicle__DataAct__Vin: ${VW_VIN:-}
-
-      # How many of the portal's deliveries one read may merge (default 4). The portal splits a car
-      # across report types, so a read keeps merging older deliveries while the reading is still short
-      # of something. Raise it to reach further back for a field that has not appeared; each delivery
-      # is one ZIP download.
-      Vehicle__DataAct__MaxDatasetsPerRead: ${VW_MAX_DATASETS:-4}
 
       # The car's *usable* pack, which is what its own SOC is a percentage of (issue #99). Zero means
       # unconfigured, and costs exactly one thing: the targeted plan's "Battery target (%)" basis, which

@@ -65,25 +65,18 @@ public sealed class VehicleUpdateWorker : BackgroundService
     private readonly TimeProvider _time;
     private readonly bool _mqttFeedConfigured;
     private readonly bool _onDemandOnly;
-    private readonly string? _setAside;
-    private readonly VehicleFeed? _builtIn;
 
     /// <param name="vehicleOptions">
     /// The MQTT feed's settings, read for one line of log and nothing else: an installation running
     /// both feeds should be told so at startup, because "two sources, newest wins" is worth knowing
     /// before you wonder why the card sometimes moves between readings.
     /// </param>
-    /// <param name="configured">
-    /// Read for its <see cref="ConfiguredVehicleFeed.SetAside"/> alone (#212): a feed that was switched
-    /// on and deliberately not started is said once at startup, or its silence reads as a fault.
-    /// </param>
     public VehicleUpdateWorker(
         IEnumerable<IVehicleUpdateService> services,
         VehicleStateHolder holder,
         ILogger<VehicleUpdateWorker> logger,
         IOptions<VehicleOptions>? vehicleOptions = null,
-        TimeProvider? time = null,
-        ConfiguredVehicleFeed? configured = null)
+        TimeProvider? time = null)
     {
         _services = services.ToList();
         _holder = holder;
@@ -91,27 +84,10 @@ public sealed class VehicleUpdateWorker : BackgroundService
         _mqttFeedConfigured = vehicleOptions?.Value.Enabled ?? false;
         _onDemandOnly = vehicleOptions?.Value.OnDemandOnly ?? false;
         _time = time ?? TimeProvider.System;
-        _setAside = configured?.SetAside;
-        _builtIn = configured?.BuiltIn;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (_setAside is not null)
-        {
-            _logger.LogInformation("{SetAside}", _setAside);
-        }
-
-        // #476: the built-in manufacturer feeds go in the next release. Said once, naming what replaces this one.
-        if (_builtIn is { } builtIn && VehicleFeeds.Plugin(builtIn) is { } plugin)
-        {
-            _logger.LogWarning(
-                "The built-in {Feed} car feed is deprecated and goes in the next release: run the {Plugin} plugin from "
-                + "gleanvolt-cars and choose 'A plugin' on the Car page. Its settings in .env carry over; enter the "
-                + "{Secret} on the plugin's page.",
-                plugin.Name, plugin.Name, builtIn == VehicleFeed.Skoda ? "API key" : "password");
-        }
-
         // A feed that pushes (#408) has nothing for a clock to ask: its provider publishes whenever the
         // car has something new, and Ask the car or a plan is what sends it a request. Said once, so
         // the log of an installation whose car arrives that way does not read as a feed that never runs.

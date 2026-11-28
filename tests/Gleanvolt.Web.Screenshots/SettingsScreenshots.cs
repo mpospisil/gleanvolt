@@ -256,24 +256,24 @@ public sealed class SettingsScreenshots : ScreenshotTest
         Capture(RenderPage<Health>("/settings/system"), "settings-system", selector: Main);
     }
 
+    /// <summary>
+    /// An installation that used the built-in volkswagen.de feed, after the upgrade that removed it (#477): moved to
+    /// A plugin, and told which plugin to run.
+    /// </summary>
     [Fact]
-    public void The_car_page_for_a_volkswagen()
+    public void The_car_page_after_a_built_in_feed_was_retired()
     {
-        VolkswagenCar(new FakeVehicleAccountSignIn(configured: true));
+        ExternalCar();
+        Services.AddSingleton<IRetiredCarFeed>(new FakeRetiredCarFeed(CarFeedPlugin.Volkswagen));
 
-        Capture(RenderPage<Car>("/car"), "car-volkswagen", selector: "#car-editor");
-    }
+        // The car this installation's built-in feed read: the form shows its own fields.
+        _car.Running[EvSettingKeys.Id] = "id4";
+        _car.Running[EvSettingKeys.Name] = "The ID.4";
+        _car.Running[EvSettingKeys.Make] = "Volkswagen";
+        _car.Running[EvSettingKeys.Model] = "ID.4 Pro";
+        _car.Running[EvSettingKeys.BatteryCapacityKWh] = "77";
 
-    [Fact]
-    public void Signing_in_to_volkswagen_asks_for_the_emailed_code()
-    {
-        VolkswagenCar(new FakeVehicleAccountSignIn(
-            configured: true, first: VehicleSignInState.CodeRequired("Volkswagen has emailed you a code.")));
-        var page = RenderPage<Car>("/car");
-
-        page.Find("#account button").Click();
-
-        Capture(page, "car-sign-in-code", selector: "#account");
+        Capture(RenderPage<Car>("/car"), "car-retired", selector: "#car-editor");
     }
 
     /// <summary>The car read by an external provider (#408): the feed chosen, and its session on the Car page.</summary>
@@ -330,11 +330,10 @@ public sealed class SettingsScreenshots : ScreenshotTest
         var car = new EvInfo("model3", "The Model 3", "Tesla", "Model 3 RWD", 57_500, 0.9, 3, 6, 16, string.Empty);
         Services.AddSingleton(car);
         Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, car));
-        Services.AddSingleton<IVehicleAccountSignIn>(new NoVehicleAccountSignIn());
-        Services.AddSingleton<IVehiclePortalReader>(new NoPortal());
         Services.AddSingleton<IVehicleStateRefresh>(new FakeVehicleStateRefresh(canRefresh: true));
         Services.AddSingleton<IVehicleTelemetry>(new VehicleStateHolder());
         Services.AddSingleton<IVehicleUpdateService>(new SampleProviderFeed());
+        Services.AddSingleton<IRetiredCarFeed>(new FakeRetiredCarFeed());
     }
 
     /// <summary>An external provider's feed, as the Car page sees it.</summary>
@@ -355,24 +354,6 @@ public sealed class SettingsScreenshots : ScreenshotTest
         public Task<VehicleState?> FetchAsync(CancellationToken cancellationToken) => Task.FromResult<VehicleState?>(null);
     }
 
-    private void VolkswagenCar(IVehicleAccountSignIn account)
-    {
-        _car.RunningFeed = VehicleFeed.Volkswagen;
-        _car.Running[EvSettingKeys.WebsiteEnabled] = "true";
-        _car.Running[EvSettingKeys.WebsiteUsername] = "owner@example.com";
-        _car.Running[EvSettingKeys.WebsiteVin] = "WVGZZZE2ZPP012345";
-        _car.RunningSecrets[EvSettingKeys.WebsitePassword] = true;
-        _car.Secrets[EvSettingKeys.WebsitePassword] = true;
-
-        var id4 = new EvInfo("id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77_000, 0.9, 3, 6, 16, "gleanvolt/vehicle/id4/state");
-        Services.AddSingleton(id4);
-        Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, id4));
-        Services.AddSingleton(account);
-        Services.AddSingleton<IVehiclePortalReader>(new NoPortal());
-        Services.AddSingleton<IVehicleStateRefresh>(new FakeVehicleStateRefresh(canRefresh: true));
-        Services.AddSingleton<IVehicleTelemetry>(new VehicleStateHolder());
-    }
-
     private sealed class NoDiscovery : IDeviceDiscovery
     {
         public DiscoveryScan? Current => null;
@@ -390,17 +371,5 @@ public sealed class SettingsScreenshots : ScreenshotTest
         public void Cancel()
         {
         }
-    }
-
-    private sealed class NoPortal : IVehiclePortalReader
-    {
-        public string PortalName => "VW Group EU Data Act portal";
-
-        public bool IsConfigured => false;
-
-        public string DescribeWhatIsMissing() => string.Empty;
-
-        public Task<VehiclePortalReading> ReadAsync(CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException("A picture never reads the portal.");
     }
 }

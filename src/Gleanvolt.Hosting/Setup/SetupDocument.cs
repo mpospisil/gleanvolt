@@ -82,13 +82,21 @@ public sealed class SetupDocument
     /// <summary>Whether <paramref name="key"/> is one of the charger's, <c>Pv:Chargers:…</c>.</summary>
     public static bool IsChargerKey(string key) => key.StartsWith("Pv:Chargers:", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>The car plugin that replaces the built-in feed <paramref name="key"/> belonged to (#477), or null.</summary>
+    public static CarFeedPlugin? RetiredCarPlugin(string key) =>
+        Vehicles.RetiredCarFeed.Retired
+            .Where(retired => key.Equals(retired.Section, StringComparison.OrdinalIgnoreCase)
+                || key.StartsWith(retired.Section + ":", StringComparison.OrdinalIgnoreCase))
+            .Select(retired => retired.Plugin)
+            .FirstOrDefault();
+
     /// <summary>Whether <paramref name="key"/> holds a secret: never written to the overrides file.</summary>
     public static bool IsSecret(string key) =>
         SecretKeys.Contains(key, StringComparer.OrdinalIgnoreCase) || ApiKeyName(key) is not null;
 
     /// <summary>The keys whose values are secrets: never written to the overrides file.</summary>
     public static IReadOnlyList<string> SecretKeys { get; } =
-        [WebPassword, SolcastApiKey, EvSettingKeys.WebsitePassword, EvSettingKeys.DataActPassword, IntegrationSettingKeys.MqttPassword];
+        [WebPassword, SolcastApiKey, IntegrationSettingKeys.MqttPassword];
 
     private SetupDocument(IReadOnlyDictionary<string, string> values) => Values = values;
 
@@ -148,6 +156,17 @@ public sealed class SetupDocument
                         + "that you accept on Settings → Plugins. Take the charger's "
                         + "keys out of the setup file.",
                         Phrase.Of("Config.SetupChargerKey", new PhraseArg.Text(key)));
+                    continue;
+                }
+
+                // A built-in car feed's key, which #477 removed: said with the plugin that replaces it.
+                if (RetiredCarPlugin(key) is { } plugin)
+                {
+                    notAllowed.Add(
+                        $"{key}: Gleanvolt doesn't read the car itself any more. The {plugin.Name} plugin does: run it, "
+                        + "accept it on Settings → Plugins and set up the account on its page, then choose A plugin on the "
+                        + "Car page. Take the key out of the setup file.",
+                        Phrase.Of("Config.SetupRetiredCarKey", new PhraseArg.Text(key), new PhraseArg.Text(plugin.Name)));
                     continue;
                 }
 
@@ -374,17 +393,6 @@ public sealed class SetupDocument
             {
                 return SetupApplyResult.Refused(SecretNotSaved("API key"));
             }
-        }
-
-        var vehiclePassword = Values
-            .Where(entry => entry.Key.Equals(EvSettingKeys.WebsitePassword, StringComparison.OrdinalIgnoreCase)
-                || entry.Key.Equals(EvSettingKeys.DataActPassword, StringComparison.OrdinalIgnoreCase))
-            .Select(entry => entry.Value)
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
-
-        if (vehiclePassword is not null && !target.Secrets.Write(SecretNames.VehicleAccountPassword, vehiclePassword))
-        {
-            return SetupApplyResult.Refused(SecretNotSaved("vehicle account"));
         }
 
         string? recoveryKey = null;

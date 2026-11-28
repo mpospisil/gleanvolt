@@ -167,10 +167,10 @@ public sealed record StatusResponse(
 
 /// <summary>The feed the car is read from.</summary>
 /// <param name="Source">
-/// Which feed: <c>external</c> for an external provider, else the manufacturer feed's id
-/// (<c>vw-website</c>, <c>skoda</c>, <c>vw-group</c>). For display and monitoring; it may grow.
+/// Which feed: <c>external</c>, a car plugin. The built-in manufacturer feeds' ids (<c>vw-website</c>,
+/// <c>skoda</c>, <c>vw-group</c>) went with them in #477. For display and monitoring; it may grow.
 /// </param>
-/// <param name="Name">What to show for it: "volkswagen.de", "MyŠkoda", or the external provider's name.</param>
+/// <param name="Name">What to show for it: the car plugin's name.</param>
 /// <param name="Health">Whether it can currently produce a reading.</param>
 public sealed record VehicleSourceResponse(string Source, string Name, VehicleSourceState Health);
 

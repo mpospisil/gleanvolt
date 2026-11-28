@@ -11,7 +11,7 @@ There are five **kinds** of provider:
 | --- | --- | --- | --- |
 | `tariff` | The tariff table | `/providers/tariff` | Choosing **External** under **Settings → Tariff** and saving |
 | `solar-forecast` | Solcast | `/providers/solar-forecast` | Choosing **External** under **Settings → Solar forecast** and saving |
-| `vehicle` | The car's built-in feeds (volkswagen.de, MyŠkoda, Data Act) | `/providers/vehicle` | Choosing **An external provider** on the **Car** page, saving and restarting |
+| `vehicle` | The car's built-in feeds (volkswagen.de, MyŠkoda, Data Act), removed in #477 | `/providers/vehicle` | Choosing **A plugin** on the **Car** page, saving and restarting |
 | `weather` | The built-in OpenWeatherMap, removed in #425 | `/providers/weather` | Choosing **External** under **Settings → Weather** and saving |
 | `charger` | The charger drivers built into Gleanvolt, removed in 1.4 (#445) | `/providers/charger` | Always on |
 
@@ -74,8 +74,9 @@ Two complete providers send fixed data:
 a sunny bell curve. Don't run either against a live installation: Gleanvolt acts on what they send.
 
 **The car plugins live in a repository of their own**, [gleanvolt-cars](https://github.com/mpospisil/gleanvolt-cars)
-(#474), MIT, laid out as gleanvolt-chargers is: Volkswagen (the volkswagen.de feed, with its own page for the account
-and the sign-in, #410) and a sample car charging from 40 % to 80 %, the template for a new one.
+(#474), MIT, laid out as gleanvolt-chargers is: Volkswagen (volkswagen.de, with its own page for the account and the
+sign-in, #410), MyŠkoda and VW Group Data Act (#475), which replaced the feeds once built into Gleanvolt (#477), and a
+sample car charging from 40 % to 80 %, the template for a new one.
 
 **The charger plugins live in a repository of their own**, [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (#443), MIT, each
 released on its own tag with an image and self-contained zips: the Shelly TopAC (moved from here, #429),
@@ -601,9 +602,9 @@ across a restart of Gleanvolt: the provider's publish after its hello replaces i
 
 Hub: `/providers/vehicle`. A program outside Gleanvolt reads the car and publishes what it says, so any
 car can be read without new code in Gleanvolt: a Tesla over BLE, a Hyundai or Kia cloud, an OBD
-dongle, a provider's own scraper. It takes the place of the built-in feeds: an installation reads its
-car from one feed, so External can't be combined with `Vehicle:Website` or `Vehicle:Skoda` (startup
-refuses), and sets the Data Act portal aside. The owner's MQTT topic may still run next to it.
+dongle, a provider's own scraper. It took the place of the built-in feeds, which #477 removed: an
+installation that used one is moved to it at its first start. The owner's MQTT topic may still run next
+to it.
 
 Turned on by `Vehicle:External:Enabled`, which the Car page writes. Like every feed choice, it takes a
 restart.
@@ -686,8 +687,8 @@ later.
 
 What it is for: **a provider that reads the car on a clock reads more often while a session is
 open.** The car's own `charging` arrives only once the car has reported it, often minutes after the
-plug-in. The built-in volkswagen.de feed reads every 5 minutes while a session is open and every 15
-otherwise. The Volkswagen plugin does the same, also reads at once when a session opens, and falls
+plug-in. The Volkswagen plugin reads every 5 minutes while a session is open and every 15 otherwise,
+as the built-in volkswagen.de feed did, also reads at once when a session opens, and falls
 back to the car's own charge state with an older Gleanvolt. In the .NET SDK,
 `VehicleProviderConnection.Session` holds it, and `SessionChanged` is raised when it changes.
 

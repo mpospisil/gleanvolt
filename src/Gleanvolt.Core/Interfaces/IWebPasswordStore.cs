@@ -4,7 +4,7 @@ namespace Gleanvolt.Core.Interfaces;
 /// Persists the web UI's password so that setting one survives a restart.
 ///
 /// <para>Declared here and implemented by the host for the same reason as
-/// <see cref="IVehicleAccountSignIn"/>: <c>Gleanvolt.Web</c> owns the page that collects the password
+/// <see cref="IVehicleStateRefresh"/>: <c>Gleanvolt.Web</c> owns the page that collects the password
 /// and knows nothing about where a given deployment keeps its settings. The host, which owns the
 /// overrides file, knows exactly that.</para>
 ///

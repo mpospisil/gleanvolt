@@ -35,8 +35,8 @@ too high. Charging still works, but plans finish late and nothing looks wrong. C
 
 ## The battery level
 
-Under **What reads this car**, choose **A plugin**, and run the plugin for your car. The built-in
-Volkswagen, Škoda and VW Group choices still work, but they are deprecated and go in the next release.
+Under **What reads this car**, choose **A plugin**, and run the plugin for your car. Gleanvolt doesn't
+read a car itself.
 
 <Tabs syncKey="car">
 <TabItem label="A plugin">
@@ -71,9 +71,8 @@ Any other program can be one too: developers can find how to write one in
    ![The Car page's Plugin section: the hub the program connects to, and the Vehicle sample program connected.](../../../../assets/screenshots/car-external-provider.png)
 
 4. The plugin's own page appears under **Plugin**, inside Gleanvolt. Enter the car's account there: the
-   password, or Škoda's API key, and sign in. If you used a built-in feed before and its VIN and user name are
-   in `.env`, the plugin has them already; otherwise the **Car** page lists them for you to copy. The page comes from the plugin, not from Gleanvolt, and only someone signed in to
-   Gleanvolt can open it. If it stays blank, press **Open in a new tab**.
+   password, or Škoda's API key, and sign in. The page comes from the plugin, not from Gleanvolt, and only
+   someone signed in to Gleanvolt can open it. If it stays blank, press **Open in a new tab**.
 
    ![A car plugin's own page inside the Car page: the last reading and the sign-in.](../../../../assets/screenshots/car-external-page.png)
 
@@ -91,107 +90,6 @@ The MyŠkoda and Data Act plugins haven't been tried on a real car yet. If you h
 "Looking for testers" issues in Gleanvolt's repository.
 
 </TabItem>
-<TabItem label="Volkswagen">
-
-:::caution[Deprecated]
-This built-in feed goes in the next release. Run the **volkswagen** plugin instead: see **A plugin**. The Car
-page lists what to enter on the plugin's page.
-:::
-
-Volkswagen cars are read live from volkswagen.de, about every 20 seconds while charging.
-
-<Steps>
-
-1. Choose **Volkswagen**. Enter the e-mail and password you use for the Volkswagen app (your **VW
-   ID**), and the car's **VIN**.
-
-   ![The Car page with Volkswagen chosen: the VW ID, the password and the VIN, then the car's own fields.](../../../../assets/screenshots/car-volkswagen.png)
-
-2. Press **Save**, then **Restart** (the page offers it).
-
-3. Back on the **Car** page, under **Account**, press **Sign in**.
-
-4. Volkswagen e-mails you a code. Type it in **One-time code** and press **Submit code**.
-
-   ![The Account section asking for the one-time code that Volkswagen e-mailed.](../../../../assets/screenshots/car-sign-in-code.png)
-
-5. Press **Ask the car** to check that it answers.
-
-</Steps>
-
-Gleanvolt stays signed in after a restart. If Volkswagen ever signs it out, a band across the top of
-every page tells you, and you sign in again the same way. It doesn't retry by itself, because repeated
-sign-ins can get an account locked.
-
-</TabItem>
-<TabItem label="Škoda">
-
-:::caution[Deprecated]
-This built-in feed goes in the next release. Run the **skoda** plugin instead: see **A plugin**. The Car
-page lists what to enter on the plugin's page.
-:::
-
-Škoda cars are read through Škoda's official API, every 5 to 15 minutes.
-
-<Steps>
-
-1. Choose **Škoda**, enter the car's **VIN**, and press **Save**, then **Restart**.
-
-2. In the **MySkoda** app, create an **API key** for this car.
-
-3. Back on the **Car** page, paste the key under **Account**. Gleanvolt checks it, says until when it is
-   valid, and starts reading the car.
-
-</Steps>
-
-A week before the key expires, Gleanvolt reminds you. Renewing it is pasting a new one.
-
-:::note
-The Škoda connection is built from Škoda's published documentation and hasn't been tried on a car yet.
-:::
-
-</TabItem>
-<TabItem label="Audi, SEAT, Cupra, Bentley">
-
-:::caution[Deprecated]
-This built-in feed goes in the next release. Run the **vwgroup** plugin instead: see **A plugin**. The Car
-page lists what to enter on the plugin's page.
-:::
-
-These are read from the **VW Group EU Data Act portal**. Its readings are usually 2 to 4 hours behind
-the car, so they suit planning more than watching a charge.
-
-First, in a web browser:
-
-<Steps>
-
-1. Open the [EU Data Act portal](https://eu-data-act.drivesomethinggreater.com/de/en) and sign in with
-   your brand's account (myAudi, SEAT or Cupra ID, and so on). Accept the consent screen.
-
-2. If your car isn't in the portal's list, add it there by its VIN.
-
-3. Go to **Data clusters → Vehicle overview → Get customised data**. Choose **All data** and every
-   **15 minutes**. The first data can take from a few hours to a couple of days to arrive.
-
-</Steps>
-
-Then in Gleanvolt:
-
-<Steps>
-
-1. On the **Car** page, choose **Audi · SEAT · Cupra · Bentley · VW commercial**. Choose your brand, and
-   enter the account's e-mail and password. Enter the VIN only if the account has more than one car.
-
-2. Press **Save**, then **Restart**.
-
-3. Press **Ask the car**. When the car's battery level appears, it works.
-
-</Steps>
-
-If the portal shows a new consent screen or asks for a code, Gleanvolt stops reading and tells you.
-Sign in to the portal in a browser, deal with it there, and restart Gleanvolt.
-
-</TabItem>
 <TabItem label="Other cars">
 
 Choose **Another manufacturer — charge only**. Charging works exactly the same; you ask for a charge in
@@ -203,8 +101,31 @@ the repository, with the other advanced integrations.
 </TabItem>
 </Tabs>
 
-## Your password is kept safe, but not encrypted
+## After upgrading from a built-in feed
 
-The password and keys you enter go into Gleanvolt's private data folder, readable only by Gleanvolt.
-They are never shown again. Anyone with a copy of that folder could sign in to your car's account, so
-keep backups of it private: see [Updating, backup and uninstalling](../../installation/updating/).
+Earlier versions of Gleanvolt read Volkswagen, Škoda and the VW Group portal themselves. Those built-in feeds
+are gone. If you used one, the first start after the upgrade chooses **A plugin** for you, and the **Car**
+page names the plugin to run until it connects:
+
+![The Car page after the upgrade: A plugin chosen, and a notice naming the Volkswagen plugin.](../../../../assets/screenshots/car-retired.png)
+
+<Steps>
+
+1. Start that plugin. On a Raspberry Pi installed with the deploy script, deploying again starts it for you
+   while your old setting is still in `.env`, and says so. Add it to `GLEANVOLT_PLUGINS` to keep it.
+
+2. Accept it under **Settings → Plugins**.
+
+3. On its page, under **Plugin** on the **Car** page, enter the password, or paste a new API key from the
+   MySkoda app. Gleanvolt deleted the ones it kept, and never hands one over. The VIN and user name from
+   `.env` are filled in already.
+
+</Steps>
+
+Until the plugin connects, the car isn't read, and you ask for a charge in kWh.
+
+## Where the car's account is kept
+
+The password or key you enter on a plugin's page stays with the plugin, in its own data folder, readable
+only by it. Gleanvolt never sees it. Anyone with a copy of that folder could sign in to your car's account,
+so keep backups of it private: see [Updating, backup and uninstalling](../../installation/updating/).

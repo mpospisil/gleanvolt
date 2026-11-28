@@ -734,78 +734,24 @@ internal sealed class FakeVehicleStateRefresh(
     }
 }
 
-/// <summary>
-/// A manufacturer-account sign-in the test drives (issue #170).
-///
-/// <para>Counts attempts, because the contract that matters is negative: opening the page must never
-/// start one. A page that signs in on render would replay a password on every refresh and email the
-/// owner a code they did not ask for.</para>
-/// </summary>
-internal sealed class FakeVehicleAccountSignIn(
-    bool configured = true, VehicleSignInState? first = null, VehicleSignInState? afterCode = null)
-    : IVehicleAccountSignIn
+/// <summary>The notice about a removed built-in car feed (#477), as a test sets it.</summary>
+internal sealed class FakeRetiredCarFeed : IRetiredCarFeed
 {
-    public int SignIns { get; private set; }
+    public CarFeedPlugin? Notice { get; private set; }
 
-    public int CodeSubmissions { get; private set; }
+    public event Action? Changed;
 
-    public string? LastCode { get; private set; }
+    public FakeRetiredCarFeed(CarFeedPlugin? notice = null) => Notice = notice;
 
-    public string AccountName => "volkswagen.de";
+    /// <summary>This installation used the built-in <paramref name="plugin"/> replaces.</summary>
+    public void Moved(CarFeedPlugin plugin) => Notice = plugin;
 
-    public string Explanation => "the code Volkswagen emails can only be answered by you";
-
-    public bool IsConfigured => configured;
-
-    public VehicleSignInState State { get; private set; } = VehicleSignInState.Unknown;
-
-    public Task<VehicleSignInState> SignInAsync(CancellationToken cancellationToken = default)
+    /// <summary>A car plugin connected.</summary>
+    public void Connect()
     {
-        SignIns++;
-        State = first ?? VehicleSignInState.CodeRequired("a code was emailed");
-        return Task.FromResult(State);
+        Notice = null;
+        Changed?.Invoke();
     }
-
-    public Task<VehicleSignInState> SubmitAsync(string code, CancellationToken cancellationToken = default)
-    {
-        CodeSubmissions++;
-        LastCode = code;
-        State = afterCode ?? VehicleSignInState.SignedIn("signed in");
-        return Task.FromResult(State);
-    }
-
-    public void SignOut() => State = VehicleSignInState.Unknown;
-}
-
-/// <summary>A sign-in that wants an API key, as the Škoda one does (issue #193).</summary>
-internal sealed class FakeKeySignIn(VehicleSignInState? afterKey = null) : IVehicleAccountSignIn
-{
-    public int Submissions { get; private set; }
-
-    public string? LastAnswer { get; private set; }
-
-    public string AccountName => "MyŠkoda API";
-
-    public string Explanation => "Create an API key in the MySkoda app and paste it here once.";
-
-    public bool IsConfigured => true;
-
-    public VehicleSignInState State { get; private set; } =
-        VehicleSignInState.KeyRequired("Create an API key for this car in the MySkoda app and paste it here.");
-
-    public Task<VehicleSignInState> SignInAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(State);
-
-    public Task<VehicleSignInState> SubmitAsync(string answer, CancellationToken cancellationToken = default)
-    {
-        Submissions++;
-        LastAnswer = answer;
-        State = afterKey ?? VehicleSignInState.SignedIn("Key valid until 2027-03-01 · My Enyaq");
-        return Task.FromResult(State);
-    }
-
-    public void SignOut() =>
-        State = VehicleSignInState.KeyRequired("Signed out; the key works until revoked in the app.");
 }
 
 /// <summary>
@@ -932,15 +878,6 @@ internal sealed class FakeEvEditor : IEvEditor
 
     public Dictionary<string, string> Stored { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Whether a password is held, by key. Never a value: the page may not be handed one.</summary>
-    public Dictionary<string, bool> Secrets { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Whether the running process had one — separate, so "saved, not applied" can be tested.</summary>
-    public Dictionary<string, bool> RunningSecrets { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>The passwords a save was given, so a test can assert one never came back out.</summary>
-    public List<string> SavedPasswords { get; } = [];
-
     public VehicleFeed RunningFeed { get; set; } = VehicleFeed.ChargeOnly;
 
     public IReadOnlyList<string> Refuse { get; set; } = [];
@@ -956,7 +893,7 @@ internal sealed class FakeEvEditor : IEvEditor
     public EvSettings Read() => new(
         "/app/data/pv-system.json",
         [
-            .. EvSettingKeys.All.Where(key => !EvSettingKeys.IsSecret(key)).Select(key =>
+            .. EvSettingKeys.All.Select(key =>
             {
                 var running = Running.GetValueOrDefault(key);
                 return Stored.TryGetValue(key, out var saved)
@@ -964,20 +901,10 @@ internal sealed class FakeEvEditor : IEvEditor
                     : new ConfiguredSetting(key, running, running, SettingSource.Environment, EvSettingKeys.EnvironmentVariable(key), running);
             }),
         ],
-        [
-            .. EvSettingKeys.Secrets.Select(key => new EvSecret(
-                key,
-                Secrets.GetValueOrDefault(key),
-                RunningSecrets.GetValueOrDefault(key),
-                Secrets.GetValueOrDefault(key) ? SettingSource.SecretStore : SettingSource.Default,
-                Secrets.GetValueOrDefault(key) ? "owner-only files (0600) in the data directory" : string.Empty)),
-        ],
         VehicleFeeds.Selected(key => Stored.TryGetValue(key, out var flag)
             ? bool.TryParse(flag, out var parsed) && parsed
             : bool.TryParse(Running.GetValueOrDefault(key), out var was) && was),
         RunningFeed,
-        [new("vw", "Volkswagen"), new("audi", "Audi"), new("cupra", "Cupra")],
-        "owner-only files (0600) in the data directory",
         6,
         16,
         Unavailable);
@@ -994,7 +921,6 @@ internal sealed class FakeEvEditor : IEvEditor
     {
         Reverts.Add(key);
         Stored.Remove(key);
-        Secrets[key] = false;
         return SettingsSaveResult.Success;
     }
 
@@ -1020,13 +946,6 @@ internal sealed class FakeEvEditor : IEvEditor
 
         foreach (var (key, value) in values)
         {
-            if (EvSettingKeys.IsSecret(key))
-            {
-                SavedPasswords.Add(value);
-                Secrets[key] = true;
-                continue;
-            }
-
             if (value == (Running.GetValueOrDefault(key) ?? string.Empty))
             {
                 Stored.Remove(key);

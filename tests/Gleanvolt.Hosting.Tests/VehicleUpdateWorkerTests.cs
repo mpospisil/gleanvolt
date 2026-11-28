@@ -169,62 +169,6 @@ public class VehicleUpdateWorkerTests
     }
 
     [Fact]
-    public async Task A_feed_set_aside_for_a_better_one_is_said_once_at_startup()
-    {
-        // #212: an ID.4 .env with the portal still switched on keeps booting, and the log says why the
-        // portal is silent rather than leaving it to look like a fault.
-        const string setAside = "Vehicle:Website is configured, so the Data Act portal is not used.";
-        var logger = new CapturingLogger();
-        var worker = new VehicleUpdateWorker(
-            [], new VehicleStateHolder(), logger, time: new ImmediateTimeProvider(),
-            configured: new ConfiguredVehicleFeed(Service: null, SetAside: setAside));
-
-        await worker.StartAsync(CancellationToken.None);
-        await worker.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(10));
-
-        Assert.Single(logger.Information, line => line == setAside);
-        Assert.Empty(logger.Warnings);
-    }
-
-    [Fact]
-    public async Task TheBuiltInFeedWarnsOnceAtStartup()
-    {
-        // #476: the built-in volkswagen.de, MyŠkoda and Data Act feeds are deprecated, and the log says which plugin
-        // replaces the one this installation runs.
-        var logger = new CapturingLogger();
-        var worker = new VehicleUpdateWorker(
-            [], new VehicleStateHolder(), logger, time: new ImmediateTimeProvider(),
-            configured: new ConfiguredVehicleFeed(Service: null, BuiltIn: VehicleFeed.Skoda));
-
-        await worker.StartAsync(CancellationToken.None);
-        await worker.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(10));
-
-        var warning = Assert.Single(logger.Warnings);
-        Assert.Contains("deprecated", warning, StringComparison.Ordinal);
-        Assert.Contains("MyŠkoda plugin", warning, StringComparison.Ordinal);
-        Assert.Contains("A plugin", warning, StringComparison.Ordinal);
-
-        // Named as the owner knows it, and no claim about a username or a password a Škoda doesn't have.
-        Assert.DoesNotContain("Skoda car feed", warning, StringComparison.Ordinal);
-        Assert.DoesNotContain("username", warning, StringComparison.Ordinal);
-        Assert.Contains("API key", warning, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task AnExternalFeedDoesNotWarn()
-    {
-        var logger = new CapturingLogger();
-        var worker = new VehicleUpdateWorker(
-            [], new VehicleStateHolder(), logger, time: new ImmediateTimeProvider(),
-            configured: new ConfiguredVehicleFeed(Service: null));
-
-        await worker.StartAsync(CancellationToken.None);
-        await worker.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(10));
-
-        Assert.Empty(logger.Warnings);
-    }
-
-    [Fact]
     public async Task What_a_service_returns_reaches_the_holder()
     {
         var holder = new VehicleStateHolder();

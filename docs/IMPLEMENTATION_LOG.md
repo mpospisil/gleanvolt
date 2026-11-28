@@ -4,6 +4,52 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-28 — Remove the built-in car feeds (#477)
+
+**Why.** Step 6 of #478, the release after #476. The volkswagen.de, MyŠkoda and Data Act feeds are car plugins in
+gleanvolt-cars; Gleanvolt reads no car itself.
+
+**What.**
+- **Removed:** `src/Gleanvolt.Infrastructure/Vehicles/{VwWebsite,Skoda,VwGroup}` and their tests and fixtures;
+  `IVehicleAccountSignIn`, `VehicleSignInState`, `IVehiclePortalReader`, `VehiclePortalReading`;
+  `VwGroupPortalOptionsResolver`; `VehicleAccount.razor`, `PortalDiagnostics.razor`, `NoVehicleAccountSignIn`; the
+  built-in keys and secrets in `EvSettingKeys`, `EvSecret`, `VehicleBrand`, `VehicleFeedPlugin`;
+  `ConfiguredVehicleFeed.SetAside`/`BuiltIn` and the worker's lines for them; 102 `CarText` and 61 `ServiceText`
+  strings nothing used any more; `docs/VW_PORTAL_SETUP.md`.
+- **Core:** `VehicleFeed` is `ChargeOnly`, `OwnTopic`, `External`. `IRetiredCarFeed` and `CarFeedPlugin` (id, name,
+  what the owner enters) for the notice. `SecretNames.RetiredVehicleSecrets` lists what is deleted.
+- **Hosting:** `Vehicles/RetiredCarFeed` (the move, the secret deletion, the warnings) and `RetiredCarFeedWatcher` (built
+  at start; ends the notice when a car plugin connects). The composition root registers `ExternalVehicleFeed` when
+  `Vehicle:External:Enabled` or `RetiredCarFeed.Moving(configuration)`. `EvEditor` has no secrets and no cross-feed
+  rules; its snapshot counts a start that moves as External. `VehicleAccountSecret` became `SecretStoreLocation`.
+  `SetupDocument` refuses the three sections' keys with `Config.SetupRetiredCarKey`.
+- **Web:** `CarEditorForm` offers the three choices and shows `#car-feed-retired` from `IRetiredCarFeed`, live; the
+  OwnTopic field's label and hint are resources now. `Car.razor` lost Account, the Data Act button and Diagnostics.
+- **Deploy:** the controller gets only the three `*_ENABLED` flags of the built-ins. `deploy/_lib.sh` adds the plugin for
+  a flag on in `.env` or in `data/pv-system.json` (read through a throwaway container: it is uid 1654's), unless a
+  hand-run `gleanvolt-<plugin>` container exists. `.env.example` (both) and `appsettings.json` lost the built-ins.
+- **Docs:** the manual's car page (en, cs) has *A plugin* and *Other cars*, and "After upgrading from a built-in
+  feed" with a new `car-retired` screenshot; `car-volkswagen` and `car-sign-in-code` are gone. Privacy (manual and
+  `docs/PRIVACY.md`), VEHICLE, SUPPORTED_EVS, WEB_UI, PROVIDERS, CONFIGURATION, HOME_ASSISTANT (the Car feed row),
+  HTTP_API (breaking changes), deploy/README and the packaging READMEs.
+
+**Quirks.**
+- The Pi's `.env` has `VW_WEBSITE_ENABLED` and `VW_ENABLED` both on; the move prefers Website, Škoda, then Data Act,
+  so it names the Volkswagen plugin there, as volkswagen.de was the feed that ran.
+- Compose passes every flag as `false` by default, so the warning counts only flags that are `true`.
+- The overrides file is nested JSON. The deploy script's `built_in_car_plugin` relies on the three sections holding
+  no nested objects.
+
+**Tests.** `RetiredCarFeedTests` (the move per flag, once only, the notice until a connection, a later choice not
+undone, the warning, secrets deleted on any feed, no overrides file); `EvEditorRegistrationTests` (a flag left on
+starts the plugin feed, a moved installation isn't moved again); `SetupDocumentTests` (each section refused naming
+the plugin); the editor, form, page and registration tests rewritten for three choices.
+
+**Files.** See the PR; mostly deletions under `src/Gleanvolt.Infrastructure/Vehicles`,
+`tests/Gleanvolt.Infrastructure.Tests` and `src/Gleanvolt.Web`.
+
+---
+
 ## 2026-11-28 — Ship the car plugins, and deprecate the built-in car feeds (#476)
 
 **Why.** Step 5 of #478. The volkswagen.de, MyŠkoda and Data Act feeds moved into gleanvolt-cars as plugins (#474,

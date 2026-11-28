@@ -12,7 +12,7 @@ namespace Gleanvolt.Core.Enums;
 /// controller can produce.</para>
 ///
 /// <para>Deliberately not a taxonomy of failures. The service knows a dozen ways an exchange can go
-/// wrong (<c>VwGroupFailure</c> alone has nine members); what leaves the service is which of these
+/// wrong (the Data Act portal's client once had nine); what leaves the service is which of these
 /// three the owner is in, plus a sentence. Anything finer is a second service's argument to make.</para>
 /// </summary>
 public enum VehicleSourceState

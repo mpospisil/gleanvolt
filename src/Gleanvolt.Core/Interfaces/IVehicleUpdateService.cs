@@ -29,7 +29,7 @@ public interface IVehicleUpdateService
     string VehicleId { get; }
 
     /// <summary>
-    /// Which manufacturer's feed this is (<c>"vw-group"</c>) — display and diagnostics only.
+    /// Which manufacturer's feed this is (<c>"external"</c>) — display and diagnostics only.
     /// <b>Never dispatch on it.</b> Choosing a service by string is the shape that grows a registry
     /// nobody asked for; the container already holds exactly the services that are configured.
     /// </summary>

@@ -430,8 +430,8 @@ public class HealthPageTests : PageTest
     {
         Services.AddSingleton<IVehicleUpdateService>(new StubFeed(
             VehicleSourceHealth.NeedsOwner(
-                "Škoda no longer recognises the stored API key — paste a new one on the Car page.",
-                Phrase.Of("Skoda.FeedKeyUnknown"))));
+                "The car plugin is not connected.",
+                Phrase.Of("ExternalVehicle.DisconnectedNoReading"))));
 
         var page = PseudoLocale.Render(() => Render<Health>());
 

@@ -278,22 +278,24 @@ page was reached, the key names, and a ready `curl` command.
 
 ### Car
 
-The car, on the same mechanism as **Settings → Installation**. Its sections are **Edit · Account · Ask the car ·
-Running · Feed · Diagnostics**, in the order the work is done: *save → restart → sign in → ask the
-car*. (`/vehicle-portal` redirects here.)
+The car, on the same mechanism as **Settings → Installation**. Its sections are **Edit · Ask the car ·
+Running · Feed**, in the order the work is done: *save → restart → ask the car*. (`/vehicle-portal`
+redirects here.)
 
-**One choice decides the feed: the manufacturer.**
+**One choice decides the feed.** Gleanvolt reads no car itself (#477): a car plugin does.
 
 | Choice | Feed it configures | What you fill in | Freshness |
 |---|---|---|---|
-| **Volkswagen** | [`Vehicle:Website`](VEHICLE.md#volkswagende-vehiclewebsite) | VW ID e-mail, password, VIN | ~20 s, plug state, live while charging |
-| **Škoda** | [`Vehicle:Skoda`](VEHICLE.md#myškoda-vehicleskoda) | VIN, then an API key under **Account** | 5–15 min, plug state |
-| **Audi · SEAT · Cupra · Bentley · VW commercial** | [`Vehicle:DataAct`](VEHICLE.md#eu-data-act-portal-vehicledataact) | Brand, VW ID, password, VIN | hours behind; no plug state |
+| **A plugin** | [`Vehicle:External`](VEHICLE.md#a-plugin-vehicleexternal) | nothing here: the account is on the plugin's page | whenever the plugin publishes |
 | **A feed I publish myself** | [`Vehicle`](VEHICLE.md#where-the-cars-state-of-charge-comes-from) | Topic | whatever publishes it |
 | **Another manufacturer — charge only** | none | nothing | — |
 
 **Charge only is not an error.** Every car with a Type 2 inlet charges without a feed. The one thing
 it costs: targets are asked for in kWh instead of per cent.
+
+**After the built-in feeds went (#477)**, an installation that used one finds *A plugin* chosen and a notice
+naming the plugin to run (Volkswagen, MyŠkoda or VW Group Data Act) and what to enter on its page. It goes when a
+car plugin connects.
 
 **The car's own fields are always there** — id, name, make, model, phases, the two currents, the
 usable pack and the charge efficiency — because they make charging correct whatever the feed. What
@@ -301,40 +303,17 @@ the installation allows is printed beside the currents.
 
 **Same overrides file, same rules as Installation.** A save writes only what differs, is checked by the
 startup rules (for example *"the car's minimum 8 A is above the installation's maximum 6 A"* is refused
-at the form), and nothing is written when anything is refused. Read-only with authentication off.
+at the form), and nothing is written when anything is refused. Read-only with authentication off. The page
+holds no secret: a car plugin keeps the account on its own page.
 
-**Passwords never go in that file.** They go to the
-[secret store](CONFIGURATION.md#the-data-directory-holds-secrets-the-secrets-section), owner-only. A
-password box is write-only: it is always empty, empty on save means *unchanged*, and **Remove** clears
-it. volkswagen.de and the Data Act portal share one stored VW ID password.
+**Ask the car** asks the configured feed now, and the answer goes to the Overview too. Opening the page
+never triggers a read. Charge-only gets no button; an own topic shows what to publish and what last
+arrived. With *A plugin*, the plugin's session and its own page are below it.
 
-**A save cannot prove an account.** The feed is built at startup, and a volkswagen.de sign-in may want
-an emailed code, so: save, **Restart**, sign in under **Account**, then **Ask the car**.
-
-**Account** says what applies to the chosen feed:
-
-| Chosen feed | What Account shows |
-|---|---|
-| **Volkswagen** | **Sign in** → the one-time code box → **Signed in** / **Sign out** |
-| **Škoda** | the API key box: a password input, empty on render, emptied after every submit |
-| **Data Act** | nothing to sign in to here: the portal signs in on each read, with the VW ID and password above |
-| **A feed I publish myself** | nothing signs in: you publish the readings |
-| **Charge only** | no account: nothing reads this car |
-
-**Ask the car** asks the configured feed now. For a live feed (volkswagen.de, MyŠkoda) the answer
-goes to the Overview too. A Data Act read signs in afresh and feeds nothing, which makes it the thing
-to press *before* switching that feed on; it also shows how far its reading is from the feed's.
-Opening the page never triggers a read. Charge-only gets no button; an own topic shows what to publish
-and what last arrived.
-
-The answer is one card — battery, range, reading age, charge state and plug state, as on the
-Overview — plus the car's own **target SOC** and **time left** where the Data Act portal sends them.
+The answer is one card — battery, range, reading age, charge state, plug state and time left, as on the
+Overview.
 
 **Running** shows the resolved car and its limits, and the feed this process actually started.
-**Diagnostics** (collapsed, Data Act reads only) lists every field the delivery held, recognised or
-not, and opens by itself when a read failed.
-
-Setting up the Data Act portal is in [VW_PORTAL_SETUP.md](VW_PORTAL_SETUP.md).
 
 ### Settings → System: Restart, Stop service and the password
 

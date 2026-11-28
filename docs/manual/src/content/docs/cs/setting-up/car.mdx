@@ -35,8 +35,8 @@ příručky k autu.
 
 ## Stav baterie
 
-V **Odkud se čtou údaje auta** zvolte **Plugin** a spusťte plugin pro své auto. Vestavěné volby
-Volkswagen, Škoda a VW Group zatím fungují, ale jsou zastaralé a v příští verzi zmizí.
+V **Odkud se čtou údaje auta** zvolte **Plugin** a spusťte plugin pro své auto. Gleanvolt sám žádné auto
+nečte.
 
 <Tabs syncKey="car">
 <TabItem label="Plugin">
@@ -71,9 +71,8 @@ Pluginem může být i jakýkoli jiný program: vývojáři najdou postup v
    ![Část Plugin na stránce Auto: hub, ke kterému se program připojuje, a připojený program Vehicle sample.](../../../../assets/screenshots/car-external-provider.png)
 
 4. Vlastní stránka pluginu se objeví v části **Plugin**, přímo v Gleanvoltu. Tam zadejte účet auta: heslo,
-   nebo klíč API Škody, a přihlaste se. Pokud jste předtím používali vestavěný zdroj a jeho VIN a uživatelské
-   jméno jsou v `.env`, plugin je už má; jinak je stránka **Auto** vypíše, abyste je mohli zkopírovat. Stránka pochází od pluginu, ne od Gleanvoltu, a otevře ji jen ten, kdo je přihlášený
-   do Gleanvoltu. Pokud zůstane prázdná, stiskněte **Otevřít na nové kartě**.
+   nebo klíč API Škody, a přihlaste se. Stránka pochází od pluginu, ne od Gleanvoltu, a otevře ji jen ten,
+   kdo je přihlášený do Gleanvoltu. Pokud zůstane prázdná, stiskněte **Otevřít na nové kartě**.
 
    ![Vlastní stránka pluginu auta na stránce Auto: poslední údaje a přihlášení.](../../../../assets/screenshots/car-external-page.png)
 
@@ -91,108 +90,6 @@ Pluginy MyŠkoda a Data Act zatím nikdo nevyzkoušel se skutečným autem. Poku
 se na issues „Looking for testers“ v repozitáři Gleanvoltu.
 
 </TabItem>
-<TabItem label="Volkswagen">
-
-:::caution[Zastaralé]
-Tento vestavěný zdroj v příští verzi zmizí. Místo něj spusťte plugin **volkswagen**: viz **Plugin**. Stránka
-Auto ukáže, co zadat na stránce pluginu.
-:::
-
-Auta Volkswagen se čtou živě z volkswagen.de, během nabíjení zhruba každých 20 sekund.
-
-<Steps>
-
-1. Zvolte **Volkswagen**. Zadejte e-mail a heslo, které používáte v aplikaci Volkswagen (**VW ID**), a
-   **VIN** auta.
-
-   ![Stránka Auto se zvoleným Volkswagenem: VW ID, heslo a VIN, pod nimi údaje o autě.](../../../../assets/screenshots/car-volkswagen.png)
-
-2. Klikněte na **Uložit** a potom na **Restartovat** (stránka to nabídne).
-
-3. Zpět na stránce **Auto** klikněte v části **Účet** na **Přihlásit**.
-
-4. Volkswagen vám pošle e-mailem kód. Napište ho do pole **Jednorázový kód** a klikněte na **Odeslat kód**.
-
-   ![Část Účet žádá o jednorázový kód, který Volkswagen poslal e-mailem.](../../../../assets/screenshots/car-sign-in-code.png)
-
-5. Klikněte na **Zeptat se auta** a ověřte, že odpovídá.
-
-</Steps>
-
-Po restartu zůstane Gleanvolt přihlášený. Pokud ho Volkswagen někdy odhlásí, řekne vám to pruh nahoře na
-každé stránce a přihlásíte se znovu stejně. Sám to znovu nezkouší, protože opakované přihlašování může
-účet zablokovat.
-
-</TabItem>
-<TabItem label="Škoda">
-
-:::caution[Zastaralé]
-Tento vestavěný zdroj v příští verzi zmizí. Místo něj spusťte plugin **skoda**: viz **Plugin**. Stránka
-Auto ukáže, co zadat na stránce pluginu.
-:::
-
-Auta Škoda se čtou přes oficiální API Škody, každých 5 až 15 minut.
-
-<Steps>
-
-1. Zvolte **Škoda**, zadejte **VIN** auta a klikněte na **Uložit** a potom na **Restartovat**.
-
-2. V aplikaci **MySkoda** vytvořte pro toto auto **klíč API**.
-
-3. Zpět na stránce **Auto** vložte klíč v části **Účet**. Gleanvolt ho ověří, napíše, do kdy platí, a
-   začne auto číst.
-
-</Steps>
-
-Týden před vypršením klíče vám to Gleanvolt připomene. Obnovení je vložení nového klíče.
-
-:::note
-Spojení se Škodou je postavené podle zveřejněné dokumentace Škody a na skutečném autě zatím nebylo
-vyzkoušené.
-:::
-
-</TabItem>
-<TabItem label="Audi, SEAT, Cupra, Bentley">
-
-:::caution[Zastaralé]
-Tento vestavěný zdroj v příští verzi zmizí. Místo něj spusťte plugin **vwgroup**: viz **Plugin**. Stránka
-Auto ukáže, co zadat na stránce pluginu.
-:::
-
-Tato auta se čtou z **portálu VW Group pro EU Data Act**. Jeho údaje bývají 2 až 4 hodiny pozadu za
-autem, takže se hodí spíš k plánování než ke sledování nabíjení.
-
-Nejdřív ve webovém prohlížeči:
-
-<Steps>
-
-1. Otevřete [portál EU Data Act](https://eu-data-act.drivesomethinggreater.com/de/en) a přihlaste se
-   účtem své značky (myAudi, SEAT nebo Cupra ID a podobně). Odsouhlaste obrazovku se souhlasem.
-
-2. Pokud vaše auto v seznamu portálu není, přidejte ho tam podle VIN.
-
-3. Otevřete **Data clusters → Vehicle overview → Get customised data**. Zvolte **All data** a každých
-   **15 minut**. První data mohou přijít za několik hodin až pár dní.
-
-</Steps>
-
-Potom v Gleanvoltu:
-
-<Steps>
-
-1. Na stránce **Auto** zvolte **Audi · SEAT · Cupra · Bentley · užitkové VW**. Vyberte značku a zadejte
-   e-mail a heslo účtu. VIN zadejte jen tehdy, když má účet víc aut.
-
-2. Klikněte na **Uložit** a potom na **Restartovat**.
-
-3. Klikněte na **Zeptat se auta**. Když se objeví stav baterie auta, funguje to.
-
-</Steps>
-
-Pokud portál ukáže novou obrazovku se souhlasem nebo bude chtít kód, Gleanvolt přestane číst a řekne
-vám to. Přihlaste se do portálu v prohlížeči, vyřešte to tam a Gleanvolt restartujte.
-
-</TabItem>
 <TabItem label="Ostatní auta">
 
 Zvolte **Jiný výrobce — jen nabíjení**. Nabíjení funguje úplně stejně; jen ho zadáváte v kWh místo
@@ -204,8 +101,31 @@ v repozitáři, spolu s dalšími pokročilými propojeními.
 </TabItem>
 </Tabs>
 
-## Heslo je v bezpečí, ale není šifrované
+## Po aktualizaci z vestavěného zdroje
 
-Hesla a klíče, které zadáte, se ukládají do soukromé složky s daty Gleanvoltu, kterou může číst jen
-Gleanvolt. Už se nikdy nezobrazí. Kdo by měl kopii té složky, mohl by se přihlásit k účtu vašeho auta,
-proto zálohy nikomu nedávejte: viz [Aktualizace, záloha a odinstalace](../../installation/updating/).
+Dřívější verze Gleanvoltu četly Volkswagen, Škodu a portál koncernu VW samy. Tyto vestavěné zdroje už nejsou.
+Pokud jste některý používali, první start po aktualizaci za vás zvolí **Plugin** a stránka **Auto** jmenuje
+plugin, který máte spustit, dokud se nepřipojí:
+
+![Stránka Auto po aktualizaci: zvolený Plugin a upozornění, které jmenuje plugin Volkswagen.](../../../../assets/screenshots/car-retired.png)
+
+<Steps>
+
+1. Spusťte ten plugin. Na Raspberry Pi nainstalovaném nasazovacím skriptem ho další nasazení spustí samo,
+   dokud je vaše staré nastavení v `.env`, a oznámí to. Aby zůstal, přidejte ho do `GLEANVOLT_PLUGINS`.
+
+2. Přijměte ho v **Nastavení → Pluginy**.
+
+3. Na jeho stránce, v části **Plugin** na stránce **Auto**, zadejte heslo, nebo vložte nový klíč API
+   z aplikace MySkoda. Gleanvolt ty, které měl uložené, smazal, a nikdy žádný nepředává. VIN a uživatelské
+   jméno z `.env` už vyplněné jsou.
+
+</Steps>
+
+Dokud se plugin nepřipojí, auto se nečte a nabití zadáváte v kWh.
+
+## Kde je uložený účet auta
+
+Heslo nebo klíč, které zadáte na stránce pluginu, zůstávají u pluginu, v jeho vlastní složce s daty, kterou
+smí číst jen on. Gleanvolt je nikdy nevidí. Kdo má kopii té složky, mohl by se přihlásit k účtu vašeho auta,
+proto zálohy držte v soukromí: viz [Aktualizace, zálohy a odinstalace](../../installation/updating/).
