@@ -1,6 +1,6 @@
 # Gleanvolt.Providers.Testing
 
-Test a [Gleanvolt](https://github.com/mpospisil/gleanvolt) charger plugin without Gleanvolt. `ChargerTestHub`
+Test a [Gleanvolt](https://github.com/mpospisil/gleanvolt) charger or car plugin without Gleanvolt. `ChargerTestHub`
 is a charger hub on a loopback port, speaking the charger contract as Gleanvolt does. The plugin connects to it
 with the ordinary SDK, so what is tested is what Gleanvolt will see.
 
@@ -64,5 +64,25 @@ the way a plugin installed before Gleanvolt does; afterwards `harness.Credential
 
 What it doesn't do: Gleanvolt's own safeguards (the setpoint threshold, the clamp to the charger's ceiling,
 dry-run) are Gleanvolt's, not the plugin's, so they aren't here. Every command is passed on as asked.
+
+## A car plugin
+
+`VehicleTestHub` is the vehicle hub, on a loopback port, as Gleanvolt speaks it (#473). It welcomes the plugin with
+the car and the charging session from `VehicleTestHubOptions`, keeps every reading and status, and refuses a reading
+Gleanvolt would refuse (`Refusals`, with the reason, by the same rules: a capture time ahead of the clock or older than
+30 days, a SOC outside 0–100, a reading that says nothing). `RefreshAsync` asks for a reading and returns the one in
+reply; `SetCarAsync` and `SetSessionAsync` say what the owner or a charge changed.
+
+```csharp
+await using var harness = new CarPluginHarness(new PluginInfo("my-car", "My car", "MyCar", 8120));
+var hub = await harness.ConnectAsync(new MyCar(...));
+
+var reading = await hub.WaitForReadingAsync();
+await hub.SetSessionAsync(new ChargingSessionInfo(true, DateTimeOffset.UtcNow, "SolarOnly"));
+```
+
+`CarPluginHarness` runs the car with its clock and its status reporter as `Gleanvolt.Cars.Hosting` wires them.
+`StartAsync(car)` starts it with nowhere to connect, as a plugin before the owner accepts it; `ConnectAsync(car,
+paired: true)` pairs it. `FakeClients(handler)` stands in for the car's maker.
 
 MIT licence.

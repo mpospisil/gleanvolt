@@ -8,5 +8,6 @@ the data directory with the saved settings, and the viewer's language (`Words`, 
 A plugin doesn't reference it directly: it references its kind's layer, which brings it along.
 
 - A charger plugin: [`Gleanvolt.Chargers.Hosting`](https://www.nuget.org/packages/Gleanvolt.Chargers.Hosting).
+- A car plugin: [`Gleanvolt.Cars.Hosting`](https://www.nuget.org/packages/Gleanvolt.Cars.Hosting).
 
 MIT.

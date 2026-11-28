@@ -4,6 +4,68 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-28 — The car layer for car plugins, and a vehicle test hub (#473)
+
+**Why.** Step 2 of #478: every car feed is moving to `gleanvolt-cars`, and a car plugin should be as small as a
+charger plugin is on `Gleanvolt.Chargers.Hosting`. The Volkswagen plugin carried its own read gate, clock and status
+reporting; those move into a package every car plugin shares, on the host #472 made shared.
+
+**What.**
+- New MIT package `Gleanvolt.Cars.Hosting` (namespace `Gleanvolt.Cars`):
+  - `PluginCar` (`IVehicleSource`, `IPluginStatus`): a plugin implements `FetchAsync(car, ct)`. Every read goes
+    through one gate, so concurrent reasons to read (Gleanvolt's refresh, a session opening, Read now) ask the maker
+    once, and never sooner than `MinimumTimeBetweenReads` after the last. `Block(words, code)` stops all requests
+    until `Resume()`. A failed fetch reports `unreachable` (`OnFetchFailed` is virtual). A fetch cancelled by its
+    caller reports nothing and doesn't hold back the next read. A null fetch keeps the last reading.
+  - `CarPoller`: a read at start, then `NextDelay` (5 min while a session is open or the car charges, 15 otherwise,
+    never while blocked), at once on a session opening, `Wake()` or `Resume()`. It publishes through the SDK when
+    attached, and reads only when not.
+  - `CarPollOptions`, bound from `<Section>` and refused at start when an interval is zero or negative (zero would
+    publish to Gleanvolt in a loop, a negative wait would stop the plugin); `CarPluginHost.CreateBuilder<TCar>` /
+    `Build` on `PluginWebHost`, with `PluginStatusReporter<VehicleWelcome>`.
+  - A block outlasts a read that was on its way when it was set, and a failure that follows a block doesn't replace it
+    with `unreachable`; otherwise the car would wait for the owner forever while it said it was fine.
+  - `CarPoller` logs each change of the car's status once (a warning with the code and the English text, and the
+    recovery), since a failing plugin on a headless machine is found in its log.
+  - `CarFrame`, the page: the status, Gleanvolt's car and its session, the last reading (SOC, charge state, cable,
+    range, time to full, capture and read times) with Read now, then the plugin's `ChildContent` and `Settings`.
+    `CarText` holds its texts in English and Czech.
+  - The global using for `Gleanvolt.Plugins` ships as `build`/`buildTransitive/Gleanvolt.Cars.Hosting.targets`.
+- `Gleanvolt.Providers.Testing`:
+  - `VehicleTestHub`, with `VehicleTestHubOptions`, `TestVehicleHub` and `RefusedVehicleReading`: it welcomes with the
+    car and the session, refuses a wrong major or a second provider, keeps readings, statuses and refusals, and offers
+    `RefreshAsync`, `SetCarAsync` and `SetSessionAsync`.
+  - Readings are checked by `VehicleReadingRules`, a copy of Core's `VehicleReadingValidator` (Testing is MIT and
+    can't reference Core), with a parity test over thirteen readings.
+  - `CarPluginHarness`: `StartAsync` runs a plugin that isn't paired yet; `ConnectAsync`, optionally paired.
+  - The loopback server, the token check and pairing's two endpoints moved out of `ChargerTestHub` into `TestHubs` and
+    `PairingDesk`, which both hubs use. The charger hub's API is unchanged.
+- The release workflow packs and pushes the new package (seven MIT packages); `RELEASING.md`, `PROVIDERS.md` (a
+  car-plugin subsection under the vehicle kind) and the READMEs say so.
+
+**Quirks.**
+- The first gate let concurrent callers see "too soon" before the gate and return null while the first read was still
+  in flight. The test for three reasons at once caught it; now only a block skips the gate.
+- Blazor writes the Czech letters as character references in a prerendered page, so the Czech test compares decoded
+  HTML.
+- Two routable test pages at `/` in one test assembly would collide, so the car test page is at `/car`.
+- No recording for testers, unlike the charger layer: a car's service is a cloud account, and a recording would hold
+  the VIN and the owner's details.
+
+**Verified.** A throwaway car plugin was built only from the seven packages packed from this branch, with
+`using Gleanvolt.Cars;` alone. Published and started in Production, it served the waiting page and the shared
+stylesheet (plain and fingerprinted). Full Release test pass here.
+
+**Files.** New `src/Gleanvolt.Cars.Hosting/` (`PluginCar.cs`, `CarPoller.cs`, `CarPollOptions.cs`, `CarPluginHost.cs`,
+`CarText.cs`, `Components/{CarFrame,_Imports}.razor`, `build/Gleanvolt.Cars.Hosting.targets`, csproj, LICENSE, README).
+`src/Gleanvolt.Providers.Testing/`: new `VehicleTestHub.cs`, `VehicleTestHubOptions.cs`, `TestVehicleHub.cs`,
+`VehicleReadingRules.cs`, `RefusedVehicleReading.cs`, `CarPluginHarness.cs`, `TestHubs.cs`; changed
+`ChargerTestHub.cs`, `HelloRules.cs`, csproj, README. Tests: new `VehicleTestHubTests.cs`, `CarsHostingTests.cs`.
+`src/Gleanvolt.Plugins.Hosting/README.md`, `Gleanvolt.slnx`, `Dockerfile`, `Dockerfile.windows`,
+`.github/workflows/release.yml`, `docs/{PROVIDERS,RELEASING,DECISIONS}.md`.
+
+---
+
 ## 2026-11-28 — A shared plugin host for every plugin kind (#472)
 
 **Why.** Charger plugins start before Gleanvolt, find it, show a waiting page until the owner accepts them, and frame

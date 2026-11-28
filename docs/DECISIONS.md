@@ -4,6 +4,36 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-28 — A car plugin implements one read; the gate, the clock and the page are the car layer's (#473)
+
+**Found.** Gleanvolt's own car feeds and the Volkswagen plugin each carry the same machinery around one request to the
+car's maker: a gate so two reasons to read don't make two requests, a minimum time between requests, a stop while the
+owner has to sign in, a clock that is faster while Gleanvolt charges, and the status Gleanvolt shows. With every car
+feed moving to `gleanvolt-cars` (#478), each plugin would carry its own copy.
+
+**Decided.**
+- **`Gleanvolt.Cars.Hosting` (MIT, released with the SDK), on the shared plugin host (#472).** A plugin extends
+  `PluginCar` with `FetchAsync`, and gets the gate (every read through it, so concurrent callers share one request),
+  `MinimumTimeBetweenReads`, `Block`/`Resume`, `unreachable` on a failure, the clock (`CarPoller`), the page
+  (`CarFrame`) and the status reporter.
+- **The clock reads once at start,** so the page shows the car before the owner accepts the plugin; the SDK's publish
+  on the welcome then falls inside the minimum and asks the maker nothing. The intervals are those Gleanvolt's own
+  feeds used: 5 minutes while a session is open or the car charges, 15 otherwise, 30 seconds apart at least.
+- **A block wins over what a read in flight brings back,** and over the exception that may follow it, so a car never
+  waits for the owner while it says it is fine.
+- **No recording for testers,** unlike the charger layer: a car's service is a cloud account, and a recording would
+  hold the VIN and the owner's details. It can come later with a redaction rule.
+- **The test hub checks readings as Gleanvolt does,** by a copy of the validator's rules (the testing package is MIT
+  and can't reference Core) that a test holds to the original, so a plugin that passes there passes Gleanvolt.
+
+**Consequences accepted.**
+- Every SDK release pushes seven MIT packages to nuget.org.
+- A change to `VehicleReadingValidator` has to be copied into `VehicleReadingRules`, or the parity test fails.
+- A plugin whose maker gives nothing new returns null, and the last reading and status stay as they were: a feed that
+  silently stops answering looks healthy until Gleanvolt's own age checks notice.
+
+---
+
 ## 2026-11-28 — One host for every plugin kind; the charger package is its charger layer (#472)
 
 **Found.** Car plugins are moving to a repository of their own, like the chargers (#478). Everything that makes a

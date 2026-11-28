@@ -1,0 +1,9 @@
+<Project>
+  <!--
+    The shared plugin host's namespace for every plugin on this package (#473): PluginInfo, PluginSettings, Words and
+    the other types in Gleanvolt.Plugins.Hosting stay in reach of a plugin's `using Gleanvolt.Cars;`.
+  -->
+  <ItemGroup>
+    <Using Include="Gleanvolt.Plugins" />
+  </ItemGroup>
+</Project>

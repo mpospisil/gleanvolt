@@ -9,6 +9,13 @@ internal static partial class HelloRules
 {
     public static (string? Code, string? Reason) Check(ProviderHello? hello, ChargerLimits limits)
     {
+        var (code, reason) = Common(hello, ChargerContract.Major, ChargerContract.Minor);
+        return code is not null ? (code, reason) : Fits(hello!, limits);
+    }
+
+    /// <summary>What Gleanvolt checks in every kind's hello: the name and id, the page URL, the contract's major.</summary>
+    public static (string? Code, string? Reason) Common(ProviderHello? hello, int major, int minor)
+    {
         if (hello is null || string.IsNullOrWhiteSpace(hello.Name) || hello.ProviderId is null || !ProviderId().IsMatch(hello.ProviderId))
         {
             return (RefusalCodes.Invalid, "The hello needs a name and an id of lowercase letters, digits and dashes.");
@@ -19,13 +26,13 @@ internal static partial class HelloRules
             return (RefusalCodes.Invalid, "The page URL must be an absolute http or https address.");
         }
 
-        if (hello.ContractMajor != ChargerContract.Major)
+        if (hello.ContractMajor != major)
         {
             return (RefusalCodes.ContractMajor,
-                $"The provider speaks contract {hello.ContractMajor}.{hello.ContractMinor}; Gleanvolt speaks {ChargerContract.Major}.{ChargerContract.Minor}.");
+                $"The provider speaks contract {hello.ContractMajor}.{hello.ContractMinor}; Gleanvolt speaks {major}.{minor}.");
         }
 
-        return Fits(hello, limits);
+        return (null, null);
     }
 
     /// <summary>Gleanvolt's own check of the charger's capabilities (ChargerHub, #440).</summary>
