@@ -19,6 +19,18 @@ public static class PluginHost
     public static WebApplicationBuilder CreateBuilder<TCharger>(string[] args, PluginInfo plugin)
         where TCharger : PluginCharger
     {
+        ArgumentNullException.ThrowIfNull(plugin);
+
+        // Optional on the shared PluginInfo (#472), where a plugin with no device on the LAN leaves it out; a charger
+        // always has one, and without it the page would save "host:0".
+        if (plugin.DefaultDevicePort is < 1 or > 65535)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(plugin),
+                plugin.DefaultDevicePort,
+                $"A charger plugin's PluginInfo needs DefaultDevicePort, the charger's own port (502 for Modbus, 80 for HTTP); {plugin.ProviderId} has {plugin.DefaultDevicePort}.");
+        }
+
         var builder = PluginWebHost.CreateBuilder(args, plugin,
             (services, configure) => services.AddGleanvoltChargerProvider<TCharger>(configure));
 

@@ -23,9 +23,10 @@ and its frame policy fixed at startup. The car plugins are moving to a repositor
   aliases; `PluginHost.Build` adds `/recording`. `StatusReporter` derives from the shared reporter and still keeps the
   session's welcome. `PluginCharger` implements `IPluginStatus`.
 - Charger plugins keep compiling unchanged:
-  - the package carries `build`/`buildTransitive/Gleanvolt.Chargers.Hosting.props` with `<Using Include="Gleanvolt.Plugins" />`;
+  - the package carries `build`/`buildTransitive/Gleanvolt.Chargers.Hosting.targets` with `<Using Include="Gleanvolt.Plugins" />` (a `.targets`: the Razor SDK writes `<PackageId>.props` itself once a package has static web assets);
   - `PluginSettings.Address` is a C# 14 extension property in `Gleanvolt.Chargers`;
-  - `PluginInfo`'s `DefaultDevicePort` is optional (0 for a plugin with no LAN device);
+  - `PluginInfo`'s `DefaultDevicePort` is optional (0 for a plugin with no LAN device), and `PluginHost` refuses a
+    charger plugin without one at start, where leaving it out used to be a compile error;
   - `SharedText`'s moved entries stay, as aliases of `HostText`'s.
 - The release workflow packs and pushes the new package; `RELEASING.md`, `PROVIDERS.md` and the package READMEs say so.
 
@@ -33,7 +34,7 @@ and its frame policy fixed at startup. The car plugins are moving to a repositor
 - The stylesheet moved from `_content/Gleanvolt.Chargers.Hosting/app.css` to `_content/Gleanvolt.Plugins.Hosting/app.css`.
   Under `TestServer` that path isn't served (a test project has no consumer manifest; the host's assets stand in at
   `/app.css`), so the test checks the link on both pages and a published SolaX plugin was checked by hand: the waiting
-  page links it and it answers 200 `text/css`.
+  page links it, and both it and the fingerprinted `app.<hash>.css` the Blazor page links answer 200 `text/css`.
 - After moving `wwwroot` out, `dotnet pack` of the charger package failed on a missing `wwwroot` until its `obj` was
   cleared: the static web assets cache remembered the folder.
 - `~/.nuget/packages` held a stale `1.3.3-local.1` from an earlier session, which would have shadowed the new packages;
@@ -47,7 +48,7 @@ branch with only `-p:GleanvoltSdkVersion` changed, and the working tree there st
 `HostText.cs`, `NetworkAddresses.cs`, and moved `Words.cs`, `ViewerCulture.cs`, `PluginCulture.cs`, `WaitingPage.cs`,
 `SavedSetting.cs`, `Components/{App,Routes,_Imports}.razor`, `wwwroot/app.css`, csproj, LICENSE, README). In
 `src/Gleanvolt.Chargers.Hosting/`: `PluginHost.cs`, `PluginCharger.cs`, `SharedText.cs`, `LanScan.cs`, new
-`DeviceAddress.cs`, `PluginSettingsExtensions.cs`, `build/Gleanvolt.Chargers.Hosting.props`, csproj, README,
+`DeviceAddress.cs`, `PluginSettingsExtensions.cs`, `build/Gleanvolt.Chargers.Hosting.targets`, csproj, README,
 `Components/_Imports.razor`. `src/Gleanvolt.Providers.Testing/{PluginHarness,FakeModbusServer}.cs`. Tests: new
 `PluginWebHostTests.cs`; `ChargersHostingTests.cs` and the culture, words and hub tests' usings. `Gleanvolt.slnx`,
 `Dockerfile`, `Dockerfile.windows`, `.github/workflows/release.yml`, `docs/{PROVIDERS,RELEASING,DECISIONS}.md`, the car

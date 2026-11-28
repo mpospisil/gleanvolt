@@ -28,7 +28,7 @@
     <None Include="LICENSE" Pack="true" PackagePath="\" />
     <None Include="README.md" Pack="true" PackagePath="\" />
     <!-- The shared host's namespace for every plugin on this package, however it is referenced (#472). -->
-    <None Include="build\Gleanvolt.Chargers.Hosting.props" Pack="true" PackagePath="build\;buildTransitive\" />
+    <None Include="build\Gleanvolt.Chargers.Hosting.targets" Pack="true" PackagePath="build\;buildTransitive\" />
   </ItemGroup>
 
   <ItemGroup>

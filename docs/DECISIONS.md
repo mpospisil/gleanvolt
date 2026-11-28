@@ -18,8 +18,9 @@ startup.
   page and endpoints. Rejected: a car copy of the charger host (two copies drift, weather would make a third), and no
   shared host at all (every new car repeats today's gaps).
 - **The charger package keeps every public name, so charger plugins only bump the SDK version.** It puts
-  `Gleanvolt.Plugins` in scope through a packed `build`/`buildTransitive` props file; `PluginSettings.Address` is a
-  C# 14 extension property; `PluginInfo.DefaultDevicePort` is optional; `SharedText`'s moved entries are aliases.
+  `Gleanvolt.Plugins` in scope through a packed `build`/`buildTransitive` `.targets` file (not `.props`, which the Razor SDK
+  generates for a package with static web assets); `PluginSettings.Address` is a
+  C# 14 extension property; `PluginInfo.DefaultDevicePort` is optional, and the charger layer refuses a charger plugin without it at start; `SharedText`'s moved entries are aliases.
 - **The stylesheet is the shared host's,** at `_content/Gleanvolt.Plugins.Hosting/app.css`.
 
 **Consequences accepted.**

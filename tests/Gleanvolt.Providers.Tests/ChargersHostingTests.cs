@@ -188,6 +188,19 @@ public sealed class ChargersHostingTests
         Assert.Contains("""<html lang="cs" """, body, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(65536)]
+    public void AChargerPluginWithoutItsDevicesPortIsRefusedAtStart(int port)
+    {
+        // Optional on the shared PluginInfo since #472, so a charger plugin that leaves it out no longer fails to
+        // compile: it must fail at start, not save "host:0" on the owner's page.
+        var plugin = new PluginInfo("no-port", "No port", "NoPort", 8112, port);
+
+        var refused = Assert.Throws<ArgumentOutOfRangeException>(() => PluginHost.CreateBuilder<TestCharger>([], plugin));
+        Assert.Contains("DefaultDevicePort", refused.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task TheWaitingViewEscapesThePluginsName()
     {
