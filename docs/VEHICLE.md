@@ -229,11 +229,11 @@ new tab* beside it, and only to someone signed in to Gleanvolt: the frame goes t
 adds a short-lived ticket the provider checks. How a provider does it is in
 [PROVIDERS.md](PROVIDERS.md#the-providers-own-page).
 
-**Volkswagen as a plugin.** [`plugins/Gleanvolt.Plugin.Volkswagen`](../plugins/Gleanvolt.Plugin.Volkswagen)
-is the volkswagen.de feed below, copied into an external provider with its own page for the account,
-the sign-in and the code (#410). It is a test of moving car feeds out of Gleanvolt, not part of the
-image or the release: run it only with *A plugin* chosen, so it and `Vehicle:Website` never
-use the VW account at the same time. Its README says how to run it and what differs from the built-in.
+**Volkswagen as a plugin.** The [Volkswagen plugin](https://github.com/mpospisil/gleanvolt-cars/tree/main/volkswagen)
+in gleanvolt-cars is the volkswagen.de feed below, as a car plugin with its own page for the account, the sign-in
+and the code (#410, #474). Run it only with *A plugin* chosen, so it and `Vehicle:Website` never use the VW account
+at the same time. Its README says how to run it and what differs from the built-in. The built-in feeds move there
+too (#478).
 
 | Key | Default | |
 |---|---|---|

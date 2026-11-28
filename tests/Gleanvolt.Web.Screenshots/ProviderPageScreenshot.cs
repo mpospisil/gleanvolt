@@ -1,6 +1,9 @@
 using System.Net;
 using Bunit;
-using Gleanvolt.Plugin.Volkswagen.Volkswagen;
+using System.Text.RegularExpressions;
+using Gleanvolt.Cars;
+using Gleanvolt.Cars.Components;
+using Microsoft.AspNetCore.Components;
 using Gleanvolt.Providers.Client;
 using Gleanvolt.Providers.Client.Vehicle;
 using Gleanvolt.Providers.Contracts.Vehicle;
@@ -8,7 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Gleanvolt.Web.Tests;
-using VolkswagenHome = Gleanvolt.Plugin.Volkswagen.Components.Pages.Home;
 using OpenWeatherHome = Gleanvolt.Plugin.OpenWeather.Components.Pages.Home;
 using Gleanvolt.Plugin.OpenWeather.OpenWeather;
 using Gleanvolt.Providers.Client.Weather;
@@ -18,56 +20,58 @@ using Microsoft.Extensions.Configuration;
 namespace Gleanvolt.Web.Screenshots;
 
 /// <summary>
-/// The Volkswagen plugin's own page (#410), rendered by bUnit as the plugin renders it and wrapped in its
-/// own stylesheet: what Gleanvolt's Car page shows in its frame, for the manual. A plugin that has just
-/// read the car: an account entered, a session saved, the car parked and plugged in.
+/// The plugins' own pages, rendered by bUnit as the plugins render them and wrapped in their stylesheet: what
+/// Gleanvolt's Settings and Car pages show in their frames, for the manual.
 /// </summary>
 internal static class ProviderPageScreenshot
 {
-    public static string Volkswagen(DateTimeOffset now)
+    /// <summary>
+    /// A car plugin's own page (#410, #474): the car layer's shared page, as the Volkswagen plugin in gleanvolt-cars
+    /// shows it, with a reading taken two minutes ago and a sign-in section of the plugin's own. The plugin itself is
+    /// not in this repository, so its section is drawn here in its shape.
+    /// </summary>
+    public static string CarPlugin(DateTimeOffset now)
     {
-        var directory = Path.Combine(Path.GetTempPath(), $"gleanvolt-screenshot-vw-{Guid.NewGuid():N}");
+        var directory = Path.Combine(Path.GetTempPath(), $"gleanvolt-screenshot-car-{Guid.NewGuid():N}");
 
         try
         {
             using var context = new BunitContext();
             context.JSInterop.Mode = JSRuntimeMode.Loose;
 
-            var options = new VolkswagenOptions { DataDirectory = directory };
-            var files = new ProviderSecretStore(options.DataDirectory);
-            var account = new AccountStore(files);
-            account.Save("owner@example.com", "not-a-real-password", "WVGZZZE2ZPE000001");
-            var session = new VwWebsiteSessionStore(files);
-            session.Save(new CookieContainer());
             var time = new FixedTimeProvider(now, TimeZoneInfo.FindSystemTimeZoneById("Europe/Prague"));
-            var client = new VwWebsiteClient(options, account, session, time: time);
-            var feed = new VolkswagenFeed(options, account, client, time, NullLogger<VolkswagenFeed>.Instance);
-            feed.Seed(new VehicleReading(
+            var car = new PictureCar(time, new VehicleReading(
                 now.AddMinutes(-9),
                 SocPercent: 64,
                 RangeMetres: 268_000,
                 ChargeTimeRemaining: TimeSpan.Zero,
                 ChargeState: CarChargeState.Idle,
-                PlugState: CarPlugState.Connected), now.AddMinutes(-2));
-            var connection = new VehicleProviderConnection(
-                Options.Create(new ProviderOptions { ProviderId = "volkswagen", Name = "Volkswagen" }),
-                feed,
-                NullLogger<VehicleProviderConnection>.Instance);
+                PlugState: CarPlugState.Connected));
+            car.ReadAsync(null, CancellationToken.None).GetAwaiter().GetResult();
 
-            context.Services.AddSingleton(account);
-            context.Services.AddSingleton(session);
-            context.Services.AddSingleton(new VwWebsiteSignIn(account, client));
-            context.Services.AddSingleton(feed);
-            context.Services.AddSingleton(new VolkswagenPoller(connection, feed, NullLogger<VolkswagenPoller>.Instance));
+            var options = Options.Create(new ProviderOptions { ProviderId = "volkswagen", Name = "Volkswagen" });
+            var connection = new VehicleProviderConnection(options, car, NullLogger<VehicleProviderConnection>.Instance);
+
+            context.Services.AddSingleton(new Gleanvolt.Plugins.PluginInfo("volkswagen", "Volkswagen", "Volkswagen", 8095));
+            context.Services.AddSingleton<PluginCar>(car);
+            context.Services.AddSingleton(new CarPoller(connection, car, time, NullLogger<CarPoller>.Instance));
             context.Services.AddSingleton(connection);
+            // Accepted on Settings → Plugins, as an owner pairs it.
+            var credentials = new ProviderCredentials(options, new ProviderSecretStore(directory));
+            credentials.Save(new Uri("http://192.168.2.7:8090"), "gvp_picture");
+            context.Services.AddSingleton(credentials);
             context.Services.AddSingleton<TimeProvider>(time);
 
-            var markup = context.Render<VolkswagenHome>().Markup;
+            var markup = context.Render<CarFrame>(parameters => parameters
+                .Add(frame => frame.Settings, (RenderFragment)(builder => builder.AddMarkupContent(0, SignInSection)))).Markup;
 
-            // The data directory is a temporary one here: say where the real one is.
-            markup = markup.Replace(Path.GetFullPath(directory), "/data", StringComparison.Ordinal);
+            // Not connected in a picture: show the car Gleanvolt would have welcomed it with.
+            markup = Regex.Replace(
+                markup,
+                "<p class=\"muted\" id=\"not-connected\">[^<]*</p>",
+                $"<dl id=\"car\"><dt>{CarText.GleanvoltCar.En}</dt><dd>Rosie (Volkswagen ID.4)</dd></dl><p id=\"session\" class=\"muted\">{CarText.SessionClosed.En}</p>");
 
-            var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "plugins", "Gleanvolt.Plugin.Volkswagen", "wwwroot", "app.css"));
+            var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Gleanvolt.Plugins.Hosting", "wwwroot", "app.css"));
             return $"""
                 <!DOCTYPE html>
                 <html lang="en" data-theme="light">
@@ -83,6 +87,37 @@ internal static class ProviderPageScreenshot
                 Directory.Delete(directory, recursive: true);
             }
         }
+    }
+
+    // The Volkswagen plugin's sign-in and account sections, in their shape and English words, signed in.
+    private const string SignInSection = """
+        <section>
+            <h2>Sign in to volkswagen.de</h2>
+            <p class="muted">A cold sign-in always makes Volkswagen email a one-time code. Once you have entered it, this browser is remembered, so a restart of the plugin should not need another.</p>
+            <p id="signin-state" class="ok">Signed in. This browser is remembered, so a restart should not need another code.</p>
+            <div class="actions">
+                <button type="button" id="signin">Sign in</button>
+                <button type="button" id="forget" class="secondary">Forget the session</button>
+            </div>
+            <p class="muted">A signed-in session is saved. Kept as files in /data, readable only by the plugin's user (0600).</p>
+        </section>
+        <section>
+            <h2>The account</h2>
+            <label for="username">VW ID (email)</label>
+            <input id="username" type="email" value="owner@example.com" />
+            <label for="password">Password</label>
+            <input id="password" type="password" placeholder="Saved. Leave empty to keep it." />
+            <label for="vin">VIN</label>
+            <input id="vin" value="WVGZZZE2ZPE000001" />
+            <div class="actions"><button type="button" id="account-save" class="secondary">Save the account</button></div>
+        </section>
+        """;
+
+    // A car that has just been read, for the picture.
+    private sealed class PictureCar(TimeProvider time, VehicleReading reading) : PluginCar(new CarPollOptions(), time)
+    {
+        protected override Task<VehicleReading?> FetchAsync(VehicleInfo? car, CancellationToken cancellationToken) =>
+            Task.FromResult<VehicleReading?>(reading);
     }
 
     /// <summary>
