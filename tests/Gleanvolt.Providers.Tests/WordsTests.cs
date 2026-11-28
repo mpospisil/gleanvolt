@@ -1,5 +1,6 @@
 using System.Globalization;
 using Gleanvolt.Chargers;
+using Gleanvolt.Plugins;
 using Gleanvolt.Providers.Tests.Resources;
 using Xunit;
 

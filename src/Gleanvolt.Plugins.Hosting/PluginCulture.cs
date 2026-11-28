@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Localization;
 
-namespace Gleanvolt.Chargers;
+namespace Gleanvolt.Plugins;
 
 /// <summary>
 /// Which language the plugin's pages use. Gleanvolt names it in the <c>?culture=</c> query of every page it opens, so the

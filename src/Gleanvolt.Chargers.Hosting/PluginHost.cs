@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Reflection;
-using Gleanvolt.Chargers.Components;
+using Gleanvolt.Plugins.Components;
 using Gleanvolt.Providers.Client;
 using Gleanvolt.Providers.Client.Charger;
 using Gleanvolt.Providers.Contracts;
@@ -13,58 +13,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Gleanvolt.Chargers;
-
-/// <summary>What a plugin is.</summary>
-/// <param name="ProviderId">Its id in the hello, stable for good: Gleanvolt remembers the first it accepts.</param>
-/// <param name="Name">What Gleanvolt and the page show, e.g. "SolaX X3-EVC".</param>
-/// <param name="Section">Its configuration section, e.g. <c>Solax</c>: <c>Solax:Host</c>, <c>Solax:DataDirectory</c>.</param>
-/// <param name="Port">The page's port when <c>Urls</c> is not set.</param>
-/// <param name="DefaultDevicePort">The charger's own port when an address names none: 502 for Modbus, 80 for HTTP.</param>
-public sealed record PluginInfo(string ProviderId, string Name, string Section, int Port, int DefaultDevicePort)
-{
-    /// <summary>The plugin's version, from its assembly: the release tag's, or 0.0.0-dev.</summary>
-    public string Version { get; init; } =
-        Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "0.0.0-dev";
-
-    /// <summary>The assembly with the plugin's page.</summary>
-    public Assembly PageAssembly { get; init; } = Assembly.GetEntryAssembly()!;
-}
-
-/// <summary>The settings a plugin's page saves: the charger's address, and whatever else the plugin adds.</summary>
-public sealed class PluginSettings
-{
-    private readonly IProviderSecretStore _files;
-    private readonly IConfiguration _configuration;
-    private readonly string _section;
-    private readonly Dictionary<string, SavedSetting> _settings = new(StringComparer.Ordinal);
-
-    public PluginSettings(IProviderSecretStore files, IConfiguration configuration, PluginInfo plugin)
-    {
-        _files = files;
-        _configuration = configuration;
-        _section = plugin.Section;
-        Address = Get("host");
-    }
-
-    /// <summary>The charger's address: <c>&lt;Section&gt;:Host</c>, or what the page saved.</summary>
-    public SavedSetting Address { get; }
-
-    /// <summary>The setting <paramref name="name"/>: <c>&lt;Section&gt;:&lt;Name&gt;</c>, or what the page saved under that name.</summary>
-    public SavedSetting Get(string name)
-    {
-        lock (_settings)
-        {
-            if (!_settings.TryGetValue(name, out var setting))
-            {
-                var key = $"{_section}:{char.ToUpperInvariant(name[0])}{name[1..]}";
-                setting = new SavedSetting(_files, "setting-" + name, _configuration, key);
-                _settings[name] = setting;
-            }
-
-            return setting;
-        }
-    }
-}
 
 /// <summary>
 /// The host every plugin runs in: its configuration (user secrets, the environment, the command line), the page

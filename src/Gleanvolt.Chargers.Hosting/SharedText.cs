@@ -13,8 +13,8 @@ public static class SharedText
     public static readonly Words Unreachable = new("The charger could not be reached: {0}", "Nabíječka není dostupná: {0}");
 
     // Gleanvolt.
-    public static readonly Words Gleanvolt = new("Gleanvolt", "Gleanvolt");
-    public static readonly Words NotConnected = new("Not connected to Gleanvolt yet.", "Zatím nepřipojeno ke Gleanvoltu.");
+    public static readonly Words Gleanvolt = HostText.Gleanvolt;
+    public static readonly Words NotConnected = HostText.NotConnected;
     public static readonly Words Range = new("Current range", "Rozsah proudu");
     public static readonly Words Phases = new("Phases", "Fáze");
     public static readonly Words DryRun = new(
@@ -22,21 +22,15 @@ public static class SharedText
         "Gleanvolt je ve zkušebním režimu (dry-run): nabíječku čte a neposílá žádné příkazy.");
     public static readonly Words ChargerCan = new("This charger", "Tato nabíječka");
     public static readonly Words CanDo = new("{0}–{1} A, {2} phase(s)", "{0}–{1} A, fáze: {2}");
-    public static readonly Words TokenFromConfiguration = new(
-        "Connected with the token from the configuration.",
-        "Připojeno tokenem z konfigurace.");
-    public static readonly Words TokenFromPairing = new("Connected with the token from pairing.", "Připojeno tokenem ze spárování.");
+    public static readonly Words TokenFromConfiguration = HostText.TokenFromConfiguration;
+    public static readonly Words TokenFromPairing = HostText.TokenFromPairing;
 
     // The waiting view, until the owner accepts the plugin in Gleanvolt (#459).
-    public static readonly Words PairingSearching = new("Looking for Gleanvolt on this network.", "Hledá se Gleanvolt v této síti.");
-    public static readonly Words PairingWaiting = new(
-        "Waiting for the owner to accept this plugin in Gleanvolt: Settings → Plugins.",
-        "Čeká se, až vlastník tento plugin přijme v Gleanvoltu: Nastavení → Pluginy.");
-    public static readonly Words PairingRejected = new(
-        "Gleanvolt rejected this plugin. It asks again in an hour, or when restarted.",
-        "Gleanvolt tento plugin odmítl. Znovu se zeptá za hodinu nebo po restartu.");
-    public static readonly Words PairingCode = new("Pairing code", "Kód pro spárování");
-    public static readonly Words PairingAddresses = new("This plugin's addresses", "Adresy tohoto pluginu");
+    public static readonly Words PairingSearching = HostText.PairingSearching;
+    public static readonly Words PairingWaiting = HostText.PairingWaiting;
+    public static readonly Words PairingRejected = HostText.PairingRejected;
+    public static readonly Words PairingCode = HostText.PairingCode;
+    public static readonly Words PairingAddresses = HostText.PairingAddresses;
 
     // The reading.
     public static readonly Words Charger = new("The charger", "Nabíječka");
@@ -44,11 +38,11 @@ public static class SharedText
     public static readonly Words Power = new("Power", "Výkon");
     public static readonly Words Setpoint = new("Current setpoint", "Nastavený proud");
     public static readonly Words Allowed = new("Charging allowed", "Nabíjení povoleno");
-    public static readonly Words Read = new("Read at", "Přečteno");
-    public static readonly Words NotSaid = new("not known", "neznámé");
-    public static readonly Words Yes = new("yes", "ano");
-    public static readonly Words No = new("no", "ne");
-    public static readonly Words NoReadingYet = new("No reading yet.", "Zatím žádné čtení.");
+    public static readonly Words Read = HostText.Read;
+    public static readonly Words NotSaid = HostText.NotSaid;
+    public static readonly Words Yes = HostText.Yes;
+    public static readonly Words No = HostText.No;
+    public static readonly Words NoReadingYet = HostText.NoReadingYet;
 
     // The address and the search, for the plugin's own sections (#459, #461).
     public static readonly Words AddressHeading = new("The charger's address", "Adresa nabíječky");

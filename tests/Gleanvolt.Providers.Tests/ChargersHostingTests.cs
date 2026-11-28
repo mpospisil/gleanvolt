@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Runtime.CompilerServices;
 using Gleanvolt.Chargers;
+using Gleanvolt.Plugins;
 using Gleanvolt.Chargers.Components;
 using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Charger;
@@ -254,6 +255,24 @@ public sealed class ChargersHostingTests
         Assert.Contains(SharedText.TokenFromPairing.En, await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task TheStylesheetIsTheSharedHostsOnBothPages()
+    {
+        await using var plugin = await PluginApp.StartAsync();
+
+        // The waiting view, before pairing.
+        Assert.Contains("""href="/_content/Gleanvolt.Plugins.Hosting/app.css" """.TrimEnd(), await plugin.Client.GetStringAsync("/"), StringComparison.Ordinal);
+
+        // That path is served from a plugin's own manifest, which a test project has none of: a published plugin is
+        // checked by hand (the plan's Task 3). Here the host's stylesheet is served at /app.css, as PluginApp says.
+        Assert.Equal(HttpStatusCode.OK, (await plugin.Client.GetAsync("/app.css")).StatusCode);
+
+        // The Blazor page, once paired.
+        plugin.App.Services.GetRequiredService<ProviderCredentials>().Save(new Uri("http://127.0.0.1:9"), "gvp_paired");
+        var page = await plugin.Client.GetStringAsync("/?" + ProviderPage.TicketParameter + "=" + Ticket("gvp_paired"));
+        Assert.Contains("_content/Gleanvolt.Plugins.Hosting/app.css", page, StringComparison.Ordinal);
+    }
+
     private static string Ticket(string token) =>
         Uri.EscapeDataString(ProviderPage.CreateTicket(token, PluginApp.Id, DateTimeOffset.UtcNow.AddMinutes(2)));
 
@@ -289,7 +308,7 @@ public sealed class ChargersHostingTests
             // the host's serves its stylesheet at /app.css, from the source in Development as a plugin run from its
             // project does.
             var builder = PluginHost.CreateBuilder<TestCharger>(
-                [$"--DataDirectory={directory}", "--applicationName=Gleanvolt.Chargers.Hosting", "--environment=Development", .. extra ?? []], plugin);
+                [$"--DataDirectory={directory}", "--applicationName=Gleanvolt.Plugins.Hosting", "--environment=Development", .. extra ?? []], plugin);
             builder.WebHost.UseTestServer();
             builder.Services.AddSingleton<IGleanvoltFinder, NoGleanvolt>();
             var app = PluginHost.Build(builder);

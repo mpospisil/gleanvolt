@@ -3,6 +3,7 @@ using Gleanvolt.Providers.Client.Charger;
 using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Charger;
 using Gleanvolt.Chargers;
+using Gleanvolt.Plugins;
 using Gleanvolt.Providers.Testing;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
