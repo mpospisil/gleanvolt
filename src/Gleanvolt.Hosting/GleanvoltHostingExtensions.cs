@@ -797,20 +797,11 @@ public static class GleanvoltHostingExtensions
 
         services.AddHostedService<HomeAssistantMqttWorker>();
 
-        // Vehicle telemetry read off MQTT (issue #73). Disabled by default; broker credentials are
-        // secrets supplied via .env / env var (Vehicle__Username / Vehicle__Password).
-        //
-        // The holder and IVehicleTelemetry are registered whether or not the feed is enabled, so the web
-        // UI can inject the read side unconditionally and render "no reading" rather than having to know
-        // about the configuration. Only the worker checks Enabled.
+        // The car's latest reading, which a car plugin's feed writes. Registered whether or not one does, so the web
+        // UI can inject the read side unconditionally and render "no reading". Vehicle:MaxAge says when it is stale.
         services.Configure<VehicleOptions>(configuration.GetSection(VehicleOptions.SectionName));
         services.AddSingleton(_ => new VehicleStateHolder());
         services.AddSingleton<IVehicleTelemetry>(provider => provider.GetRequiredService<VehicleStateHolder>());
-
-        // The MQTT topic may run beside the manufacturer feed, and the freshest reading wins
-        // (VehicleStateHolder keeps the newest capture time). Out of #212's scope: that issue settles
-        // which *manufacturer* feed reads the car, not whether an owner's own topic may.
-        services.AddHostedService<VehicleMqttWorker>();
 
         // The built-in car feeds are gone (#477): a car plugin reads the car, through Vehicle:External. An installation
         // that used one is moved to it at this start (RetiredCarFeed), so this start already runs the plugin's feed.
@@ -1269,9 +1260,7 @@ public static class GleanvoltHostingExtensions
             {
                 var loginEnforced = web.LoginEnforced(provider.GetRequiredService<WebPasswordState>());
                 var ha = provider.GetRequiredService<IOptions<HomeAssistantOptions>>().Value;
-                var vehicle = provider.GetRequiredService<IOptions<VehicleOptions>>().Value;
                 var discovery = provider.GetRequiredService<HaDiscovery>();
-                var ev = provider.GetRequiredService<EvInfo>();
 
                 return new MqttDisplayOptions(
                     new HomeAssistantMqttDisplay(
@@ -1286,17 +1275,7 @@ public static class GleanvoltHostingExtensions
                             new MqttTopicDisplay(topic.Purpose, topic.Topic, topic.Inbound, topic.PurposePhrase))],
                         ha.StatusInterval,
                         ha.RetireDeviceIds,
-                        ha.RetireTopicPrefixes),
-                    new VehicleMqttDisplay(
-                        Connection(
-                            vehicle.Enabled, vehicle.BrokerHost, vehicle.BrokerPort, vehicle.Username,
-                            vehicle.Password, VehicleMqttWorker.ClientId),
-                        // The topic the worker actually subscribed to, which comes from the car (#124)
-                        // and not from Vehicle:Topic -- showing the latter would display a setting that
-                        // is being ignored.
-                        ev.TelemetryTopic,
-                        vehicle.MaxAge,
-                        vehicle.ReconnectInterval));
+                        ha.RetireTopicPrefixes));
 
                 MqttConnectionDisplay Connection(
                     bool enabled, string host, int port, string? username, string? password, string clientId) =>

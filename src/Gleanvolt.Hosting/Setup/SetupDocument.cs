@@ -164,7 +164,7 @@ public sealed class SetupDocument
                 {
                     notAllowed.Add(
                         $"{key}: Gleanvolt doesn't read the car itself any more. The {plugin.Name} plugin does: run it, "
-                        + "accept it on Settings → Plugins and set up the account on its page, then choose A plugin on the "
+                        + "accept it on Settings → Plugins and set up the account on its page, then choose A car plugin on the "
                         + "Car page. Take the key out of the setup file.",
                         Phrase.Of("Config.SetupRetiredCarKey", new PhraseArg.Text(key), new PhraseArg.Text(plugin.Name)));
                     continue;

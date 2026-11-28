@@ -98,7 +98,7 @@
     <value>State</value>
   </data>
   <data name="NoManufacturerFeed" xml:space="preserve">
-    <value>No manufacturer feed is running. Charging is unaffected; what is missing is the car's own state of charge, so a target is asked for in kWh rather than as a percentage.</value>
+    <value>No car plugin is reading the car. Charging is unaffected; what is missing is the car's own state of charge, so a target is asked for in kWh rather than as a percentage.</value>
   </data>
   <data name="CarBattery" xml:space="preserve">
     <value>Car battery</value>
@@ -145,27 +145,8 @@
   <data name="TheCarFallback" xml:space="preserve">
     <value>the car</value>
   </data>
-  <data name="OwnTopicNothingToPress_Cars" xml:space="preserve">
-    <value>car</value>
-  </data>
-  <data name="OwnTopicNothingToPress" xml:space="preserve">
-    <value>Nothing to press, because nothing here fetches: you publish this car's readings yourself to {0} — one JSON object per reading, with the time the {1} took it in {2}, and {3}, {4}, {5} and {6} where your source has them.</value>
-    <comment>{0} is the topic (or TheTopicInTheForm), {1} is OwnTopicNothingToPress_Cars in italics, {2}–{6} are JSON field names.</comment>
-  </data>
-  <data name="TheTopicInTheForm" xml:space="preserve">
-    <value>the topic in the form above</value>
-  </data>
-  <data name="LastArrived" xml:space="preserve">
-    <value>The last message carried {0}, captured {1} ago.</value>
-  </data>
-  <data name="NothingArrived" xml:space="preserve">
-    <value>No message has arrived yet.</value>
-  </data>
   <data name="TheFeed" xml:space="preserve">
     <value>the feed</value>
-  </data>
-  <data name="OwnTopicToo" xml:space="preserve">
-    <value>This car also has its own topic, {0}. It can run alongside a manufacturer feed; the newest reading wins.</value>
   </data>
   <!-- Car form -->
   <data name="ChangesTakeEffect_One" xml:space="preserve">
@@ -196,7 +177,7 @@
     <value>A save is checked the same way startup checks the configuration, and only values that differ are written to {0}. That file overrides {1} key by key, so each field shows where its value comes from. Nothing changes until the controller restarts.</value>
   </data>
   <data name="Manufacturer" xml:space="preserve">
-    <value>Manufacturer</value>
+    <value>Battery level</value>
   </data>
   <data name="WhatReadsThisCar" xml:space="preserve">
     <value>What reads this car</value>
@@ -246,9 +227,6 @@
   <data name="FieldMaxCurrent" xml:space="preserve">
     <value>Maximum current (A)</value>
   </data>
-  <data name="FieldOwnTopic" xml:space="preserve">
-    <value>Own topic</value>
-  </data>
   <data name="HintId" xml:space="preserve">
     <value>a-z, 0-9, - and _</value>
   </data>
@@ -270,20 +248,11 @@
   <data name="RevertTo" xml:space="preserve">
     <value>Revert to {0}</value>
   </data>
-  <data name="FeedOwnTopic" xml:space="preserve">
-    <value>A feed I publish myself</value>
-  </data>
   <data name="FeedNone" xml:space="preserve">
-    <value>Another manufacturer — charge only</value>
-  </data>
-  <data name="FreshOwnTopic" xml:space="preserve">
-    <value>depends on your publisher</value>
+    <value>Nothing — targets in kWh</value>
   </data>
   <data name="FreshNone" xml:space="preserve">
     <value>no reading from the car</value>
-  </data>
-  <data name="NoteOwnTopic" xml:space="preserve">
-    <value>An MQTT topic you publish to yourself. The broker and its credentials are the house broker's and are set in the Vehicle section; only the topic belongs to the car.</value>
   </data>
   <data name="NoteNone" xml:space="preserve">
     <value>No feed. This is a supported setup, not an unfinished form: every EV with a Type 2 inlet charges without one. The only difference is that targets are set in kWh rather than as a state of charge, because nothing reports how much the battery already holds.</value>
@@ -331,7 +300,7 @@
   </data>
   <!-- The portal's failure kinds, as the Ask the car result names them -->
   <data name="FeedExternal" xml:space="preserve">
-    <value>A plugin</value>
+    <value>A car plugin</value>
   </data>
   <data name="FreshExternal" xml:space="preserve">
     <value>as often as the plugin publishes</value>
@@ -374,11 +343,5 @@
   </data>
   <data name="FeedRetired" xml:space="preserve">
     <value>Gleanvolt no longer reads the car itself, and this installation used its built-in feed. Run the {0} plugin, accept it on Settings → Plugins, and keep “{1}” chosen above. Until it connects, the car isn’t read.</value>
-  </data>
-  <data name="FieldTopic" xml:space="preserve">
-    <value>Topic</value>
-  </data>
-  <data name="HintTopic" xml:space="preserve">
-    <value>one concrete topic, no wildcards</value>
   </data>
 </root>

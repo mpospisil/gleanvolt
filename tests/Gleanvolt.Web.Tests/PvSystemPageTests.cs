@@ -47,7 +47,7 @@ public class PvSystemPageTests : BunitContext
 
     /// <summary>An ID.4 Pro: 77 kWh usable, three phases, 6–16 A.</summary>
     private static EvInfo Car(int? phases = 3, int? minAmps = 6, int? maxAmps = 16) => new(
-        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77_000, 0.9, phases, minAmps, maxAmps, "gleanvolt/vehicle/id4/state");
+        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77_000, 0.9, phases, minAmps, maxAmps);
 
     /// <summary>
     /// A configured MQTT link, as the host composes one. <paramref name="password"/> is what the host
@@ -65,10 +65,8 @@ public class PvSystemPageTests : BunitContext
 
     private static MqttDisplayOptions Mqtt(
         MqttConnectionDisplay? homeAssistant = null,
-        MqttConnectionDisplay? vehicle = null,
         string topicPrefix = "gleanvolt/home-roof",
         bool batteryHold = false,
-        string vehicleTopic = "gleanvolt/vehicle/id4/state",
         IReadOnlyList<string>? retiredDeviceIds = null)
     {
         // The same shape HaDiscovery.WellKnownTopics() produces, battery hold included only when the
@@ -96,12 +94,7 @@ public class PvSystemPageTests : BunitContext
                 TopicPrefix: topicPrefix,
                 Topics: homeAssistant is null ? [] : topics,
                 StatusInterval: TimeSpan.FromSeconds(15),
-                RetiredDeviceIds: retiredDeviceIds),
-            new VehicleMqttDisplay(
-                vehicle ?? MqttConnectionDisplay.Off,
-                Topic: vehicleTopic,
-                MaxAge: TimeSpan.FromHours(12),
-                ReconnectInterval: TimeSpan.FromSeconds(30)));
+                RetiredDeviceIds: retiredDeviceIds));
     }
 
     /// <summary>The API as the host composes it once it is switched on, with the keys it was given.</summary>
@@ -286,15 +279,14 @@ public class PvSystemPageTests : BunitContext
     }
 
     [Fact]
-    public void The_api_comes_first_then_home_assistant_then_car_telemetry()
+    public void The_api_comes_first_then_home_assistant()
     {
         var markup = RenderIntegrations().Markup;
 
         var api = markup.IndexOf("id=\"api-editor\"", StringComparison.Ordinal);
         var mqtt = markup.IndexOf("id=\"mqtt-editor\"", StringComparison.Ordinal);
-        var telemetry = markup.IndexOf("id=\"vehicle-telemetry\"", StringComparison.Ordinal);
 
-        Assert.True(api >= 0 && api < mqtt && mqtt < telemetry, $"api {api}, mqtt {mqtt}, telemetry {telemetry}");
+        Assert.True(api >= 0 && api < mqtt, $"api {api}, mqtt {mqtt}");
     }
 
     [Fact]
@@ -357,12 +349,12 @@ public class PvSystemPageTests : BunitContext
     [Fact]
     public void Says_plainly_when_neither_link_is_configured()
     {
-        // Off is the default for both. Home Assistant's own form says it with its checkbox; car telemetry,
-        // turned on on the Car page, says where.
+        // Off is the default. Home Assistant's own form says it with its checkbox. The car's telemetry section is
+        // gone (#486).
         var page = RenderIntegrations();
 
         Assert.Empty(page.FindAll("#ha-mqtt-off"));
-        Assert.Equal("/car", page.Find("#vehicle-mqtt-off a").GetAttribute("href"));
+        Assert.Empty(page.FindAll("#vehicle-telemetry"));
         Assert.Empty(page.FindAll("table.topics"));
     }
 
@@ -371,15 +363,7 @@ public class PvSystemPageTests : BunitContext
     {
         var off = RenderIntegrations().Markup;
 
-        using var on = new BunitContext();
-        var noTopic = RenderIn<Integrations>(on, mqtt: Mqtt(vehicle: Link(), vehicleTopic: "")).Markup;
-
-        foreach (var markup in new[] { off, noTopic })
-        {
-            Assert.DoesNotContain("HomeAssistant__Enabled", markup);
-            Assert.DoesNotContain("Vehicle__Enabled", markup);
-            Assert.DoesNotContain("Ev__Vehicles__0__Telemetry__Topic", markup);
-        }
+        Assert.DoesNotContain("HomeAssistant__Enabled", off);
     }
 
     [Fact]
@@ -409,16 +393,6 @@ public class PvSystemPageTests : BunitContext
         var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link(), retiredDeviceIds: ["old_controller"]));
 
         Assert.Null(page.Find("#ha-mqtt-retiring").Closest("details"));
-    }
-
-    [Fact]
-    public void Car_telemetry_is_a_section_of_its_own()
-    {
-        var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
-
-        var section = page.Find("#vehicle-telemetry");
-        Assert.Contains("gleanvolt/vehicle/id4/state", section.TextContent);
-        Assert.Contains("gleanvolt-vehicle-raspberrypi", section.TextContent);
     }
 
     [Fact]
@@ -475,12 +449,9 @@ public class PvSystemPageTests : BunitContext
     {
         // What the broker's connection log and its ACL file call us -- the string to search for when
         // the broker is the suspect.
-        var page = RenderIntegrations(mqtt: Mqtt(
-            homeAssistant: Link(),
-            vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link()));
 
         Assert.Contains("gleanvolt-controller-home-roof", page.Markup);
-        Assert.Contains("gleanvolt-vehicle-raspberrypi", page.Markup);
     }
 
     [Fact]
@@ -495,79 +466,16 @@ public class PvSystemPageTests : BunitContext
     }
 
     [Fact]
-    public void Shows_the_topic_the_vehicle_feed_actually_subscribed_to()
-    {
-        var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(clientId: "gleanvolt-vehicle-raspberrypi")));
-
-        Assert.Contains("gleanvolt/vehicle/id4/state", page.Markup);
-        Assert.Contains("12 h", page.Markup);
-        Assert.Contains("30 s", page.Markup);
-    }
-
-    [Fact]
-    public void Says_when_the_vehicle_feed_is_on_with_nothing_to_subscribe_to()
-    {
-        // The exact case the worker warns about once and then does nothing -- which from the dashboard
-        // is indistinguishable from a car that never reports.
-        var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(), vehicleTopic: string.Empty));
-
-        Assert.Equal("/car", page.Find("#vehicle-mqtt-no-topic a").GetAttribute("href"));
-    }
-
-    [Fact]
-    public void Says_when_the_two_links_share_one_broker_and_stays_quiet_when_they_do_not()
-    {
-        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link(), vehicle: Link()));
-
-        Assert.Contains("mosquitto:1883", page.Find("#mqtt-one-broker").TextContent);
-
-        using var separate = new BunitContext();
-        var separatePage = RenderIn<Integrations>(separate, mqtt: Mqtt(homeAssistant: Link(), vehicle: Link(host: "192.168.2.4")));
-
-        Assert.Empty(separatePage.FindAll("#mqtt-one-broker"));
-        Assert.Contains("192.168.2.4:1883", separatePage.Markup);
-    }
-
-    [Fact]
     public void No_broker_password_reaches_an_unauthenticated_page()
     {
         // The structural half of the guarantee is the host's: with no login enforced it hands over a
         // null. This is the other half -- that a null renders as an explanation rather than as blank,
         // and that nothing secret is in the markup to be revealed by a view-source.
-        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link(password: null), vehicle: Link(password: null)));
+        var page = RenderIntegrations(mqtt: Mqtt(homeAssistant: Link(password: null)));
 
         Assert.DoesNotContain("broker-secret", page.Markup);
         Assert.Contains("Web__PasswordHash", page.Markup);
         Assert.Empty(page.FindAll("button"));
-    }
-
-    [Fact]
-    public void A_broker_password_renders_masked_until_it_is_asked_for()
-    {
-        // The car telemetry link's: Home Assistant's password is the form's, and the form never shows it.
-        var page = RenderIntegrations(mqtt: Mqtt(vehicle: Link(password: "broker-secret")));
-
-        // Behind a login is not behind a closed door: a shoulder and a screenshot are a different
-        // threat from the network, so it starts hidden.
-        Assert.DoesNotContain("broker-secret", page.Markup);
-        Assert.Contains("•", page.Markup);
-
-        page.FindAll("button").Single(button => button.TextContent == "Reveal").Click();
-
-        Assert.Contains("broker-secret", page.Markup);
-        Assert.Contains("Copy", page.Markup);
-    }
-
-    [Fact]
-    public void An_anonymous_broker_does_not_read_as_a_withheld_password()
-    {
-        var page = RenderIntegrations(mqtt: Mqtt(
-            vehicle: Link(username: string.Empty, password: null, hasPassword: false)));
-
-        // The car telemetry section only: the edit forms around it name Web__PasswordHash for their own reason.
-        var telemetry = page.Find("#vehicle-telemetry").InnerHtml;
-        Assert.DoesNotContain("Web__PasswordHash", telemetry);
-        Assert.Contains("anonymous", telemetry);
     }
 
     [Fact]
@@ -704,7 +612,7 @@ public class PvSystemPageTests : BunitContext
     public void Every_string_on_the_integrations_page_comes_from_a_resource()
     {
         var page = PseudoLocale.Render(() => RenderIntegrations(
-            mqtt: Mqtt(homeAssistant: Link(), vehicle: Link(), batteryHold: true, retiredDeviceIds: ["solax_old"]),
+            mqtt: Mqtt(homeAssistant: Link(), batteryHold: true, retiredDeviceIds: ["solax_old"]),
             api: Api()));
 
         // Only the configuration's own values: host names, ids, topic paths and the example command.

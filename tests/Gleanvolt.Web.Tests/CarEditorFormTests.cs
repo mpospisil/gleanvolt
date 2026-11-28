@@ -63,15 +63,15 @@ public class CarEditorFormTests : BunitContext
         // Not an error state, and it must not read like an unfinished form: every EV with a Type 2
         // inlet charges without a feed.
         Assert.Contains("supported setup", form.Find("#car-feed-note").TextContent);
-        Assert.Empty(form.FindAll(Field(EvSettingKeys.TelemetryTopic)));
     }
 
     [Fact]
-    public void The_choices_are_a_plugin_the_own_topic_or_charge_only()
+    public void The_choices_are_a_car_plugin_or_nothing()
     {
-        var options = Form().Find("#car-feed").QuerySelectorAll("option").Select(option => option.GetAttribute("value"));
+        var options = Form().Find("#car-feed").QuerySelectorAll("option").ToList();
 
-        Assert.Equal(["External", "OwnTopic", "ChargeOnly"], options);
+        Assert.Equal(["External", "ChargeOnly"], options.Select(option => option.GetAttribute("value")));
+        Assert.Equal(["A car plugin", "Nothing — targets in kWh"], options.Select(option => option.TextContent.Trim()));
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public class CarEditorFormTests : BunitContext
 
         var notice = form.Find("#car-feed-retired").TextContent;
         Assert.Contains("VW Group Data Act plugin", notice);
-        Assert.Contains("A plugin", notice);
+        Assert.Contains("A car plugin", notice);
         Assert.Contains("password", notice);
 
         // A car plugin connects while the page is open.
@@ -104,48 +104,26 @@ public class CarEditorFormTests : BunitContext
         Assert.DoesNotContain("password", notice);
     }
 
-    [Theory]
-    [InlineData(VehicleFeed.OwnTopic, EvSettingKeys.TelemetryTopic)]
-    public void Each_choice_shows_its_own_fields_and_no_other(VehicleFeed feed, string owned)
+    [Fact]
+    public void A_choice_has_no_fields_of_its_own()
     {
-        var form = Form(feed);
+        // The account is on the plugin's page; the form holds the car's own fields and the choice.
+        var form = Form(VehicleFeed.External);
 
-        Assert.NotNull(form.Find(Field(owned)));
-
-        var others = VehicleFeeds.All
-            .Where(candidate => candidate != feed)
-            .SelectMany(VehicleFeeds.Fields)
-            .Where(key => !VehicleFeeds.Fields(feed).Contains(key));
-
-        Assert.All(others, key => Assert.Empty(form.FindAll(Field(key))));
+        Assert.Equal(EvSettingKeys.Car.Count, form.FindAll(".pv-fields input, .pv-fields select").Count(control => control.Id != "car-feed"));
     }
 
     [Fact]
-    public void Choosing_a_feed_changes_which_fields_exist_before_anything_is_saved()
+    public void Choosing_a_car_plugin_is_saved_as_one_switch()
     {
         var form = Form();
 
-        form.Find("#car-feed").Change("OwnTopic");
-
-        Assert.NotNull(form.Find(Field(EvSettingKeys.TelemetryTopic)));
+        form.Find("#car-feed").Change("External");
         Assert.Empty(_editor.Saves);
-    }
-
-    [Fact]
-    public void Switching_sends_the_choice_and_the_new_fields_as_one_save()
-    {
-        var form = Form(VehicleFeed.External);
-
-        form.Find("#car-feed").Change("OwnTopic");
-        form.Find(Field(EvSettingKeys.TelemetryTopic)).Input("cars/id4");
         form.Find("#car-save").Click();
 
-        Assert.Equal([VehicleFeed.OwnTopic], _editor.Switches);
-        Assert.Equal("cars/id4", Assert.Single(_editor.Saves)[EvSettingKeys.TelemetryTopic]);
-
-        // The half-applied switch this exists to prevent.
-        Assert.Equal("false", _editor.Stored[EvSettingKeys.ExternalEnabled]);
-        Assert.Equal("true", _editor.Stored[EvSettingKeys.MqttEnabled]);
+        Assert.Equal([VehicleFeed.External], _editor.Switches);
+        Assert.Equal("true", _editor.Stored[EvSettingKeys.ExternalEnabled]);
     }
 
     [Fact]
@@ -234,7 +212,7 @@ public class CarEditorFormTests : BunitContext
         var pending = form.Find("#car-pending");
 
         Assert.Contains("Saved, not applied", pending.TextContent);
-        Assert.Contains("Another manufacturer — charge only → A plugin", pending.TextContent);
+        Assert.Contains("Nothing — targets in kWh → A car plugin", pending.TextContent);
         Assert.Contains("3 → 1", pending.TextContent);
 
         form.Find("#restart").Click();
@@ -304,7 +282,6 @@ public class CarEditorFormTests : BunitContext
 
     [Theory]
     [InlineData(VehicleFeed.External)]
-    [InlineData(VehicleFeed.OwnTopic)]
     [InlineData(VehicleFeed.ChargeOnly)]
     public void Every_string_on_the_form_comes_from_a_resource(VehicleFeed feed)
     {

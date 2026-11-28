@@ -147,7 +147,6 @@ public sealed class EvEditorTests : IDisposable
         EvSettingKeys.Phases => "3",
         EvSettingKeys.MinChargingCurrentAmps => "6",
         EvSettingKeys.MaxChargingCurrentAmps => "16",
-        EvSettingKeys.TelemetryTopic => "gleanvolt/vehicle/id4/state",
         // Every Enabled key: false, so that round-tripping them all enables no feed.
         _ => "false",
     };
@@ -157,14 +156,14 @@ public sealed class EvEditorTests : IDisposable
     [Fact]
     public void The_file_wins_over_the_environment_and_says_so()
     {
-        SetEnvironment(EvSettingKeys.TelemetryTopic, "cars/one");
-        WriteFile((EvSettingKeys.TelemetryTopic, "cars/two"));
+        SetEnvironment(EvSettingKeys.Model, "ID.4 Pro");
+        WriteFile((EvSettingKeys.Model, "ID.4 GTX"));
 
-        var setting = Editor().Read()[EvSettingKeys.TelemetryTopic];
+        var setting = Editor().Read()[EvSettingKeys.Model];
 
-        Assert.Equal("cars/two", setting.Saved);
+        Assert.Equal("ID.4 GTX", setting.Saved);
         Assert.Equal(SettingSource.WebUi, setting.Source);
-        Assert.Equal("cars/one", setting.Underlying);
+        Assert.Equal("ID.4 Pro", setting.Underlying);
     }
 
     [Fact]
@@ -242,64 +241,29 @@ public sealed class EvEditorTests : IDisposable
         Assert.Empty(File());
     }
 
-    [Fact]
-    public void A_feed_switched_on_with_a_required_field_empty_is_refused_naming_the_field()
-    {
-        var result = Editor().SaveFeed(VehicleFeed.OwnTopic, new Dictionary<string, string>());
-
-        Assert.False(result.Saved);
-        Assert.Contains(EvSettingKeys.TelemetryTopic, Assert.Single(result.Problems), StringComparison.Ordinal);
-        Assert.Empty(File());
-    }
-
     // -- Switching feed.
 
     [Fact]
-    public void Switching_disables_the_feed_it_leaves_in_the_same_save()
+    public void Choosing_a_car_plugin_writes_its_switch()
     {
-        SetEnvironment(EvSettingKeys.MqttEnabled, "true");
-        SetEnvironment(EvSettingKeys.TelemetryTopic, "cars/id4");
-
         var editor = Editor();
-        Assert.Equal(VehicleFeed.OwnTopic, editor.Read().Feed);
 
-        var result = editor.SaveFeed(VehicleFeed.External, new Dictionary<string, string>());
+        Assert.True(editor.SaveFeed(VehicleFeed.External, new Dictionary<string, string>()).Saved);
 
-        Assert.True(result.Saved);
-        Assert.Equal("false", File()[EvSettingKeys.MqttEnabled]);
-        Assert.Equal("true", File()[EvSettingKeys.ExternalEnabled]);
+        Assert.Equal([EvSettingKeys.ExternalEnabled], File().Keys.ToArray());
         Assert.Equal(VehicleFeed.External, editor.Read().Feed);
     }
 
     [Fact]
-    public void Switching_leaves_the_old_accounts_fields_alone()
+    public void Nothing_against_a_plugin_switched_on_in_the_environment_writes_false()
     {
-        // Switching back must not mean typing the topic in again.
-        WriteFile((EvSettingKeys.MqttEnabled, "true"), (EvSettingKeys.TelemetryTopic, "cars/id4"));
-
+        SetEnvironment(EvSettingKeys.ExternalEnabled, "true");
         var editor = Editor();
 
         Assert.True(editor.SaveFeed(VehicleFeed.ChargeOnly, new Dictionary<string, string>()).Saved);
 
-        Assert.Equal("cars/id4", File()[EvSettingKeys.TelemetryTopic]);
+        Assert.Equal("false", File()[EvSettingKeys.ExternalEnabled]);
         Assert.Equal(VehicleFeed.ChargeOnly, editor.Read().Feed);
-    }
-
-    [Fact]
-    public void Switching_off_a_feed_nothing_underneath_enables_writes_no_noise()
-    {
-        // "false" against a key that is already false is not an exception, and the file holds only
-        // exceptions.
-        var editor = Editor();
-
-        Assert.True(editor.SaveFeed(VehicleFeed.OwnTopic, new Dictionary<string, string>
-        {
-            [EvSettingKeys.TelemetryTopic] = "gleanvolt/vehicle/id4/state",
-        }).Saved);
-
-        Assert.Equal(
-            [EvSettingKeys.TelemetryTopic, EvSettingKeys.MqttEnabled],
-            File().Keys.Order(StringComparer.Ordinal).ToArray());
     }
 
     [Fact]

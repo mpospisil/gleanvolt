@@ -63,14 +63,9 @@ public sealed class VehicleUpdateWorker : BackgroundService
     private readonly VehicleStateHolder _holder;
     private readonly ILogger<VehicleUpdateWorker> _logger;
     private readonly TimeProvider _time;
-    private readonly bool _mqttFeedConfigured;
     private readonly bool _onDemandOnly;
 
-    /// <param name="vehicleOptions">
-    /// The MQTT feed's settings, read for one line of log and nothing else: an installation running
-    /// both feeds should be told so at startup, because "two sources, newest wins" is worth knowing
-    /// before you wonder why the card sometimes moves between readings.
-    /// </param>
+    /// <param name="vehicleOptions">The <c>Vehicle</c> section, read for <c>OnDemandOnly</c>.</param>
     public VehicleUpdateWorker(
         IEnumerable<IVehicleUpdateService> services,
         VehicleStateHolder holder,
@@ -81,7 +76,6 @@ public sealed class VehicleUpdateWorker : BackgroundService
         _services = services.ToList();
         _holder = holder;
         _logger = logger;
-        _mqttFeedConfigured = vehicleOptions?.Value.Enabled ?? false;
         _onDemandOnly = vehicleOptions?.Value.OnDemandOnly ?? false;
         _time = time ?? TimeProvider.System;
     }
@@ -123,14 +117,6 @@ public sealed class VehicleUpdateWorker : BackgroundService
                 "Vehicle updates are on demand only: nothing is polled, and the car is asked when the "
                 + "web UI or a plan asks for it.");
             return;
-        }
-
-        if (_mqttFeedConfigured)
-        {
-            _logger.LogInformation(
-                "Both vehicle feeds are on: the MQTT topic and the manufacturer's own service. They "
-                + "write to one holder and the newest reading wins, so whichever saw the car most "
-                + "recently is what the dashboard shows.");
         }
 
         await Task.WhenAll(polled.Select(service => RunAsync(service, stoppingToken))).ConfigureAwait(false);

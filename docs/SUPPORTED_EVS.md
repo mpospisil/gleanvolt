@@ -16,7 +16,7 @@ the answer to the first does not depend on the second.
 | **Volkswagen, Audi, Škoda, SEAT, Cupra, Bentley** | Yes | **The vwgroup plugin**: the VW Group EU Data Act portal | VW ID.4 Pro (as a built-in feed) |
 | **Volkswagen** (a car in myVolkswagen) | Yes | **The volkswagen plugin**: volkswagen.de, live while charging | VW ID.4 Pro |
 | **Škoda** (a car in MySkoda) | Yes | **The skoda plugin**: the MyŠkoda Public API, live | **Not yet** — built from the published spec |
-| **Any other brand** | Yes | Through an [external provider](#route-d--write-a-provider) or your own MQTT topic; otherwise targets are given in kWh instead of % | — |
+| **Any other brand** | Yes | Through a [car plugin of your own](#route-d--write-a-provider); otherwise targets are given in kWh instead of % | — |
 
 The reference installation charges a **VW ID.4 Pro** (77 kWh usable, three-phase, 16 A). It is the
 only car Gleanvolt has been run against. Everything else below is what the design and the charging
@@ -82,7 +82,7 @@ charger delivers it. Without a feed, every kWh target, every solar mode and ever
 unchanged.
 
 Gleanvolt reads no car itself: each route is a car plugin from
-[gleanvolt-cars](https://github.com/mpospisil/gleanvolt-cars), run beside it with **A plugin** chosen on `/car`. Until
+[gleanvolt-cars](https://github.com/mpospisil/gleanvolt-cars), run beside it with **A car plugin** chosen on `/car`. Until
 #477 the first three were built into Gleanvolt; the plugins carry over what those feeds learnt. There are three of
 ours, and a fourth for any other car: a provider of your own.
 

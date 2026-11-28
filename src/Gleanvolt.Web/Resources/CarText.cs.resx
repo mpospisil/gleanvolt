@@ -97,7 +97,7 @@
     <value>Stav</value>
   </data>
   <data name="NoManufacturerFeed" xml:space="preserve">
-    <value>Neběží žádný zdroj dat od výrobce. Nabíjení to neovlivní; chybí jen stav nabití auta, takže cíl se zadává v kWh, ne v procentech.</value>
+    <value>Auto nečte žádný plugin. Nabíjení to neovlivní; chybí jen stav nabití auta, takže cíl se zadává v kWh, ne v procentech.</value>
   </data>
   <data name="CarBattery" xml:space="preserve">
     <value>Baterie auta</value>
@@ -144,26 +144,8 @@
   <data name="TheCarFallback" xml:space="preserve">
     <value>auto</value>
   </data>
-  <data name="OwnTopicNothingToPress_Cars" xml:space="preserve">
-    <value>auto</value>
-  </data>
-  <data name="OwnTopicNothingToPress" xml:space="preserve">
-    <value>Není co stisknout, protože se tu nic nestahuje. Údaje tohoto auta publikujete sami do {0} — jeden objekt JSON na každý údaj, s časem, kdy údaj pořídilo {1}, v poli {2} a dále s poli {3}, {4}, {5} a {6}, pokud je váš zdroj má.</value>
-  </data>
-  <data name="TheTopicInTheForm" xml:space="preserve">
-    <value>tématu z formuláře výše</value>
-  </data>
-  <data name="LastArrived" xml:space="preserve">
-    <value>Poslední zpráva přinesla {0}, pořízeno před {1}.</value>
-  </data>
-  <data name="NothingArrived" xml:space="preserve">
-    <value>Zatím nepřišla žádná zpráva.</value>
-  </data>
   <data name="TheFeed" xml:space="preserve">
     <value>zdroj dat</value>
-  </data>
-  <data name="OwnTopicToo" xml:space="preserve">
-    <value>Toto auto má také vlastní téma {0}. Může běžet souběžně se zdrojem od výrobce — platí nejčerstvější údaj.</value>
   </data>
   <data name="ChangesTakeEffect_One" xml:space="preserve">
     <value>{0} změna se projeví po restartu.</value>
@@ -193,7 +175,7 @@
     <value>Uložené hodnoty se kontrolují stejně jako konfigurace při startu a do {0} se zapíše jen to, co se liší. Tento soubor má přednost před {1} (klíč po klíči), takže u každého pole je vidět, odkud pochází jeho hodnota. Nic se nezmění, dokud se správce nabíjení nerestartuje.</value>
   </data>
   <data name="Manufacturer" xml:space="preserve">
-    <value>Výrobce</value>
+    <value>Stav baterie</value>
   </data>
   <data name="WhatReadsThisCar" xml:space="preserve">
     <value>Odkud se čtou údaje auta</value>
@@ -243,9 +225,6 @@
   <data name="FieldMaxCurrent" xml:space="preserve">
     <value>Maximální proud (A)</value>
   </data>
-  <data name="FieldOwnTopic" xml:space="preserve">
-    <value>Vlastní téma</value>
-  </data>
   <data name="HintId" xml:space="preserve">
     <value>a-z, 0-9, - a _</value>
   </data>
@@ -267,20 +246,11 @@
   <data name="RevertTo" xml:space="preserve">
     <value>Vrátit na {0}</value>
   </data>
-  <data name="FeedOwnTopic" xml:space="preserve">
-    <value>Zdroj, který publikuji sám</value>
-  </data>
   <data name="FeedNone" xml:space="preserve">
-    <value>Jiný výrobce — jen nabíjení</value>
-  </data>
-  <data name="FreshOwnTopic" xml:space="preserve">
-    <value>podle vašeho zdroje</value>
+    <value>Nic — cíle v kWh</value>
   </data>
   <data name="FreshNone" xml:space="preserve">
     <value>žádné údaje z auta</value>
-  </data>
-  <data name="NoteOwnTopic" xml:space="preserve">
-    <value>Téma MQTT, do kterého publikujete sami. Broker a přihlašovací údaje k němu jsou společné s domácím brokerem a nastavují se v sekci Vehicle; k autu patří jen téma.</value>
   </data>
   <data name="NoteNone" xml:space="preserve">
     <value>Bez zdroje dat — i to je podporovaná instalace, ne nedokončený formulář: každé elektroauto se zásuvkou Type 2 se nabije i bez něj. Jediný rozdíl je, že cíl se zadává v kWh, ne jako stav nabití, protože nic nehlásí, kolik energie už v baterii je.</value>
@@ -325,7 +295,7 @@
     <value>3 — třífázově</value>
   </data>
   <data name="FeedExternal" xml:space="preserve">
-    <value>Plugin</value>
+    <value>Plugin auta</value>
   </data>
   <data name="FreshExternal" xml:space="preserve">
     <value>tak často, jak plugin publikuje</value>
@@ -365,11 +335,5 @@
   </data>
   <data name="FeedRetired" xml:space="preserve">
     <value>Gleanvolt už auto sám nečte a tato instalace používala jeho vestavěný zdroj. Spusťte plugin {0}, přijměte ho v Nastavení → Pluginy a nechte výše zvolené „{1}“. Dokud se nepřipojí, auto se nečte.</value>
-  </data>
-  <data name="FieldTopic" xml:space="preserve">
-    <value>Topic</value>
-  </data>
-  <data name="HintTopic" xml:space="preserve">
-    <value>jeden konkrétní topic, bez zástupných znaků</value>
   </data>
 </root>

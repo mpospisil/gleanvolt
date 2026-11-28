@@ -4,6 +4,32 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-28 — Remove the car's own MQTT feed; two choices on the Car page (#486)
+
+**Why.** The owner's request after testing #477: a car plugin is the only way to read the car, and the Car page's
+*What reads this car* offers two choices.
+
+**What.**
+- **Removed:** `Hosting/Vehicles/VehicleMqttWorker`, `Infrastructure/Vehicles/VehicleTelemetryPayload` and its tests;
+  `VehicleOptions.Enabled/BrokerHost/BrokerPort/Username/Password/Topic/ReconnectInterval`; `EvInfo.TelemetryTopic`,
+  `EvVehicleOptions.Telemetry` and `EvTelemetryOptions`; `EvSettingKeys.TelemetryTopic/MqttEnabled`,
+  `VehicleFeed.OwnTopic`, `VehicleFeeds.Fields/Required`; `VehicleMqttDisplay` and `MqttDisplayOptions.Vehicle`;
+  `VehicleTelemetrySection.razor` and `MqttConnection.razor`; the moved key `Vehicle:Topic`; 12 `CarText`, 11
+  `SettingsText`, 6 `SharedText` and one `ServiceText` string.
+- **Car page:** two options, "A car plugin" / "Nothing — targets in kWh" (cs "Plugin auta" / "Nic — cíle v kWh"), under
+  the heading "Battery level". The own-topic branches of Ask the car and Feed are gone.
+- **Migration** (`RetiredCarFeed`): a topic or its switch saved in the overrides file is removed with a warning;
+  `Vehicle:Enabled=true` from the environment warns at every start.
+- **Deploy:** compose passes `Vehicle__Enabled` only (for the warning), not the broker, credentials or topic.
+  `.env.example` and `appsettings.json` lost them.
+- **Docs:** VEHICLE (the MQTT section is gone), WEB_UI, HOME_ASSISTANT, MODE_TARGETED, SUPPORTED_EVS, PROVIDERS,
+  deploy/README, the manual's car and settings pages (en, cs) and two screenshots.
+
+**Tests.** `RetiredCarFeedTests` (the topic taken out of the file, the environment switch warning every start, off
+says nothing); the feed table, editor, form, page, MQTT display and Integrations tests rewritten for two choices.
+
+---
+
 ## 2026-11-28 — Remove the built-in car feeds (#477)
 
 **Why.** Step 6 of #478, the release after #476. The volkswagen.de, MyŠkoda and Data Act feeds are car plugins in

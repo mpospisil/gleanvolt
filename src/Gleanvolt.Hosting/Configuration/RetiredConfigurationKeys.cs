@@ -32,11 +32,10 @@ public static class RetiredConfigurationKeys
         ("Weather:Longitude", "Pv:Longitude"),
         ("HomeAssistant:DeviceName", "Pv:Name"),
 
-        // Issue #124. The car's own facts left the feed's section. The rest of Vehicle -- Enabled, the
-        // broker, MaxAge, ReconnectInterval -- describes the feed and deliberately stays put.
+        // Issue #124. The car's own facts left the feed's section. (Vehicle:Topic moved too, and since #486 the
+        // car's MQTT topic is not read at all.)
         ("Vehicle:BatteryCapacityKWh", "Ev:Vehicles:0:BatteryCapacityKWh"),
         ("Vehicle:ChargeEfficiency", "Ev:Vehicles:0:ChargeEfficiency"),
-        ("Vehicle:Topic", "Ev:Vehicles:0:Telemetry:Topic"),
 
         // Issue #215. The session file and the key file stopped being two arrangements with two
         // settings and became one secret store with one directory. Refused rather than ignored for

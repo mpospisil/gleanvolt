@@ -372,9 +372,8 @@ in `.env` or in Home Assistant:
 - **Home Assistant's MQTT integration** still says broker `mosquitto`. That name used to be resolved by
   the compose network; the compose file now maps it to this Pi, so it keeps working. Changing it to
   `localhost` (Settings → Devices & Services → MQTT → Reconfigure) is tidier and optional.
-- **The controller** dials `localhost`, or `MQTT_BROKER_HOST` when set. An `.env` with
-  `VEHICLE_BROKER_HOST=mosquitto` would break the car's feed, because the controller has no such name;
-  delete that line.
+- **The controller** dials `localhost`, or `MQTT_BROKER_HOST` when set. A `VEHICLE_BROKER_HOST` line is no longer
+  read (#486); delete it.
 - **The broker is now on the Pi's `:1883`**, reachable from the LAN. It always required a password, so
   this exposes nothing that was open; it is also what lets another device use it. If the Pi already ran
   a second broker on 1883, see [Troubleshooting](#troubleshooting).
@@ -571,7 +570,7 @@ The deploy runs it with `EV_CHARGER_HOST` as its address. Gleanvolt takes the fi
 remembers it; **Settings → Plugins** shows it.
 
 **The car plugin** (#476, #477). Gleanvolt reads no car itself: a car plugin reads the car's battery level, with
-**A plugin** chosen on the **Car** page. Add one to the list:
+**A car plugin** chosen on the **Car** page. Add one to the list:
 
 ```bash
 GLEANVOLT_PLUGINS=openweather,solax,volkswagen     # or skoda, vwgroup; at most one car plugin
@@ -584,7 +583,7 @@ Enter the password, or the Škoda API key, on the plugin's page, which the **Car
 **Upgrading from a built-in car feed** (#477). volkswagen.de, MyŠkoda and the Data Act portal are no longer built in.
 An `.env` with `VW_WEBSITE_ENABLED`, `SKODA_ENABLED` or `VW_ENABLED` set to `true` (or a Car page that had one chosen)
 and no car plugin in `GLEANVOLT_PLUGINS` gets the plugin that replaced it, in that order, and the deploy says so. The
-controller chooses **A plugin** for you at its first start, names the plugin on the **Car** page until it connects,
+controller chooses **A car plugin** for you at its first start, names the plugin on the **Car** page until it connects,
 and deletes the password, session or key it kept: enter it again on the plugin's page. Once the plugin has its
 account, add it to `GLEANVOLT_PLUGINS` and remove the `*_ENABLED` flag; the controller warns at every start until
 then. `VW_WEBSITE_PASSWORD` and `VW_PASSWORD` are no longer read by anything: delete them.

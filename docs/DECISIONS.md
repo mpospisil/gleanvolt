@@ -4,6 +4,33 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-28 — The car's own MQTT topic is removed; the Car page offers a car plugin or nothing (#486)
+
+**Found.** After #477 the Car page offered three choices, and the third, *A feed I publish myself*, was the car's
+own MQTT topic (`Vehicle:Enabled`, `Ev:Vehicles:0:Telemetry:Topic`, the `Vehicle` broker settings). It's the
+`VehicleMqttWorker`, the payload parser, and a *Vehicle telemetry* section on Settings → Integrations. A car plugin
+can read anything Home Assistant can, and the reference Pi has had the topic off (`VEHICLE_ENABLED=false`) since the
+Volkswagen plugin read the ID.4.
+
+**Decided (with the owner).**
+- **Removed:** the worker, the payload parser, the topic and broker keys, `EvInfo.TelemetryTopic`,
+  `VehicleMqttDisplay`, the Integrations section and the `MqttConnection` component that only it used.
+  `VehicleOptions` keeps `MaxAge` and `OnDemandOnly`.
+- **Two choices, named for the question *What reads this car*:** **A car plugin** and **Nothing — targets in kWh**
+  (Czech: *Plugin auta*, *Nic — cíle v kWh*). The section heading is *Battery level*, not *Manufacturer*.
+- **An installation on the topic becomes charge-only.** `RetiredCarFeed` removes the topic and its switch from the
+  overrides file (nothing can edit them there any more) with one warning, and `VEHICLE_ENABLED=true` in `.env` warns
+  at every start. Compose still passes `VEHICLE_ENABLED`, and only that, so the warning can be given.
+- **`Vehicle:Topic` is no longer a moved key** (its replacement is gone too); `Vehicle:BatteryCapacityKWh` and
+  `Vehicle:ChargeEfficiency` still are.
+
+**Consequences accepted.**
+- An owner whose car arrived only over the topic loses the battery level until a car plugin reads it. The startup
+  warning and the manual say so.
+- A Home Assistant automation that published to the topic now publishes to nothing; it can be deleted.
+
+---
+
 ## 2026-11-28 — The built-in car feeds are removed; a start moves an installation to its plugin once (#477)
 
 **Found.** With the three car plugins shipped and the built-ins deprecated (#476), the built-ins were about a third of

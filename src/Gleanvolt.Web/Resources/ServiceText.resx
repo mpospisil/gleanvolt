@@ -264,9 +264,6 @@
     <value>Could not write {0}: {1}</value>
     <comment>{1} is the system's own error.</comment>
   </data>
-  <data name="Config_FeedNeeds" xml:space="preserve">
-    <value>The feed that is switched on needs {0}, but it is empty.</value>
-  </data>
   <data name="Solcast_EnterKey" xml:space="preserve">
     <value>Enter the API key from your Solcast account.</value>
   </data>
@@ -702,6 +699,6 @@
     <value>{0}: the charger isn't part of setup any more. A charger is a plugin, set up on its own page, that you accept on Settings → Plugins. Take the charger's keys out of the setup file.</value>
   </data>
   <data name="Config_SetupRetiredCarKey" xml:space="preserve">
-    <value>{0}: Gleanvolt doesn't read the car itself any more. The {1} plugin does: run it, accept it on Settings → Plugins and set up the account on its page, then choose A plugin on the Car page. Take the key out of the setup file.</value>
+    <value>{0}: Gleanvolt doesn't read the car itself any more. The {1} plugin does: run it, accept it on Settings → Plugins and set up the account on its page, then choose A car plugin on the Car page. Take the key out of the setup file.</value>
   </data>
 </root>

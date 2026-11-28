@@ -91,16 +91,6 @@
         </div>
     }
 
-    @if (VehicleFeeds.Fields(_feed).Count > 0)
-    {
-        <div class="pv-fields">
-            @foreach (var key in VehicleFeeds.Fields(_feed))
-            {
-                @Field(key)
-            }
-        </div>
-    }
-
     <h3>@CarText.TheCar</h3>
 
     <p class="muted">
@@ -164,8 +154,6 @@
         [EvSettingKeys.Phases] = CarText.FieldPhases,
         [EvSettingKeys.MinChargingCurrentAmps] = CarText.FieldMinCurrent,
         [EvSettingKeys.MaxChargingCurrentAmps] = CarText.FieldMaxCurrent,
-        [EvSettingKeys.TelemetryTopic] = CarText.FieldTopic,
-        [EvSettingKeys.MqttEnabled] = CarText.FieldOwnTopic,
         [EvSettingKeys.ExternalEnabled] = CarText.FeedExternal,
     };
 
@@ -176,7 +164,6 @@
         [EvSettingKeys.ChargeEfficiency] = CarText.HintEfficiency,
         [EvSettingKeys.MinChargingCurrentAmps] = CarText.HintMinCurrent,
         [EvSettingKeys.MaxChargingCurrentAmps] = CarText.HintMaxCurrent,
-        [EvSettingKeys.TelemetryTopic] = CarText.HintTopic,
     };
 
     private EvSettings _settings = Empty;
@@ -233,7 +220,7 @@
     }
 
     // What the form holds that the next start would not already read. Hidden feeds contribute nothing:
-    // switching feed leaves the topic exactly as it was, so switching back does not mean typing it in again.
+    // (A feed choice owns no fields since #486: only the car's own fields are edits.)
     private Dictionary<string, string> Edits() =>
         _settings.Settings
             .Where(setting => _values.TryGetValue(setting.Key, out var value)
@@ -346,22 +333,18 @@
 
     private static string FeedName(VehicleFeed feed) => feed switch
     {
-        VehicleFeed.OwnTopic => CarText.FeedOwnTopic,
         VehicleFeed.External => CarText.FeedExternal,
         _ => CarText.FeedNone,
     };
 
     private static string FeedFreshness(VehicleFeed feed) => feed switch
     {
-        VehicleFeed.OwnTopic => CarText.FreshOwnTopic,
         VehicleFeed.External => CarText.FreshExternal,
         _ => CarText.FreshNone,
     };
 
     private static string FeedNote(VehicleFeed feed) => feed switch
     {
-        VehicleFeed.OwnTopic =>
-            CarText.NoteOwnTopic,
         VehicleFeed.External =>
             CarText.NoteExternal,
         _ =>

@@ -222,7 +222,7 @@ public sealed class EvEditor : IEvEditor
     }
 
     // Everything a start would refuse, run against the configuration the next start would read. The
-    // Ev section goes through the startup resolver itself; a feed's required fields are stated here.
+    // Ev section goes through the startup resolver itself.
     private ConfigurationProblems Check(IReadOnlyDictionary<string, string> stored)
     {
         var problems = new ConfigurationProblems();
@@ -243,23 +243,6 @@ public sealed class EvEditor : IEvEditor
             var lines = ex.Message.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
             var listed = lines.Where(line => line.StartsWith("- ", StringComparison.Ordinal)).Select(line => line[2..]).ToList();
             problems.AddRange(listed.Count > 0 ? listed : [ex.Message]);
-        }
-
-        var enabled = VehicleFeeds.All
-            .Where(feed => VehicleFeeds.EnabledKey(feed) is { } key && Flag(Next(key, stored)?.Value))
-            .ToList();
-
-        foreach (var feed in enabled)
-        {
-            foreach (var key in VehicleFeeds.Required(feed))
-            {
-                if (string.IsNullOrWhiteSpace(Next(key, stored)?.Value))
-                {
-                    problems.Add(
-                        $"{key} is needed by the feed that is switched on, and is empty.",
-                        Phrase.Of("Config.FeedNeeds", new PhraseArg.Text(key)));
-                }
-            }
         }
 
         return problems;

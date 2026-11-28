@@ -151,13 +151,13 @@ public class VehicleUpdateWorkerTests
         new(new DateTimeOffset(2026, 9, 2, 8, 0, 0, TimeSpan.Zero), SocPercent: soc, SourceId: "vw-group");
 
     private static VehicleUpdateWorker Worker(
-        VehicleStateHolder holder, TimeProvider time, bool mqttFeedEnabled = false,
+        VehicleStateHolder holder, TimeProvider time,
         ILogger<VehicleUpdateWorker>? logger = null,
         params IVehicleUpdateService[] services) =>
         new(services,
             holder,
             logger ?? NullLogger<VehicleUpdateWorker>.Instance,
-            Options.Create(new VehicleOptions { Enabled = mqttFeedEnabled }),
+            Options.Create(new VehicleOptions()),
             time);
 
     /// <summary>Starts the worker, waits for the service to have been asked, then stops it.</summary>

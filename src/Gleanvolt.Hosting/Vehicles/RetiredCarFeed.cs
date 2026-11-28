@@ -36,6 +36,10 @@ public sealed class RetiredCarFeed : IRetiredCarFeed
         ("Vehicle:DataAct", CarFeedPlugin.VwGroup, "VW_ENABLED"),
     ];
 
+    // The car's own MQTT topic, removed in #486: its switch and the topic.
+    private const string MqttEnabledKey = "Vehicle:Enabled";
+    private const string MqttTopicKey = "Ev:Vehicles:0:Telemetry:Topic";
+
     // The Data Act portal's own fallback: VW_ENABLED read straight from the environment, as the built-in did.
     private const string DataActFallback = "VW_ENABLED";
 
@@ -74,11 +78,43 @@ public sealed class RetiredCarFeed : IRetiredCarFeed
                 : "The built-in car feed's {Secret} could not be deleted from the secret store; it is no longer read.", name);
         }
 
+        // #486: the car's own MQTT topic is not read any more. An installation that chose it is charge-only now. What
+        // the Car page saved for it is taken out of the overrides file, which nothing can edit it in any more.
+        var removedTopic = false;
+        if (_overrides is not null && Saved(_overrides.Path, MqttEnabledKey, MqttTopicKey))
+        {
+            try
+            {
+                Store(stored =>
+                {
+                    stored.Remove(MqttEnabledKey);
+                    stored.Remove(MqttTopicKey);
+                });
+                removedTopic = true;
+                _logger.LogWarning(
+                    "Gleanvolt no longer reads the car over MQTT (#486): the topic saved on the Car page was removed from {Path}. "
+                    + "The car is not read unless a car plugin does it, with 'A car plugin' chosen on the Car page.", _overrides.Path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                _logger.LogWarning("Could not remove the car's MQTT topic from {Path} ({Reason}); it is ignored.", _overrides.Path, ex.Message);
+            }
+        }
+
+        if (!removedTopic && Flag(configuration[MqttEnabledKey]))
+        {
+            _logger.LogWarning(
+                "Gleanvolt no longer reads the car over MQTT (#486): {Enabled} (VEHICLE_ENABLED) and the car's topic are "
+                + "ignored, and the car is not read unless a car plugin does it, with 'A car plugin' chosen on the Car page. "
+                + "Remove VEHICLE_ENABLED from .env; this warning repeats at every start until then.",
+                MqttEnabledKey);
+        }
+
         if (StillSet(configuration) is { Count: > 0 } left)
         {
             _logger.LogWarning(
                 "{Keys} {Verb} set, and Gleanvolt reads no car itself any more (#477): the car is read by a car plugin, with "
-                + "'A plugin' chosen on the Car page. Compose hands the built-in's VIN and username to the plugin; once the "
+                + "'A car plugin' chosen on the Car page. Compose hands the built-in's VIN and username to the plugin; once the "
                 + "plugin's page has its account, name the plugin in GLEANVOLT_PLUGINS and remove these from .env. This "
                 + "warning repeats at every start until then.",
                 string.Join(", ", left), left.Count == 1 ? "is" : "are");
@@ -218,6 +254,20 @@ public sealed class RetiredCarFeed : IRetiredCarFeed
             var stored = PvSystemOverrides.Read(path);
             change(stored);
             PvSystemOverrides.Write(path, stored);
+        }
+    }
+
+    // Whether the overrides file holds any of the keys. A missing or unreadable file holds none.
+    private static bool Saved(string path, params string[] keys)
+    {
+        try
+        {
+            var stored = PvSystemOverrides.Read(path);
+            return keys.Any(stored.ContainsKey);
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
         }
     }
 

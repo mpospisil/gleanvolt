@@ -6,7 +6,6 @@
 @inject ConfiguredVehicleFeed Feed
 @inject IEvEditor Editor
 @inject IVehicleStateRefresh Refresh
-@inject IVehicleTelemetry Telemetry
 @inject TimeProvider Time
 
 @*
@@ -58,24 +57,6 @@
     <h3 id="car-external">@CarText.ExternalProvider</h3>
     <ExternalProviderPanel Kind="vehicle" />
     <ExternalProviderPage Kind="vehicle" />
-}
-else if (_runningFeed == VehicleFeed.OwnTopic)
-{
-    <p class="muted" id="car-ask-own-topic">
-        @Localized.Rich(
-            CarText.OwnTopicNothingToPress,
-            string.IsNullOrWhiteSpace(Vehicle.TelemetryTopic) ? @<text>@CarText.TheTopicInTheForm</text> : @<code>@Vehicle.TelemetryTopic</code>,
-            @<em>@CarText.OwnTopicNothingToPress_Cars</em>,
-            @<code>captured_at</code>, @<code>soc_percent</code>, @<code>range_km</code>, @<code>charge_state</code>, @<code>plug_state</code>)
-        @if (Telemetry.GetCurrentState() is { } published)
-        {
-            @Localized.Format(CarText.LastArrived, Units.Percent(published.SocPercent), Age(published))
-        }
-        else
-        {
-            @CarText.NothingArrived
-        }
-    </p>
 }
 else
 {
@@ -189,13 +170,6 @@ else
 {
     <p class="muted" id="no-feed">
         @CarText.NoManufacturerFeed
-    </p>
-}
-
-@if (!string.IsNullOrWhiteSpace(Vehicle.TelemetryTopic))
-{
-    <p class="table-note muted" id="own-topic">
-        @Localized.Rich(CarText.OwnTopicToo, @<code>@Vehicle.TelemetryTopic</code>)
     </p>
 }
 

@@ -9,8 +9,8 @@ namespace Gleanvolt.Hosting.Tests;
 
 /// <summary>
 /// Which vehicle feed the composition root turns on (issues #140, #212): <b>one car, one feed</b> — a car plugin
-/// (<c>Vehicle:External</c>), or none, with the owner's own MQTT topic beside either. The built-in manufacturer feeds
-/// are gone (#477).
+/// (<c>Vehicle:External</c>), or none. The built-in manufacturer feeds are gone (#477), and the owner's own MQTT topic
+/// (#486).
 ///
 /// <para>Asserted on the registrations rather than by resolving hosted services, because resolving
 /// them all would build a Modbus stack this test has no use for.</para>
@@ -42,13 +42,12 @@ public class VehicleFeedRegistrationTests
         services.Any(descriptor => descriptor.ImplementationType == typeof(T));
 
     [Fact]
-    public void Off_by_default_the_MQTT_feed_is_the_one_that_runs()
+    public void Off_by_default_nothing_reads_the_car()
     {
-        // Nothing that leaves the LAN starts itself.
+        // Nothing starts itself, and since #486 there is no MQTT topic to subscribe to either.
         var services = Services();
 
         Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IVehicleUpdateService));
-        Assert.True(Registers<VehicleMqttWorker>(services));
         Assert.True(Registers<VehicleUpdateWorker>(services));
     }
 
@@ -115,25 +114,5 @@ public class VehicleFeedRegistrationTests
         await using var provider = Services(TheCar).BuildServiceProvider();
 
         Assert.Null(provider.GetRequiredService<ConfiguredVehicleFeed>().Service);
-    }
-
-    [Fact]
-    public void An_unnamed_MQTT_reading_is_given_this_feed_s_name()
-    {
-        // The payload's "source" is optional (#73). Left unnamed, a reading would be filed under
-        // "unnamed" in the week's tally and the dashboard's "via ..." would stay blank for the feed
-        // that has been working since then.
-        var reading = VehicleMqttWorker.Label(new VehicleState(DateTimeOffset.UnixEpoch, SocPercent: 60));
-
-        Assert.Equal(VehicleMqttWorker.DefaultSourceId, reading.SourceId);
-    }
-
-    [Fact]
-    public void A_publisher_that_named_itself_keeps_its_name()
-    {
-        var reading = VehicleMqttWorker.Label(
-            new VehicleState(DateTimeOffset.UnixEpoch, SocPercent: 60, SourceId: "id4"));
-
-        Assert.Equal("id4", reading.SourceId);
     }
 }

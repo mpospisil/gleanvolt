@@ -171,36 +171,6 @@
   <data name="Out" xml:space="preserve">
     <value>odchozí</value>
   </data>
-  <data name="VehicleTelemetry" xml:space="preserve">
-    <value>Telemetrie vozidla</value>
-  </data>
-  <data name="VehicleTelemetryTopic" xml:space="preserve">
-    <value>telemetrie vozidla</value>
-  </data>
-  <data name="VehicleTelemetryTip_1" xml:space="preserve">
-    <value>uchované (retained)</value>
-  </data>
-  <data name="VehicleTelemetryTip" xml:space="preserve">
-    <value>Jedno konkrétní téma, ne zástupný znak: aplikace zatím sleduje jen jedno auto a {0} přes několik aut by potichu nechal platit nejnovější zprávu, ať by popisovala kterékoli auto. Zprávy mají být {1}, takže po restartu se hned načte poslední údaj a nemusí se čekat na další aktualizaci auta z cloudu. Pozor: toto ID klienta neobsahuje ID systému, takže dva správci nabíjení na jednom stroji by se na brokeru střetli.</value>
-  </data>
-  <data name="SubscribedTo" xml:space="preserve">
-    <value>Odebírané téma</value>
-  </data>
-  <data name="Nothing" xml:space="preserve">
-    <value>nic</value>
-  </data>
-  <data name="StaleAfter" xml:space="preserve">
-    <value>Zastaralé po</value>
-  </data>
-  <data name="RetryEvery" xml:space="preserve">
-    <value>Opakovat po</value>
-  </data>
-  <data name="NoTopic" xml:space="preserve">
-    <value>Zdroj je zapnutý, ale nemá nastavené téma, takže se nepřipojí k žádnému brokeru a nic nečte. Na Přehledu to vypadá stejně jako auto, které nikdy nic nehlásí. Téma, do kterého váš zdroj publikuje, zadejte na stránce {0}.</value>
-  </data>
-  <data name="OneBroker" xml:space="preserve">
-    <value>Obě spojení používají stejný broker {0}. Stále jsou to dvě připojení se dvěma ID klienta a každé lze nasměrovat jinam bez vlivu na druhé.</value>
-  </data>
   <data name="ApiTopic" xml:space="preserve">
     <value>API</value>
   </data>
@@ -1004,7 +974,7 @@
     <value>Plugin potřebuje váš zásah: {0}</value>
   </data>
   <data name="ExternalState_OffVehicle" xml:space="preserve">
-    <value>Vypnuto. Zapne se volbou Plugin na stránce Auto, uložením a restartem.</value>
+    <value>Vypnuto. Zapne se volbou Plugin auta na stránce Auto, uložením a restartem.</value>
   </data>
   <data name="ExternalPage" xml:space="preserve">
     <value>Stránka</value>
@@ -1107,9 +1077,6 @@
   </data>
   <data name="RunningDetailsNote" xml:space="preserve">
     <value>Tak, jak je používá běžící správce nabíjení; změna uložená výše platí od dalšího startu.</value>
-  </data>
-  <data name="VehicleTelemetryOff" xml:space="preserve">
-    <value>Vypnuto: stav nabití auta se přes MQTT nečte. Zapíná se i s tématem, do kterého váš zdroj publikuje, na stránce {0}.</value>
   </data>
   <data name="GroupAdvanced" xml:space="preserve">
     <value>Pokročilé</value>

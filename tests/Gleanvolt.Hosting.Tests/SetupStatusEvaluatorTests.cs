@@ -96,11 +96,11 @@ public class SetupStatusEvaluatorTests
     [Fact]
     public void A_moved_key_keeps_the_controller_stopped()
     {
-        var status = Usable(("Vehicle:Topic", "old/topic"));
+        var status = Usable(("Vehicle:BatteryCapacityKWh", "77"));
 
         var problem = Assert.Single(status.MissingRequired);
         Assert.Equal(SetupArea.Configuration, problem.Area);
-        Assert.Contains("Ev:Vehicles:0:Telemetry:Topic", problem.English);
+        Assert.Contains("Ev:Vehicles:0:BatteryCapacityKWh", problem.English);
     }
 
     [Fact]

@@ -11,7 +11,7 @@ There are five **kinds** of provider:
 | --- | --- | --- | --- |
 | `tariff` | The tariff table | `/providers/tariff` | Choosing **External** under **Settings → Tariff** and saving |
 | `solar-forecast` | Solcast | `/providers/solar-forecast` | Choosing **External** under **Settings → Solar forecast** and saving |
-| `vehicle` | The car's built-in feeds (volkswagen.de, MyŠkoda, Data Act), removed in #477 | `/providers/vehicle` | Choosing **A plugin** on the **Car** page, saving and restarting |
+| `vehicle` | The car's built-in feeds (volkswagen.de, MyŠkoda, Data Act), removed in #477 | `/providers/vehicle` | Choosing **A car plugin** on the **Car** page, saving and restarting |
 | `weather` | The built-in OpenWeatherMap, removed in #425 | `/providers/weather` | Choosing **External** under **Settings → Weather** and saving |
 | `charger` | The charger drivers built into Gleanvolt, removed in 1.4 (#445) | `/providers/charger` | Always on |
 

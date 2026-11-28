@@ -282,18 +282,18 @@ The car, on the same mechanism as **Settings → Installation**. Its sections ar
 Running · Feed**, in the order the work is done: *save → restart → ask the car*. (`/vehicle-portal`
 redirects here.)
 
-**One choice decides the feed.** Gleanvolt reads no car itself (#477): a car plugin does.
+**One choice decides the feed: *What reads this car*.** Gleanvolt reads no car itself (#477): a car plugin does,
+or nothing does. The owner's own MQTT topic went in #486.
 
 | Choice | Feed it configures | What you fill in | Freshness |
 |---|---|---|---|
-| **A plugin** | [`Vehicle:External`](VEHICLE.md#a-plugin-vehicleexternal) | nothing here: the account is on the plugin's page | whenever the plugin publishes |
-| **A feed I publish myself** | [`Vehicle`](VEHICLE.md#where-the-cars-state-of-charge-comes-from) | Topic | whatever publishes it |
-| **Another manufacturer — charge only** | none | nothing | — |
+| **A car plugin** | [`Vehicle:External`](VEHICLE.md#a-car-plugin-vehicleexternal) | nothing here: the account is on the plugin's page | whenever the plugin publishes |
+| **Nothing — targets in kWh** | none | nothing | — |
 
-**Charge only is not an error.** Every car with a Type 2 inlet charges without a feed. The one thing
+**Nothing is not an error.** Every car with a Type 2 inlet charges without a feed. The one thing
 it costs: targets are asked for in kWh instead of per cent.
 
-**After the built-in feeds went (#477)**, an installation that used one finds *A plugin* chosen and a notice
+**After the built-in feeds went (#477)**, an installation that used one finds *A car plugin* chosen and a notice
 naming the plugin to run (Volkswagen, MyŠkoda or VW Group Data Act) and what to enter on its page. It goes when a
 car plugin connects.
 
@@ -307,8 +307,8 @@ at the form), and nothing is written when anything is refused. Read-only with au
 holds no secret: a car plugin keeps the account on its own page.
 
 **Ask the car** asks the configured feed now, and the answer goes to the Overview too. Opening the page
-never triggers a read. Charge-only gets no button; an own topic shows what to publish and what last
-arrived. With *A plugin*, the plugin's session and its own page are below it.
+never triggers a read. With nothing reading the car there is no button. With *A car plugin*, the plugin's
+session and its own page are below it.
 
 The answer is one card — battery, range, reading age, charge state, plug state and time left, as on the
 Overview.

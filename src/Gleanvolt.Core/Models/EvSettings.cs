@@ -5,14 +5,12 @@ namespace Gleanvolt.Core.Models;
 /// that reads it. <see cref="PvSystemSettingKeys"/>'s arrangement, applied to the other side of the
 /// cable, and the editor refuses a key that is not on this list for the same reason.
 ///
-/// <para><b>Three sections, one page.</b> An owner has no way of knowing that <c>Ev:Vehicles:0</c>,
-/// <c>Vehicle:External</c> and <c>Vehicle</c> are about the same car; the page knows. The built-in manufacturer
-/// feeds (<c>Vehicle:Website</c>, <c>Vehicle:Skoda</c>, <c>Vehicle:DataAct</c>) are gone since #477: a car plugin
-/// reads those cars.</para>
+/// <para><b>Two sections, one page.</b> <c>Ev:Vehicles:0</c> is the car and <c>Vehicle:External</c> whether a car
+/// plugin reads it. The built-in manufacturer feeds are gone since #477, and the car's own MQTT topic since #486: a
+/// car plugin is the only way Gleanvolt reads a car.</para>
 ///
 /// <para><b>Out of scope on purpose:</b> a second car (<c>Ev:Vehicles:1</c> and beyond — see
-/// <c>EvRules.SupportedVehicleCount</c>), the poll intervals and timeouts, <c>Vehicle:MaxAge</c>, and
-/// the MQTT broker's own host and credentials, which are the house broker's rather than the car's.</para>
+/// <c>EvRules.SupportedVehicleCount</c>) and <c>Vehicle:MaxAge</c>.</para>
 /// </summary>
 public static class EvSettingKeys
 {
@@ -29,17 +27,12 @@ public static class EvSettingKeys
     public const string MinChargingCurrentAmps = Vehicle + ":MinChargingCurrentAmps";
     public const string MaxChargingCurrentAmps = Vehicle + ":MaxChargingCurrentAmps";
 
-    /// <summary>The owner's own MQTT topic. The per-car half of the <c>Vehicle</c> section.</summary>
-    public const string TelemetryTopic = Vehicle + ":Telemetry:Topic";
 
     /// <summary>
     /// Whether an external provider reads the car (#408): a program outside Gleanvolt that connects to
     /// <c>/providers/vehicle</c> with the provider token and publishes what the car says.
     /// </summary>
     public const string ExternalEnabled = "Vehicle:External:Enabled";
-
-    /// <summary>Whether the owner's own MQTT topic is subscribed to at all — <c>VehicleOptions.Enabled</c>.</summary>
-    public const string MqttEnabled = "Vehicle:Enabled";
 
     /// <summary>The car's own fields, which are worth setting whether or not any feed reads it.</summary>
     public static IReadOnlyList<string> Car { get; } =
@@ -54,7 +47,6 @@ public static class EvSettingKeys
     [
         .. Car,
         ExternalEnabled,
-        MqttEnabled, TelemetryTopic,
     ];
 
     /// <summary>Whether <paramref name="key"/> is one the web UI may edit. Case-insensitive, as configuration is.</summary>
@@ -78,8 +70,9 @@ public static class EvSettingKeys
 /// <c>Enabled</c> key and clears the others'; the composition root goes on reading only those keys,
 /// and nothing reads <c>Ev:Vehicles:0:Make</c>.</para>
 ///
-/// <para><b>No manufacturer feeds (#477).</b> volkswagen.de, MyŠkoda and the Data Act portal were built-in choices
-/// until #477; they are car plugins now, read through <see cref="External"/>.</para>
+/// <para><b>A car plugin or nothing.</b> volkswagen.de, MyŠkoda and the Data Act portal were built-in choices until
+/// #477, and the owner's own MQTT topic until #486; a car plugin reads any of them now, through
+/// <see cref="External"/>.</para>
 /// </summary>
 public enum VehicleFeed
 {
@@ -89,9 +82,6 @@ public enum VehicleFeed
     /// </summary>
     ChargeOnly,
 
-    /// <summary>A topic the owner publishes themselves (<c>Vehicle</c>).</summary>
-    OwnTopic,
-
     /// <summary>
     /// A car plugin (<c>Vehicle:External</c>, #408): any car, read by a program outside Gleanvolt, paired on
     /// Settings → Plugins.
@@ -100,50 +90,27 @@ public enum VehicleFeed
 }
 
 /// <summary>
-/// What each <see cref="VehicleFeed"/> switches on and what it then needs. Stated once, here, because
-/// three surfaces ask it: the page (which fields to show), the editor (what a save must fill in or
-/// clear) and its validation (what an enabled feed may not be missing).
+/// What each <see cref="VehicleFeed"/> switches on. Stated once, here, because the page and the editor both ask it.
 /// </summary>
 public static class VehicleFeeds
 {
     /// <summary>The choices in the order the page offers them.</summary>
-    public static IReadOnlyList<VehicleFeed> All { get; } =
-        [VehicleFeed.External, VehicleFeed.OwnTopic, VehicleFeed.ChargeOnly];
+    public static IReadOnlyList<VehicleFeed> All { get; } = [VehicleFeed.External, VehicleFeed.ChargeOnly];
 
     /// <summary>The key that switches this feed on, or null for <see cref="VehicleFeed.ChargeOnly"/>.</summary>
     public static string? EnabledKey(VehicleFeed feed) => feed switch
     {
         VehicleFeed.External => EvSettingKeys.ExternalEnabled,
-        VehicleFeed.OwnTopic => EvSettingKeys.MqttEnabled,
         _ => null,
     };
 
-    /// <summary>Every key this feed owns, in the order the page shows them. Empty for charge-only.</summary>
-    public static IReadOnlyList<string> Fields(VehicleFeed feed) => feed switch
-    {
-        VehicleFeed.OwnTopic => [EvSettingKeys.TelemetryTopic],
-        _ => [],
-    };
-
-    /// <summary>The keys this feed cannot start without.</summary>
-    public static IReadOnlyList<string> Required(VehicleFeed feed) => Fields(feed);
-
     /// <summary>The feed the configuration in <paramref name="isEnabled"/> selects.</summary>
     /// <param name="isEnabled">Answers whether an <c>Enabled</c> key reads true.</param>
-    /// <remarks>A plugin wins over the owner's own topic, which may run beside it.</remarks>
     public static VehicleFeed Selected(Func<string, bool> isEnabled)
     {
         ArgumentNullException.ThrowIfNull(isEnabled);
 
-        foreach (var feed in (VehicleFeed[])[VehicleFeed.External, VehicleFeed.OwnTopic])
-        {
-            if (isEnabled(EnabledKey(feed)!))
-            {
-                return feed;
-            }
-        }
-
-        return VehicleFeed.ChargeOnly;
+        return isEnabled(EvSettingKeys.ExternalEnabled) ? VehicleFeed.External : VehicleFeed.ChargeOnly;
     }
 }
 

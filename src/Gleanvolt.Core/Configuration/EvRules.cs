@@ -66,8 +66,7 @@ public static partial class EvRules
             ChargeEfficiency: Efficiency(vehicle.ChargeEfficiency, problems),
             Phases: Phases(vehicle.Phases, problems),
             MinChargingCurrentAmps: Amps(vehicle.MinChargingCurrentAmps, "Ev:Vehicles:0:MinChargingCurrentAmps", problems),
-            MaxChargingCurrentAmps: Amps(vehicle.MaxChargingCurrentAmps, "Ev:Vehicles:0:MaxChargingCurrentAmps", problems),
-            TelemetryTopic: vehicle.Telemetry?.Topic.Trim() ?? string.Empty);
+            MaxChargingCurrentAmps: Amps(vehicle.MaxChargingCurrentAmps, "Ev:Vehicles:0:MaxChargingCurrentAmps", problems));
 
         ValidateBand(info, chargerMinAmps, chargerMaxAmps, problems);
 
