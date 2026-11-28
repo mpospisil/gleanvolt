@@ -66,6 +66,7 @@ public sealed class VehicleUpdateWorker : BackgroundService
     private readonly bool _mqttFeedConfigured;
     private readonly bool _onDemandOnly;
     private readonly string? _setAside;
+    private readonly VehicleFeed? _builtIn;
 
     /// <param name="vehicleOptions">
     /// The MQTT feed's settings, read for one line of log and nothing else: an installation running
@@ -91,6 +92,7 @@ public sealed class VehicleUpdateWorker : BackgroundService
         _onDemandOnly = vehicleOptions?.Value.OnDemandOnly ?? false;
         _time = time ?? TimeProvider.System;
         _setAside = configured?.SetAside;
+        _builtIn = configured?.BuiltIn;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -98,6 +100,16 @@ public sealed class VehicleUpdateWorker : BackgroundService
         if (_setAside is not null)
         {
             _logger.LogInformation("{SetAside}", _setAside);
+        }
+
+        // #476: the built-in manufacturer feeds go in the next release. Said once, naming what replaces this one.
+        if (_builtIn is { } builtIn && VehicleFeeds.Plugin(builtIn) is { } plugin)
+        {
+            _logger.LogWarning(
+                "The built-in {Feed} car feed is deprecated and goes in the next release: run the {Plugin} plugin from "
+                + "gleanvolt-cars and choose 'A plugin' on the Car page. Its username and VIN carry over from .env; the "
+                + "password doesn't.",
+                builtIn, plugin.Name);
         }
 
         // A feed that pushes (#408) has nothing for a clock to ask: its provider publishes whenever the

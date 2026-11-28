@@ -79,7 +79,7 @@
                     @onchange="e => Choose(e.Value?.ToString())">
                 @foreach (var feed in VehicleFeeds.All)
                 {
-                    <option value="@feed.ToString()">@FeedName(feed)</option>
+                    <option value="@feed.ToString()">@(VehicleFeeds.Plugin(feed) is null ? FeedName(feed) : Localized.Format(CarText.FeedDeprecatedName, FeedName(feed)))</option>
                 }
             </select>
             <span class="source">@FeedFreshness(_feed)</span>
@@ -87,6 +87,32 @@
     </div>
 
     <p class="table-note muted" id="car-feed-note">@FeedNote(_feed)</p>
+
+    @*
+        #476: the built-in manufacturer feeds go in the next release. The notice names the plugin that replaces this
+        one, and lists what to enter on its page: compose hands over what .env holds, but a value saved here lives
+        in the overrides file, which a plugin never reads. Never a password: those are entered on the plugin's page.
+    *@
+    @if (VehicleFeeds.Plugin(_feed) is { } replacement)
+    {
+        <div class="warning" id="car-feed-deprecated" role="status">
+            <p>
+                @Localized.Format(CarText.FeedDeprecated, replacement.Name, CarText.FeedExternal)
+                <ManualLink Page="setting-up/car">@CarText.FeedDeprecatedHow</ManualLink>
+            </p>
+            @if (Carried(replacement) is { Count: > 0 } carried)
+            {
+                <p>@CarText.FeedDeprecatedCopy</p>
+                <dl class="facts">
+                    @foreach (var (key, value) in carried)
+                    {
+                        <dt>@Label(key)</dt>
+                        <dd><code>@value</code></dd>
+                    }
+                </dl>
+            }
+        </div>
+    }
 
     @if (VehicleFeeds.Fields(_feed).Count > 0)
     {
@@ -482,6 +508,12 @@
         VehicleFeed.External => CarText.FreshExternal,
         _ => CarText.FreshNone,
     };
+
+    // The carried settings this form holds a value for, in the plugin's order.
+    private List<(string Key, string Value)> Carried(VehicleFeedPlugin plugin) =>
+        [.. plugin.CarriedKeys
+            .Select(key => (Key: key, Value: _values.GetValueOrDefault(key)?.Trim() ?? string.Empty))
+            .Where(entry => entry.Value.Length > 0)];
 
     private static string FeedNote(VehicleFeed feed) => feed switch
     {

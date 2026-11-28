@@ -187,6 +187,39 @@ public class VehicleUpdateWorkerTests
     }
 
     [Fact]
+    public async Task TheBuiltInFeedWarnsOnceAtStartup()
+    {
+        // #476: the built-in volkswagen.de, MyŠkoda and Data Act feeds are deprecated, and the log says which plugin
+        // replaces the one this installation runs.
+        var logger = new CapturingLogger();
+        var worker = new VehicleUpdateWorker(
+            [], new VehicleStateHolder(), logger, time: new ImmediateTimeProvider(),
+            configured: new ConfiguredVehicleFeed(Service: null, BuiltIn: VehicleFeed.Skoda));
+
+        await worker.StartAsync(CancellationToken.None);
+        await worker.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var warning = Assert.Single(logger.Warnings);
+        Assert.Contains("deprecated", warning, StringComparison.Ordinal);
+        Assert.Contains("MyŠkoda plugin", warning, StringComparison.Ordinal);
+        Assert.Contains("A plugin", warning, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnExternalFeedDoesNotWarn()
+    {
+        var logger = new CapturingLogger();
+        var worker = new VehicleUpdateWorker(
+            [], new VehicleStateHolder(), logger, time: new ImmediateTimeProvider(),
+            configured: new ConfiguredVehicleFeed(Service: null));
+
+        await worker.StartAsync(CancellationToken.None);
+        await worker.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Empty(logger.Warnings);
+    }
+
+    [Fact]
     public async Task What_a_service_returns_reaches_the_holder()
     {
         var holder = new VehicleStateHolder();

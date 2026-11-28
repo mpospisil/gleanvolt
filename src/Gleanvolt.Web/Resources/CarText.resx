@@ -659,4 +659,16 @@
     <value>The page of {0}</value>
     <comment>{0} the provider's name.</comment>
   </data>
+  <data name="FeedDeprecatedName" xml:space="preserve">
+    <value>{0} (deprecated)</value>
+  </data>
+  <data name="FeedDeprecated" xml:space="preserve">
+    <value>This built-in feed is deprecated and goes in the next release. Run the {0} plugin instead, and choose {1} above.</value>
+  </data>
+  <data name="FeedDeprecatedHow" xml:space="preserve">
+    <value>How to set it up</value>
+  </data>
+  <data name="FeedDeprecatedCopy" xml:space="preserve">
+    <value>Enter these on the plugin's page, with the password. Values from .env reach it by themselves; these may have been saved here.</value>
+  </data>
 </root>

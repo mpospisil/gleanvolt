@@ -51,6 +51,20 @@ public class VehicleFeedRegistrationTests
     private static bool Registers<T>(IServiceCollection services) =>
         services.Any(descriptor => descriptor.ImplementationType == typeof(T));
 
+    [Theory]
+    [InlineData("Vehicle:Website:Enabled", VehicleFeed.Volkswagen)]
+    [InlineData("Vehicle:Skoda:Enabled", VehicleFeed.Skoda)]
+    [InlineData("Vehicle:DataAct:Enabled", VehicleFeed.DataAct)]
+    [InlineData("Vehicle:External:Enabled", null)]
+    public async Task The_configured_feed_says_which_deprecated_built_in_it_is(string enabled, VehicleFeed? builtIn)
+    {
+        // #476: the worker warns at startup for a built-in feed, and only for one.
+        var services = Services(Credentials.Concat(TheCar).Concat([(enabled, "true")]).ToArray());
+        await using var provider = services.BuildServiceProvider();
+
+        Assert.Equal(builtIn, provider.GetRequiredService<ConfiguredVehicleFeed>().BuiltIn);
+    }
+
     [Fact]
     public void Off_by_default_the_MQTT_feed_is_the_one_that_runs()
     {
