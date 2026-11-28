@@ -4,6 +4,35 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-28 — The car plugins ship with compose; the built-in feeds are deprecated, not switched (#476)
+
+**Found.** The three car plugins were released from gleanvolt-cars (volkswagen, skoda and vwgroup, 1.0.0), and the
+Volkswagen plugin was verified on the reference Pi against the ID.4: it kept the old volume's sign-in and read the car
+at once. An installation on a built-in feed has its VIN, username, brand and client id in `.env`, or only in the
+overrides file when they were saved on the Car page. The Volkswagen plugin read none of them from configuration.
+
+**Decided.**
+- **Compose ships the plugins** as it ships the charger plugins: `gleanvolt-plugin-{volkswagen,skoda,vwgroup}` under
+  profiles of the same names, on their own `*_PLUGIN_TAG`. At most one car plugin runs; the deploy scripts refuse two.
+- **Compose carries the non-secret settings,** from the built-ins' own env names (`VW_WEBSITE_USERNAME`/`_VIN`,
+  `SKODA_VIN`, `VW_USERNAME`, `VW_BRAND`, `VW_CLIENT_ID`, `VW_VIN`), into the plugin's settings. A value saved on the
+  plugin's page wins. Passwords and the Škoda key never carry over.
+- **The Volkswagen plugin learns `Volkswagen:Username` and `Volkswagen:Vin`** (gleanvolt-cars #3, to be released as 1.0.1).
+  It uses them until an account is saved on its page.
+- **A value only in the overrides file can't reach a plugin,** so the Car page lists the carried values with the
+  deprecation notice, for the owner to copy.
+- **Feed selection is unchanged.** The built-ins are labelled "(deprecated)", the notice names the plugin and links
+  the manual, and the vehicle worker warns once at startup. Nothing switches an installation to "A plugin" in this
+  release; the removal release does that.
+
+**Consequences accepted.**
+- An owner moving early has two feeds configured until they choose "A plugin". The built-in's account stays as a way
+  back until the removal release.
+- The Pi's hand-run Volkswagen container and the compose `volkswagen` profile both want port 8095. The deploy README
+  says to stop the hand-run one first; the removal step replaces it.
+
+---
+
 ## 2026-11-28 — The car plugins get a repository of their own, gleanvolt-cars (#474)
 
 **Found.** With the car layer released as a preview (#473), nothing kept the Volkswagen plugin and the vehicle sample

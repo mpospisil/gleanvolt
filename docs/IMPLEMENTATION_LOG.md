@@ -4,6 +4,64 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-28 — Ship the car plugins, and deprecate the built-in car feeds (#476)
+
+**Why.** Step 5 of #478. The volkswagen.de, MyŠkoda and Data Act feeds moved into gleanvolt-cars as plugins (#474,
+#475), and all three are released at 1.0.0. This release ships them and tells owners of the built-ins where to go,
+without switching anybody; the next one removes the built-ins (#477).
+
+**What.**
+- **Compose** (`deploy/docker-compose.yml`, `deploy/docker-compose.nas.yml`): three services on ports 8095, 8101 and
+  8102, with host networking, `plugins/<name>` as `/data`, and their own tag, port and memory variables.
+  `gleanvolt-init` on a NAS prepares their directories. Each gets the built-in feed's non-secret `.env` values:
+  - `Volkswagen__Username`/`__Vin` from `VW_WEBSITE_USERNAME`/`_VIN`;
+  - `Skoda__Vin` from `SKODA_VIN`;
+  - `VwGroup__Username`/`__Brand`/`__ClientId`/`__Vin` from `VW_USERNAME`, `VW_BRAND`, `VW_CLIENT_ID` and `VW_VIN`.
+- **Deploy scripts** (`deploy/_lib.sh`): `CAR_PLUGINS`, part of `KNOWN_PLUGINS`. Two car plugins in
+  `GLEANVOLT_PLUGINS` are refused with both named, as two charger plugins are.
+- **Core:** `VehicleFeeds.Plugin(feed)` gives each built-in's `VehicleFeedPlugin(Id, Name, CarriedKeys)`, and
+  `ConfiguredVehicleFeed.BuiltIn` says which built-in this installation runs. The composition root sets it from the
+  `Enabled` flags; the Data Act portal counts only when it isn't set aside.
+- **Car page:**
+  - built-in options read "… (deprecated)";
+  - a built-in choice shows a `warning` notice naming the plugin and linking the manual's car page;
+  - the notice lists the carried values the form holds, never a password.
+- **Log:** `VehicleUpdateWorker` warns once at startup, beside its set-aside line.
+- **Manual (en, cs):**
+  - the car page leads with an "A plugin" tab listing the three plugins and how to start one;
+  - the built-in tabs carry a deprecation caution;
+  - the plugins page lists the car;
+  - the car screenshots are regenerated.
+- **Docs:** `deploy/.env.example` and `deploy/README.md` document the car plugins and the carried values.
+- **gleanvolt-cars #3:** the Volkswagen plugin takes `Volkswagen:Username` and `Volkswagen:Vin` until an account is
+  saved on its page.
+
+**Quirks.**
+- **The Volkswagen plugin read no settings from configuration.** Its username, password and VIN live together in
+  `account.json`, so carrying them needed a plugin change.
+- **The overrides file never reaches a plugin's container.** Values saved on the Car page are therefore shown for
+  copying, not carried.
+- **nuget.org's restore feed lags its website** by 10–30 minutes after validation, and its CDN nodes disagree for a
+  while. The first `volkswagen-v1.0.0` image job failed on it, and re-running the failed job was enough.
+
+**Verified.**
+- `dotnet test -c Release`: every project green (Web 964, Hosting 1121, Core 870).
+- `docker compose config` of both files with test values: each plugin gets exactly its carried values, and the
+  passwords stay in the controller.
+- The deploy script's car check refuses `volkswagen,skoda` and passes `solax,volkswagen`.
+- `npm run screenshots:check` is clean.
+- On the Pi: the controller on `sha-1d55add`, and the Volkswagen plugin 1.0.0 on the old volume read the ID.4 (SOC
+  45%).
+
+**Files.** `deploy/docker-compose.yml`, `deploy/docker-compose.nas.yml`, `deploy/_lib.sh`, `deploy/.env.example`,
+`deploy/README.md`, `src/Gleanvolt.Core/Models/EvSettings.cs`, `src/Gleanvolt.Core/Models/ConfiguredVehicleFeed.cs`,
+`src/Gleanvolt.Hosting/GleanvoltHostingExtensions.cs`, `src/Gleanvolt.Hosting/Vehicles/VehicleUpdateWorker.cs`,
+`src/Gleanvolt.Web/Components/CarEditorForm.razor`, `src/Gleanvolt.Web/Resources/CarText{,.cs}.resx`, the tests
+beside them, `docs/manual/src/content/docs/{en,cs}/setting-up/{car,plugins}.mdx` and the regenerated screenshots, and
+the step 4 and step 5 plans.
+
+---
+
 ## 2026-11-28 — The Volkswagen plugin and the vehicle sample move to gleanvolt-cars (#474)
 
 **Why.** Step 3 of #478. Car plugins get a public MIT repository of their own, as the chargers did (#443), so a car

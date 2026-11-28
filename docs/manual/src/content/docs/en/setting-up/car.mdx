@@ -1,6 +1,6 @@
 ---
 title: Your car and its battery level
-description: Tell Gleanvolt about your car, and let it read the car's battery level from Volkswagen, Škoda, the VW Group portal or a program of your own.
+description: Tell Gleanvolt about your car, and let a plugin read the car's battery level from Volkswagen, Škoda, the VW Group portal or elsewhere.
 ---
 
 import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -35,10 +35,68 @@ too high. Charging still works, but plans finish late and nothing looks wrong. C
 
 ## The battery level
 
-Under **What reads this car**, choose your manufacturer. The page then shows what it needs.
+Under **What reads this car**, choose **A plugin**, and run the plugin for your car. The built-in
+Volkswagen, Škoda and VW Group choices still work, but they are deprecated and go in the next release.
 
 <Tabs syncKey="car">
+<TabItem label="A plugin">
+
+A plugin is a small program beside Gleanvolt that reads the car. Gleanvolt's own car plugins are in
+[gleanvolt-cars](https://github.com/mpospisil/gleanvolt-cars):
+
+| Plugin | For | Reads |
+|---|---|---|
+| `volkswagen` | a Volkswagen ID., with your VW ID | live from volkswagen.de |
+| `skoda` | a Škoda, with an API key from the MySkoda app | through Škoda's official API, every 5 to 15 minutes |
+| `vwgroup` | Audi, SEAT, Cupra, Bentley, VW commercial, or any Group brand | from the VW Group EU Data Act portal, usually 2 to 4 hours behind |
+
+Any other program can be one too: developers can find how to write one in
+[the provider guide](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md#the-vehicle-kind).
+
+<Steps>
+
+1. On the **Car** page, choose **A plugin** under **What reads this car**. Press **Save**,
+   then **Restart**.
+
+   ![The Car page with A plugin chosen, then the car's own fields.](../../../../assets/screenshots/car-external.png)
+
+2. Start the plugin. On a Raspberry Pi installed with the deploy script, add it to `GLEANVOLT_PLUGINS` in
+   `.env`, such as `GLEANVOLT_PLUGINS=openweather,solax,volkswagen`, and deploy again. Otherwise, follow its
+   own notes in gleanvolt-cars. It asks to connect: accept it under **Settings → Plugins**. See
+   [Plugins](../plugins/).
+
+3. Back on the **Car** page, **Plugin** says when the plugin connected and when its last reading arrived.
+   The Overview's car card names it too.
+
+   ![The Car page's Plugin section: the hub the program connects to, and the Vehicle sample program connected.](../../../../assets/screenshots/car-external-provider.png)
+
+4. The plugin's own page appears under **Plugin**, inside Gleanvolt. Enter the car's account there: the
+   password, or Škoda's API key, and sign in. The VIN and the user name are already filled in if you used a
+   built-in feed before. The page comes from the plugin, not from Gleanvolt, and only someone signed in to
+   Gleanvolt can open it. If it stays blank, press **Open in a new tab**.
+
+   ![A car plugin's own page inside the Car page: the last reading and the sign-in.](../../../../assets/screenshots/car-external-page.png)
+
+</Steps>
+
+- **The plugin sends readings when the car changes.** Gleanvolt doesn't ask it on a clock. **Ask the
+  car** asks it once, and it has a minute to answer.
+- **If the plugin disconnects**, the last reading stays and gets older, as with any feed. Gleanvolt
+  doesn't switch to another feed by itself.
+- **If the plugin's login to the car's account expires**, it says so: a band across every page asks you
+  to deal with it, on the plugin's page, and it goes away when the plugin reports it is fine again.
+- **Gleanvolt never sends the car anything** through it: no start, no stop, no charge limit.
+
+The MyŠkoda and Data Act plugins haven't been tried on a real car yet. If you have one, see the
+"Looking for testers" issues in Gleanvolt's repository.
+
+</TabItem>
 <TabItem label="Volkswagen">
+
+:::caution[Deprecated]
+This built-in feed goes in the next release. Run the **volkswagen** plugin instead: see **A plugin**. The Car
+page lists what to enter on the plugin's page.
+:::
 
 Volkswagen cars are read live from volkswagen.de, about every 20 seconds while charging.
 
@@ -68,6 +126,11 @@ sign-ins can get an account locked.
 </TabItem>
 <TabItem label="Škoda">
 
+:::caution[Deprecated]
+This built-in feed goes in the next release. Run the **skoda** plugin instead: see **A plugin**. The Car
+page lists what to enter on the plugin's page.
+:::
+
 Škoda cars are read through Škoda's official API, every 5 to 15 minutes.
 
 <Steps>
@@ -89,6 +152,11 @@ The Škoda connection is built from Škoda's published documentation and hasn't 
 
 </TabItem>
 <TabItem label="Audi, SEAT, Cupra, Bentley">
+
+:::caution[Deprecated]
+This built-in feed goes in the next release. Run the **vwgroup** plugin instead: see **A plugin**. The Car
+page lists what to enter on the plugin's page.
+:::
 
 These are read from the **VW Group EU Data Act portal**. Its readings are usually 2 to 4 hours behind
 the car, so they suit planning more than watching a charge.
@@ -124,52 +192,10 @@ If the portal shows a new consent screen or asks for a code, Gleanvolt stops rea
 Sign in to the portal in a browser, deal with it there, and restart Gleanvolt.
 
 </TabItem>
-<TabItem label="Through another program">
-
-Any car can be read by a program outside Gleanvolt that reads it however it can: through its own app or
-cloud, over Bluetooth, or from a dongle in the car. On the **Car** page this is **A plugin**. Gleanvolt's
-own car plugins are in [gleanvolt-cars](https://github.com/mpospisil/gleanvolt-cars): Volkswagen so far, with
-MyŠkoda and the VW Group Data Act portal to come. Any other program can be one too: developers can find how
-to write one in [the provider guide](https://github.com/mpospisil/gleanvolt/blob/main/docs/PROVIDERS.md#the-vehicle-kind).
-
-<Steps>
-
-1. On the **Car** page, choose **A plugin** under **What reads this car**. Press **Save**,
-   then **Restart**.
-
-   ![The Car page with A plugin chosen, then the car's own fields.](../../../../assets/screenshots/car-external.png)
-
-2. Start the program. It asks to connect: accept it under **Settings → Plugins**. See
-   [Plugins](../plugins/).
-
-3. Back on the **Car** page, **Plugin** says when the program connected and when its last
-   reading arrived. The Overview's car card names it too.
-
-   ![The Car page's Plugin section: the hub the program connects to, and the Vehicle sample program connected.](../../../../assets/screenshots/car-external-provider.png)
-
-4. If the program has a page of its own, the **Car** page shows it under **Plugin**, inside
-   Gleanvolt. That is where you sign in to the car's account and enter a code Volkswagen or another
-   maker emails you. The page comes from the program, not from Gleanvolt, and only someone signed in to
-   Gleanvolt can open it. If it stays blank, press **Open in a new tab**.
-
-   ![A car plugin's own page inside the Car page: the last reading and the sign-in.](../../../../assets/screenshots/car-external-page.png)
-
-</Steps>
-
-- **The program sends readings when the car changes.** Gleanvolt doesn't ask it on a clock. **Ask the
-  car** asks it once, and it has a minute to answer.
-- **If the program disconnects**, the last reading stays and gets older, as with any feed. Gleanvolt
-  doesn't switch to another feed by itself.
-- **If the program's login to the car's account expires**, the program can say so: a band across every
-  page asks you to deal with it, and it goes away when the program reports it is fine again. A program
-  with a page of its own is where you sign in again.
-- **Gleanvolt never sends the car anything** through it: no start, no stop, no charge limit.
-
-</TabItem>
 <TabItem label="Other cars">
 
 Choose **Another manufacturer — charge only**. Charging works exactly the same; you ask for a charge in
-kWh rather than in percent. If a program can read your car, see **Through another program**.
+kWh rather than in percent. If a program can read your car, see **A plugin**.
 
 If Home Assistant can see your car's battery level, it can pass it on to Gleanvolt. That is described in
 the repository, with the other advanced integrations.
