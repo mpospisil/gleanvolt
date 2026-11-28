@@ -30,7 +30,7 @@ namespace Gleanvolt.Providers.Testing;
 public sealed class ChargerTestHub : IAsyncDisposable
 {
     /// <summary>The largest message the hub takes, as Gleanvolt: 1 MiB.</summary>
-    public const long MaximumMessageBytes = 1024 * 1024;
+    public const long MaximumMessageBytes = TestHubs.MaximumMessageBytes;
 
     private readonly ChargerTestHubOptions _options;
     private readonly WebApplication _app;
@@ -40,8 +40,7 @@ public sealed class ChargerTestHub : IAsyncDisposable
     private readonly List<ChargerReading> _readings = [];
     private readonly List<RefusedReading> _refusals = [];
     private readonly List<ProviderStatus> _statuses = [];
-    private readonly List<PairingKnock> _knocks = [];
-    private readonly Dictionary<string, string> _knockHashes = new(StringComparer.Ordinal);
+    private readonly PairingDesk _pairing;
     private TaskCompletionSource<ProviderHello> _hello = NewHello();
     private string? _connectionId;
     private ProviderHello? _attached;
@@ -54,6 +53,7 @@ public sealed class ChargerTestHub : IAsyncDisposable
         _app = app;
         Endpoint = endpoint;
         Token = token;
+        _pairing = new PairingDesk(token);
     }
 
     /// <summary>Where the plugin connects: <c>http://127.0.0.1:&lt;port&gt;</c>, without the hub's path.</summary>
@@ -135,7 +135,7 @@ public sealed class ChargerTestHub : IAsyncDisposable
     public IReadOnlyList<ProviderStatus> Statuses => Snapshot(_statuses);
 
     /// <summary>Every pairing knock the hub accepted, oldest first.</summary>
-    public IReadOnlyList<PairingKnock> PairingKnocks => Snapshot(_knocks);
+    public IReadOnlyList<PairingKnock> PairingKnocks => _pairing.Knocks;
 
     /// <summary>Every reading the hub accepted, asked for or not, oldest first.</summary>
     public IReadOnlyList<ChargerReading> Readings => Snapshot(_readings);
@@ -147,13 +147,8 @@ public sealed class ChargerTestHub : IAsyncDisposable
     public static async Task<ChargerTestHub> StartAsync(ChargerTestHubOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= new ChargerTestHubOptions();
-        var token = options.Token ?? Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
-
-        var builder = WebApplication.CreateSlimBuilder();
-        builder.WebHost.UseUrls("http://127.0.0.1:0");
-        builder.Logging.ClearProviders();
-        builder.Services.AddSignalR(hub => hub.MaximumReceiveMessageSize = MaximumMessageBytes)
-            .AddJsonProtocol(json => json.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
+        var token = TestHubs.Token(options.Token);
+        var builder = TestHubs.CreateBuilder();
 
         // The instance is made before the app is built, so the hub can be handed it; the app and the address are
         // filled in once it runs.
@@ -161,21 +156,16 @@ public sealed class ChargerTestHub : IAsyncDisposable
         builder.Services.AddSingleton(holder);
 
         var app = builder.Build();
-        // The pairing paths pass the token check whether or not they are mapped: unmapped, they answer 404 as an older
-        // Gleanvolt does, not 401.
-        app.Use((context, next) => Authorised(context.Request, token) || IsPairing(context.Request)
-            ? next(context)
-            : Refuse(context.Response));
+        TestHubs.UseToken(app, token);
         app.MapHub<TestChargerHub>(ChargerContract.HubPath);
         if (options.AcceptPairing)
         {
-            MapPairing(app, holder);
+            TestHubs.MapPairing(app, () => holder.Hub!._pairing);
         }
 
         await app.StartAsync(cancellationToken).ConfigureAwait(false);
 
-        var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
-        var hub = new ChargerTestHub(options, app, new Uri(address), token);
+        var hub = new ChargerTestHub(options, app, TestHubs.Address(app), token);
         holder.Hub = hub;
         return hub;
     }
@@ -379,77 +369,6 @@ public sealed class ChargerTestHub : IAsyncDisposable
         }
     }
 
-    // ---- Pairing ----
-
-    // Gleanvolt's two endpoints, without its waiting list: every knock is accepted at once. The secret is still
-    // checked against the hash the plugin knocked with, so a plugin that collects with the wrong one is found out.
-    private static void MapPairing(WebApplication app, Holder holder)
-    {
-        app.MapPost(PairingPaths.Knock, async (HttpContext context) =>
-        {
-            if (await ReadAsync<PairingKnock>(context.Request).ConfigureAwait(false) is not { } knock)
-            {
-                return Results.BadRequest();
-            }
-
-            return Results.Json(holder.Hub!.Knocked(knock), PairingJson);
-        });
-
-        app.MapPost("/providers/pairing/{id}/collect", async (string id, HttpContext context) =>
-        {
-            if (await ReadAsync<PairingCollect>(context.Request).ConfigureAwait(false) is not { } collect)
-            {
-                return Results.BadRequest();
-            }
-
-            return Results.Json(holder.Hub!.Collected(id, collect.Secret), PairingJson);
-        });
-    }
-
-    private static async Task<T?> ReadAsync<T>(HttpRequest request)
-        where T : class
-    {
-        try
-        {
-            return await request.ReadFromJsonAsync<T>(PairingJson).ConfigureAwait(false);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    private PairingTicket Knocked(PairingKnock knock)
-    {
-        var id = Guid.NewGuid().ToString("N");
-        lock (_gate)
-        {
-            _knocks.Add(knock);
-            _knockHashes[id] = knock.SecretHash;
-        }
-
-        return new PairingTicket(id);
-    }
-
-    private PairingAnswer Collected(string id, string? secret)
-    {
-        lock (_gate)
-        {
-            // As Gleanvolt: a collect that does not prove the secret learns nothing, not even that the request exists.
-            return secret is not null && _knockHashes.TryGetValue(id, out var hash) && hash == PairingSecret.Hash(secret)
-                ? new PairingAnswer(PairingState.Accepted, Token)
-                : new PairingAnswer(PairingState.Unknown);
-        }
-    }
-
-    private static bool IsPairing(HttpRequest request) =>
-        request.Path.StartsWithSegments("/providers/pairing", StringComparison.Ordinal);
-
-    private static readonly JsonSerializerOptions PairingJson = new(JsonSerializerDefaults.Web)
-    {
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-    };
-
     // ---- Inside ----
 
     private async Task<ChargerCommandResult> CommandAsync(Func<RequestId, Task> send, CancellationToken cancellationToken)
@@ -513,22 +432,6 @@ public sealed class ChargerTestHub : IAsyncDisposable
 
     private static TaskCompletionSource<ProviderHello> NewHello() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    // As Gleanvolt: the token in the Authorization header, or as access_token for a WebSocket that can't set one.
-    private static bool Authorised(HttpRequest request, string token)
-    {
-        var header = request.Headers.Authorization.ToString();
-        var offered = header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-            ? header["Bearer ".Length..].Trim()
-            : request.Query["access_token"].ToString();
-
-        return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(offered), Encoding.UTF8.GetBytes(token));
-    }
-
-    private static Task Refuse(HttpResponse response)
-    {
-        response.StatusCode = StatusCodes.Status401Unauthorized;
-        return Task.CompletedTask;
-    }
 
     internal sealed class Holder
     {

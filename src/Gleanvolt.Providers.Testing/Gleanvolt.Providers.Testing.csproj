@@ -33,6 +33,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- VehicleReadingRules, compared there with Gleanvolt's own validator (#473). -->
+    <InternalsVisibleTo Include="Gleanvolt.Providers.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <GlobalAnalyzerConfigFiles Include="..\CultureInvariant.globalconfig" />
   </ItemGroup>
 
