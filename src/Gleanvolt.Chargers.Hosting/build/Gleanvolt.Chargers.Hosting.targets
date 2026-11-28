@@ -1,0 +1,10 @@
+<Project>
+  <!--
+    The shared plugin host's namespace for every plugin on this package (#472): PluginInfo, PluginSettings, Words and
+    the other types that moved to Gleanvolt.Plugins.Hosting stay in reach of a plugin's `using Gleanvolt.Chargers;`. A .targets, not a .props: the Razor SDK writes
+    build/<PackageId>.props itself for a package with static web assets, and the two would collide.
+  -->
+  <ItemGroup>
+    <Using Include="Gleanvolt.Plugins" />
+  </ItemGroup>
+</Project>

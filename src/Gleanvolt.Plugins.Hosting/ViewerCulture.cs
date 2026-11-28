@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Gleanvolt.Chargers;
+namespace Gleanvolt.Plugins;
 
 /// <summary>
 /// The viewer's culture, captured when a component starts on its circuit, for the renders an event raised

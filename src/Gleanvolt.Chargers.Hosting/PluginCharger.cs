@@ -12,7 +12,7 @@ namespace Gleanvolt.Chargers;
 /// Gleanvolt. A plugin implements the device: <see cref="ReadAsync"/>, <see cref="SetCurrentAsync"/> and
 /// <see cref="SetChargingAllowedAsync"/>, calling <see cref="Healthy"/> or <see cref="Problem"/> as a read goes.
 /// </summary>
-public abstract class PluginCharger : IChargerSource
+public abstract class PluginCharger : IChargerSource, IPluginStatus
 {
     /// <summary>Raised when the status, the newest reading or anything the page shows changes.</summary>
     public event Action? Changed;
@@ -84,56 +84,18 @@ public sealed class GleanvoltSession
 }
 
 /// <summary>
-/// Tells Gleanvolt how the plugin is doing: after every hello, since a new session starts with no status in
-/// Gleanvolt, and whenever the status changes, not on every poll. Keeps <see cref="GleanvoltSession"/> current.
+/// Tells Gleanvolt how the charger is: after every hello, since a new session starts with no status, and whenever the
+/// charger's status changes. It also keeps the session's welcome for the page.
 /// </summary>
-public sealed class StatusReporter : IHostedService
+public sealed class StatusReporter : PluginStatusReporter<ChargerWelcome>
 {
-    private readonly ChargerProviderConnection _connection;
-    private readonly PluginCharger _charger;
-    private readonly ILogger<StatusReporter> _logger;
-    private ProviderStatus? _reported;
-
     public StatusReporter(ChargerProviderConnection connection, PluginCharger charger, GleanvoltSession session, ILogger<StatusReporter> logger)
+        : base(connection, charger, logger)
     {
-        _connection = connection;
-        _charger = charger;
-        _logger = logger;
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(session);
 
         // Here rather than at start: the first hello can come before it.
-        connection.Welcomed += welcome =>
-        {
-            session.Welcome = welcome;
-            _ = ReportAsync(force: true);
-        };
-        charger.Changed += () => _ = ReportAsync(force: false);
+        connection.Welcomed += welcome => session.Welcome = welcome;
     }
-
-    public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
-    private async Task ReportAsync(bool force)
-    {
-        if (_charger.Status is not { } status || (!force && Same(status, _reported)))
-        {
-            return;
-        }
-
-        try
-        {
-            _reported = status;
-            await _connection.ReportStatusAsync(status).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _reported = null;
-            _logger.LogDebug("Could not report the status to Gleanvolt ({Reason}).", ex.Message);
-        }
-    }
-
-    // The messages are a dictionary, so a record's equality would call every poll a change.
-    private static bool Same(ProviderStatus status, ProviderStatus? other) =>
-        other is not null && status.Healthy == other.Healthy && status.NeedsOwner == other.NeedsOwner
-        && status.Code == other.Code && status.Message == other.Message;
 }

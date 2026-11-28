@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!--
+    What every Gleanvolt plugin shares, whatever its kind and whoever writes it (#472): the configuration, the page
+    Gleanvolt frames and admits only with its ticket, the waiting view while the plugin is paired, the frame policy that
+    follows the pairing, the data directory and saved settings, the viewer's language. A kind's layer
+    (Gleanvolt.Chargers.Hosting, Gleanvolt.Cars.Hosting) adds its provider, its base class and its page.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AddRazorSupportForMvc>false</AddRazorSupportForMvc>
+    <RootNamespace>Gleanvolt.Plugins</RootNamespace>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>Gleanvolt.Plugins.Hosting</PackageId>
+    <Description>The host every Gleanvolt plugin shares: configuration, the page Gleanvolt frames, pairing's waiting view, the frame policy, saved settings and the viewer's language. Used through a kind's layer, such as Gleanvolt.Chargers.Hosting. MIT.</Description>
+    <PackageTags>gleanvolt;plugin;provider</PackageTags>
+
+    <!-- MIT, like the contracts: see Gleanvolt.Providers.Contracts.csproj. -->
+    <GleanvoltMitPackage>true</GleanvoltMitPackage>
+    <PackageLicenseFile></PackageLicenseFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="LICENSE" Pack="true" PackagePath="\" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gleanvolt.Providers.Client\Gleanvolt.Providers.Client.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gleanvolt.Chargers.Hosting" />
+    <InternalsVisibleTo Include="Gleanvolt.Cars.Hosting" />
+    <InternalsVisibleTo Include="Gleanvolt.Providers.Testing" />
+    <InternalsVisibleTo Include="Gleanvolt.Providers.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <GlobalAnalyzerConfigFiles Include="..\CultureInvariant.globalconfig" />
+  </ItemGroup>
+
+</Project>

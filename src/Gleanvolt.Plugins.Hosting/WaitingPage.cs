@@ -5,7 +5,7 @@ using System.Text.Encodings.Web;
 using System.Text.Unicode;
 using Gleanvolt.Providers.Client;
 
-namespace Gleanvolt.Chargers;
+namespace Gleanvolt.Plugins;
 
 /// <summary>
 /// What the plugin's page shows until the owner accepts it in Gleanvolt (#459): its name, where the pairing stands,
@@ -22,11 +22,11 @@ internal static class WaitingPage
 
         var phase = status.Phase switch
         {
-            PairingPhase.Waiting => SharedText.PairingWaiting,
-            PairingPhase.Rejected => SharedText.PairingRejected,
+            PairingPhase.Waiting => HostText.PairingWaiting,
+            PairingPhase.Rejected => HostText.PairingRejected,
 
             // NotNeeded with no token is the moment after a paired token was dropped: the search starts again.
-            _ => SharedText.PairingSearching,
+            _ => HostText.PairingSearching,
         };
 
         var html = new StringBuilder();
@@ -37,7 +37,7 @@ internal static class WaitingPage
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <meta http-equiv="refresh" content="10">
-            <link rel="stylesheet" href="/_content/Gleanvolt.Chargers.Hosting/app.css">
+            <link rel="stylesheet" href="/_content/Gleanvolt.Plugins.Hosting/app.css">
             <title>{Encode(plugin.Name)}</title>
             </head>
             <body>
@@ -50,7 +50,7 @@ internal static class WaitingPage
         {
             html.Append(CultureInfo.InvariantCulture, $"""
                 <dl>
-                <dt>{Say(SharedText.PairingCode)}</dt>
+                <dt>{Say(HostText.PairingCode)}</dt>
                 <dd id="pairing-code"><strong>{Encode(status.Code)}</strong></dd>
                 </dl>
 
@@ -60,7 +60,7 @@ internal static class WaitingPage
         var own = addresses.Select(address => address.ToString()).ToList();
         if (own.Count > 0)
         {
-            html.Append(CultureInfo.InvariantCulture, $"<h2>{Say(SharedText.PairingAddresses)}</h2>\n<ul id=\"pairing-addresses\">\n");
+            html.Append(CultureInfo.InvariantCulture, $"<h2>{Say(HostText.PairingAddresses)}</h2>\n<ul id=\"pairing-addresses\">\n");
             foreach (var address in own)
             {
                 html.Append(CultureInfo.InvariantCulture, $"<li>{Encode(address)}</li>\n");

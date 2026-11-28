@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Resources;
 
-namespace Gleanvolt.Chargers;
+namespace Gleanvolt.Plugins;
 
 /// <summary>
 /// One text in the two languages Gleanvolt speaks. The page shows the viewer's (<see cref="ToString"/>, from the

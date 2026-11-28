@@ -58,6 +58,7 @@ COPY src/Gleanvolt.Providers.Contracts/Gleanvolt.Providers.Contracts.csproj src/
 COPY src/Gleanvolt.Providers.Client/Gleanvolt.Providers.Client.csproj src/Gleanvolt.Providers.Client/
 COPY src/Gleanvolt.Providers.Testing/Gleanvolt.Providers.Testing.csproj src/Gleanvolt.Providers.Testing/
 COPY src/Gleanvolt.Chargers.Hosting/Gleanvolt.Chargers.Hosting.csproj src/Gleanvolt.Chargers.Hosting/
+COPY src/Gleanvolt.Plugins.Hosting/Gleanvolt.Plugins.Hosting.csproj src/Gleanvolt.Plugins.Hosting/
 COPY src/Gleanvolt.Providers.Server/Gleanvolt.Providers.Server.csproj src/Gleanvolt.Providers.Server/
 RUN dotnet restore src/Gleanvolt.Worker/Gleanvolt.Worker.csproj -a "$TARGETARCH"
 

@@ -27,6 +27,8 @@
   <ItemGroup>
     <None Include="LICENSE" Pack="true" PackagePath="\" />
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <!-- The shared host's namespace for every plugin on this package, however it is referenced (#472). -->
+    <None Include="build\Gleanvolt.Chargers.Hosting.targets" Pack="true" PackagePath="build\;buildTransitive\" />
   </ItemGroup>
 
   <ItemGroup>
@@ -34,8 +36,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Gleanvolt.Providers.Client\Gleanvolt.Providers.Client.csproj" />
+    <ProjectReference Include="..\Gleanvolt.Plugins.Hosting\Gleanvolt.Plugins.Hosting.csproj" />
     <ProjectReference Include="..\Gleanvolt.Modbus\Gleanvolt.Modbus.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Gleanvolt.Plugins" />
   </ItemGroup>
 
   <ItemGroup>

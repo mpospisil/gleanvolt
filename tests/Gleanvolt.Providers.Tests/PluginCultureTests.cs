@@ -1,4 +1,5 @@
 using Gleanvolt.Chargers;
+using Gleanvolt.Plugins;
 using Xunit;
 
 namespace Gleanvolt.Providers.Tests;

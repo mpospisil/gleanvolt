@@ -8,6 +8,11 @@ charger's address and port, and finding the charger, are your plugin's: they are
 [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (SolaX, Huawei, go-e, Shelly TopAC) are built
 on it; read one of them first.
 
+It is the charger's layer on [`Gleanvolt.Plugins.Hosting`](https://www.nuget.org/packages/Gleanvolt.Plugins.Hosting)
+(#472), the host every plugin kind shares, which comes with it. `PluginInfo`, `PluginSettings`, `SavedSetting`,
+`Words` and `ViewerCulture` live there, in the namespace `Gleanvolt.Plugins`, which this package puts in scope for
+you: `using Gleanvolt.Chargers;` is still all a plugin needs.
+
 ## A plugin in four files
 
 `MyCharger.csproj`:

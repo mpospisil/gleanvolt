@@ -4,6 +4,58 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-28 — A shared plugin host for every plugin kind (#472)
+
+**Why.** Charger plugins start before Gleanvolt, find it, show a waiting page until the owner accepts them, and frame
+their page for whichever Gleanvolt paired them, all from `Gleanvolt.Chargers.Hosting`. Every other plugin (OpenWeather,
+Volkswagen, the samples) sets itself up in about 100 lines of `Program.cs` with Gleanvolt fixed at `localhost:8090`
+and its frame policy fixed at startup. The car plugins are moving to a repository of their own (#478, design in
+`docs/superpowers/specs/2026-11-28-car-plugins-design.md`), so the host has to serve more than chargers. This is step 1.
+
+**What.**
+- New MIT package `Gleanvolt.Plugins.Hosting` (namespace `Gleanvolt.Plugins`), released with the SDK: `PluginWebHost`
+  (`CreateBuilder(args, plugin, addProvider)` and `Build(builder, endpoints, extraAssemblies)`), `PageFraming`,
+  `PluginInfo`, `PluginSettings`, `SavedSetting`/`SettingSource`, `Words`, `ViewerCulture`, `HostText`, the waiting
+  page, the culture middleware, the page shell (`App`, `Routes`) and its stylesheet, `IPluginStatus` and
+  `PluginStatusReporter<TWelcome>`. Moved with `git mv`, bodies unchanged.
+- `Gleanvolt.Chargers.Hosting` is the charger layer on it: `PluginHost.CreateBuilder<TCharger>` passes
+  `AddGleanvoltChargerProvider<TCharger>` to the shared builder and adds the recorder, the session and the charger's
+  aliases; `PluginHost.Build` adds `/recording`. `StatusReporter` derives from the shared reporter and still keeps the
+  session's welcome. `PluginCharger` implements `IPluginStatus`.
+- Charger plugins keep compiling unchanged:
+  - the package carries `build`/`buildTransitive/Gleanvolt.Chargers.Hosting.targets` with `<Using Include="Gleanvolt.Plugins" />` (a `.targets`: the Razor SDK writes `<PackageId>.props` itself once a package has static web assets);
+  - `PluginSettings.Address` is a C# 14 extension property in `Gleanvolt.Chargers`;
+  - `PluginInfo`'s `DefaultDevicePort` is optional (0 for a plugin with no LAN device), and `PluginHost` refuses a
+    charger plugin without one at start, where leaving it out used to be a compile error;
+  - `SharedText`'s moved entries stay, as aliases of `HostText`'s.
+- The release workflow packs and pushes the new package; `RELEASING.md`, `PROVIDERS.md` and the package READMEs say so.
+
+**Quirks.**
+- The stylesheet moved from `_content/Gleanvolt.Chargers.Hosting/app.css` to `_content/Gleanvolt.Plugins.Hosting/app.css`.
+  Under `TestServer` that path isn't served (a test project has no consumer manifest; the host's assets stand in at
+  `/app.css`), so the test checks the link on both pages and a published SolaX plugin was checked by hand: the waiting
+  page links it, and both it and the fingerprinted `app.<hash>.css` the Blazor page links answer 200 `text/css`.
+- After moving `wwwroot` out, `dotnet pack` of the charger package failed on a missing `wwwroot` until its `obj` was
+  cleared: the static web assets cache remembered the folder.
+- `~/.nuget/packages` held a stale `1.3.3-local.1` from an earlier session, which would have shadowed the new packages;
+  the check used `1.3.3-local.472`.
+- `DockerfileTests` caught the new project missing from the image's restore step, in both Dockerfiles.
+
+**Verified.** gleanvolt-chargers' four plugins build and pass (15 + 16 + 17 + 28 tests) on packages packed from this
+branch with only `-p:GleanvoltSdkVersion` changed, and the working tree there stays clean. Full Release test pass here.
+
+**Files.** New `src/Gleanvolt.Plugins.Hosting/` (`PluginWebHost.cs`, `PluginStatusReporter.cs`, `PluginInfo.cs`,
+`HostText.cs`, `NetworkAddresses.cs`, and moved `Words.cs`, `ViewerCulture.cs`, `PluginCulture.cs`, `WaitingPage.cs`,
+`SavedSetting.cs`, `Components/{App,Routes,_Imports}.razor`, `wwwroot/app.css`, csproj, LICENSE, README). In
+`src/Gleanvolt.Chargers.Hosting/`: `PluginHost.cs`, `PluginCharger.cs`, `SharedText.cs`, `LanScan.cs`, new
+`DeviceAddress.cs`, `PluginSettingsExtensions.cs`, `build/Gleanvolt.Chargers.Hosting.targets`, csproj, README,
+`Components/_Imports.razor`. `src/Gleanvolt.Providers.Testing/{PluginHarness,FakeModbusServer}.cs`. Tests: new
+`PluginWebHostTests.cs`; `ChargersHostingTests.cs` and the culture, words and hub tests' usings. `Gleanvolt.slnx`,
+`Dockerfile`, `Dockerfile.windows`, `.github/workflows/release.yml`, `docs/{PROVIDERS,RELEASING,DECISIONS}.md`, the car
+plugins design and plan under `docs/superpowers/`.
+
+---
+
 ## 2026-11-28 — Help when a plugin is missing, and "External providers" becomes "Plugins" (#470)
 
 **Why.** A first run has no charger plugin, so no mode can start, and Gleanvolt said only "No charger plugin is

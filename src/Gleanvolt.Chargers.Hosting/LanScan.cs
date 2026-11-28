@@ -29,13 +29,7 @@ public static class LanScan
             .Distinct()];
 
     /// <summary>This machine's own IPv4 addresses on the interfaces that are up, loopback left out.</summary>
-    internal static IReadOnlyList<IPAddress> OwnAddresses() =>
-        [.. NetworkInterface.GetAllNetworkInterfaces()
-            .Where(card => card.OperationalStatus == OperationalStatus.Up && card.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-            .SelectMany(card => card.GetIPProperties().UnicastAddresses)
-            .Select(unicast => unicast.Address)
-            .Where(address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address))
-            .Distinct()];
+    internal static IReadOnlyList<IPAddress> OwnAddresses() => NetworkAddresses.OwnAddresses();
 
     /// <summary>The hosts of <paramref name="network"/>, or null when it is not a private network of a /22 or smaller.</summary>
     public static IReadOnlyList<IPAddress>? Hosts(string network)

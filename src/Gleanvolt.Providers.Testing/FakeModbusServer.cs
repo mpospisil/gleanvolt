@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 
 using Gleanvolt.Chargers;
+using Gleanvolt.Plugins;
 
 namespace Gleanvolt.Providers.Testing;
 

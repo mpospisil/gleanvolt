@@ -4,6 +4,33 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-28 — One host for every plugin kind; the charger package is its charger layer (#472)
+
+**Found.** Car plugins are moving to a repository of their own, like the chargers (#478). Everything that makes a
+charger plugin pleasant to run (it starts before Gleanvolt, finds it, waits to be accepted, frames its page for the
+Gleanvolt that paired it) lived in `Gleanvolt.Chargers.Hosting`, behind a builder that takes a charger type. The other
+plugins each set themselves up by hand, with Gleanvolt fixed at `localhost:8090` and the frame policy fixed at
+startup.
+
+**Decided.**
+- **One shared host, `Gleanvolt.Plugins.Hosting` (MIT, released with the SDK), and a thin layer per kind.** The
+  kind's layer hands `PluginWebHost.CreateBuilder` a callback that registers its provider, and adds its own base class,
+  page and endpoints. Rejected: a car copy of the charger host (two copies drift, weather would make a third), and no
+  shared host at all (every new car repeats today's gaps).
+- **The charger package keeps every public name, so charger plugins only bump the SDK version.** It puts
+  `Gleanvolt.Plugins` in scope through a packed `build`/`buildTransitive` `.targets` file (not `.props`, which the Razor SDK
+  generates for a package with static web assets); `PluginSettings.Address` is a
+  C# 14 extension property; `PluginInfo.DefaultDevicePort` is optional, and the charger layer refuses a charger plugin without it at start; `SharedText`'s moved entries are aliases.
+- **The stylesheet is the shared host's,** at `_content/Gleanvolt.Plugins.Hosting/app.css`.
+
+**Consequences accepted.**
+- Every SDK release now pushes one more package to nuget.org (six MIT packages).
+- The global using reaches every plugin on the package, so a plugin that declares a type of its own named like one in
+  `Gleanvolt.Plugins` (`Words`, `PluginInfo`) now sees an ambiguity. None of the four charger plugins does.
+- A plugin page that linked the old stylesheet path by hand breaks; none of the four charger plugins did.
+
+---
+
 ## 2026-11-28 — Owners see "plugin"; pairing is the only path the owner docs describe (#470)
 
 **Found.** Since 1.4 the charger is always a plugin and the wizard ends without one, so a new owner's first
