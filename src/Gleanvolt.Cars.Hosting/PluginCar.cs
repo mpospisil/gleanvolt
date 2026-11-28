@@ -106,14 +106,28 @@ public abstract class PluginCar : IVehicleSource, IPluginStatus
             }
             catch (Exception ex)
             {
-                OnFetchFailed(ex);
+                // A block the plugin set on the way (a sign-in refused) says more than the exception that followed it.
+                if (!_blocked)
+                {
+                    OnFetchFailed(ex);
+                }
+
                 return _last;
             }
 
             if (reading is not null)
             {
                 _last = reading;
-                Healthy();
+
+                // A block set while the maker was asked (the owner changed the account) outlasts the answer.
+                if (_blocked)
+                {
+                    RaiseChanged();
+                }
+                else
+                {
+                    Healthy();
+                }
             }
 
             return _last;

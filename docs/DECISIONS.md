@@ -19,6 +19,8 @@ feed moving to `gleanvolt-cars` (#478), each plugin would carry its own copy.
 - **The clock reads once at start,** so the page shows the car before the owner accepts the plugin; the SDK's publish
   on the welcome then falls inside the minimum and asks the maker nothing. The intervals are those Gleanvolt's own
   feeds used: 5 minutes while a session is open or the car charges, 15 otherwise, 30 seconds apart at least.
+- **A block wins over what a read in flight brings back,** and over the exception that may follow it, so a car never
+  waits for the owner while it says it is fine.
 - **No recording for testers,** unlike the charger layer: a car's service is a cloud account, and a recording would
   hold the VIN and the owner's details. It can come later with a redaction rule.
 - **The test hub checks readings as Gleanvolt does,** by a copy of the validator's rules (the testing package is MIT

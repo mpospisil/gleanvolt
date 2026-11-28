@@ -25,7 +25,9 @@ public static class CarPluginHost
         var builder = PluginWebHost.CreateBuilder(args, plugin,
             (services, configure) => services.AddGleanvoltVehicleProvider<TCar>(configure));
 
-        builder.Services.AddSingleton(builder.Configuration.GetSection(plugin.Section).Get<CarPollOptions>() ?? new CarPollOptions());
+        var poll = builder.Configuration.GetSection(plugin.Section).Get<CarPollOptions>() ?? new CarPollOptions();
+        poll.Validate(plugin.Section);
+        builder.Services.AddSingleton(poll);
 
         // The car the SDK asks is the one the page shows and the clock reads.
         builder.Services.AddSingleton(provider => (TCar)provider.GetRequiredService<IVehicleSource>());

@@ -101,6 +101,80 @@ public sealed class CarsHostingTests
     }
 
     [Fact]
+    public async Task ABlockWhileAReadIsInFlightOutlastsTheRead()
+    {
+        // The owner changes the account on the page while the maker is being asked: the answer is kept, the block too.
+        var car = new CountingCar(_time) { Hold = new TaskCompletionSource() };
+        var read = car.ReadAsync(null, default);
+        await PluginHarness.Eventually(() => car.Fetches == 1, "the read reaches the maker");
+
+        car.BlockNow(new Words("Sign in again.", "Přihlaste se znovu."), ProviderStatusCodes.NeedsSignIn);
+        car.Hold.SetResult();
+        await read;
+
+        Assert.NotNull(car.LastReading);
+        Assert.True(car.IsBlocked);
+        Assert.True(car.Status!.NeedsOwner);
+        Assert.Equal("needs-sign-in", car.Status.Code);
+    }
+
+    [Fact]
+    public async Task ABlockInsideAFailingReadIsNotOverwrittenByUnreachable()
+    {
+        // A sign-in the maker refused: the plugin blocks, and the exception that follows must not hide it.
+        var car = new CountingCar(_time) { BlockInFetch = true, Failure = new HttpRequestException("401") };
+
+        await car.ReadAsync(null, default);
+
+        Assert.True(car.IsBlocked);
+        Assert.True(car.Status!.NeedsOwner);
+        Assert.Equal("needs-sign-in", car.Status.Code);
+    }
+
+    [Fact]
+    public async Task AProblemAndABlockAreLoggedOnceEachAndTheRecoveryToo()
+    {
+        var car = new CountingCar(_time) { Failure = new HttpRequestException("boom") };
+        var log = new ListLogger<CarPoller>();
+        using var poller = new CarPoller(new Gleanvolt.Providers.Client.Vehicle.VehicleProviderConnection(
+            Microsoft.Extensions.Options.Options.Create(new ProviderOptions { ProviderId = "test-car", Name = "Test car" }),
+            car, Microsoft.Extensions.Logging.Abstractions.NullLogger<Gleanvolt.Providers.Client.Vehicle.VehicleProviderConnection>.Instance),
+            car, _time, log);
+
+        await car.ReadAsync(null, default);
+        _time.Advance(TimeSpan.FromSeconds(31));
+        await car.ReadAsync(null, default);
+
+        var problem = Assert.Single(log.Entries);
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Warning, problem.Level);
+        Assert.Contains("unreachable", problem.Message, StringComparison.Ordinal);
+        Assert.Contains("boom", problem.Message, StringComparison.Ordinal);
+
+        car.BlockNow(new Words("Sign in again.", "Přihlaste se znovu."), ProviderStatusCodes.NeedsSignIn);
+        Assert.Equal(2, log.Entries.Count);
+        Assert.Contains("needs-sign-in", log.Entries[^1].Message, StringComparison.Ordinal);
+
+        car.Failure = null;
+        car.Resume();
+        Assert.Equal(3, log.Entries.Count);
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Information, log.Entries[^1].Level);
+    }
+
+    [Theory]
+    [InlineData("PollInterval", "00:00:00")]
+    [InlineData("IdlePollInterval", "-00:05:00")]
+    [InlineData("MinimumTimeBetweenReads", "-00:00:01")]
+    public void AnIntervalThatWouldRaceOrStopTheClockIsRefusedAtStart(string key, string value)
+    {
+        // Zero would publish to Gleanvolt in a loop; a negative wait throws inside the clock and stops the plugin.
+        var plugin = new PluginInfo("bad-car", "Bad car", "BadCar", 8115);
+
+        var refused = Assert.Throws<InvalidOperationException>(() => CarPluginHost.CreateBuilder<PageCar>([$"--BadCar:{key}={value}"], plugin));
+
+        Assert.Contains("BadCar:" + key, refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AStopIsNotAProblem()
     {
         var car = new CountingCar(_time);
@@ -304,6 +378,8 @@ public sealed class CarsHostingTests
 
         public VehicleReading? Reading { get; set; }
 
+        public bool BlockInFetch { get; set; }
+
         public void BlockNow(Words what, string code) => Block(what, code);
 
         protected override async Task<VehicleReading?> FetchAsync(VehicleInfo? car, CancellationToken cancellationToken)
@@ -312,6 +388,11 @@ public sealed class CarsHostingTests
             if (Hold is { } hold)
             {
                 await hold.Task.WaitAsync(cancellationToken);
+            }
+
+            if (BlockInFetch)
+            {
+                Block(new Words("Sign in again.", "Přihlaste se znovu."), ProviderStatusCodes.NeedsSignIn);
             }
 
             return Failure is { } failure
@@ -340,5 +421,36 @@ public sealed class TestCarPage : ComponentBase
     {
         builder.OpenComponent<CarFrame>(0);
         builder.CloseComponent();
+    }
+}
+
+/// <summary>A logger that keeps what it is told.</summary>
+public sealed class ListLogger<T> : Microsoft.Extensions.Logging.ILogger<T>
+{
+    private readonly Lock _gate = new();
+    private readonly List<(Microsoft.Extensions.Logging.LogLevel Level, string Message)> _entries = [];
+
+    public IReadOnlyList<(Microsoft.Extensions.Logging.LogLevel Level, string Message)> Entries
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _entries];
+            }
+        }
+    }
+
+    public IDisposable? BeginScope<TState>(TState state)
+        where TState : notnull => null;
+
+    public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+    public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    {
+        lock (_gate)
+        {
+            _entries.Add((logLevel, formatter(state, exception)));
+        }
     }
 }

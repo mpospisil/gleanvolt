@@ -20,8 +20,13 @@ reporting; those move into a package every car plugin shares, on the host #472 m
   - `CarPoller`: a read at start, then `NextDelay` (5 min while a session is open or the car charges, 15 otherwise,
     never while blocked), at once on a session opening, `Wake()` or `Resume()`. It publishes through the SDK when
     attached, and reads only when not.
-  - `CarPollOptions`, bound from `<Section>`; `CarPluginHost.CreateBuilder<TCar>` / `Build` on `PluginWebHost`, with
-    `PluginStatusReporter<VehicleWelcome>`.
+  - `CarPollOptions`, bound from `<Section>` and refused at start when an interval is zero or negative (zero would
+    publish to Gleanvolt in a loop, a negative wait would stop the plugin); `CarPluginHost.CreateBuilder<TCar>` /
+    `Build` on `PluginWebHost`, with `PluginStatusReporter<VehicleWelcome>`.
+  - A block outlasts a read that was on its way when it was set, and a failure that follows a block doesn't replace it
+    with `unreachable`; otherwise the car would wait for the owner forever while it said it was fine.
+  - `CarPoller` logs each change of the car's status once (a warning with the code and the English text, and the
+    recovery), since a failing plugin on a headless machine is found in its log.
   - `CarFrame`, the page: the status, Gleanvolt's car and its session, the last reading (SOC, charge state, cable,
     range, time to full, capture and read times) with Read now, then the plugin's `ChildContent` and `Settings`.
     `CarText` holds its texts in English and Czech.

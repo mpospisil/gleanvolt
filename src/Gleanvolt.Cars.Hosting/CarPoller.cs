@@ -1,4 +1,5 @@
 using Gleanvolt.Providers.Client.Vehicle;
+using Gleanvolt.Providers.Contracts;
 using Gleanvolt.Providers.Contracts.Vehicle;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -19,6 +20,7 @@ public sealed class CarPoller : BackgroundService
     private readonly ILogger<CarPoller> _logger;
     private readonly Lock _gate = new();
     private TaskCompletionSource _wake = NewWake();
+    private ProviderStatus? _logged;
 
     public CarPoller(VehicleProviderConnection connection, PluginCar car, TimeProvider time, ILogger<CarPoller> logger)
     {
@@ -32,6 +34,7 @@ public sealed class CarPoller : BackgroundService
         // Here rather than when the loop starts: the first welcome, and its session, can come before it.
         connection.SessionChanged += OnSessionChanged;
         car.Resumed += Wake;
+        car.Changed += LogStatus;
     }
 
     /// <summary>Reads now, rather than at the next tick.</summary>
@@ -116,6 +119,37 @@ public sealed class CarPoller : BackgroundService
         if (opened)
         {
             Wake();
+        }
+    }
+
+    // The log is where a failure on a headless machine is found: each change of the car's status, once, and the
+    // recovery after one. Unchanged statuses and the first healthy read say nothing.
+    private void LogStatus()
+    {
+        if (_car.Status is not { } status)
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            var previous = _logged;
+            if (previous is not null && previous.Healthy == status.Healthy && previous.Code == status.Code && previous.Message == status.Message)
+            {
+                return;
+            }
+
+            _logged = status;
+            if (!status.Healthy)
+            {
+                _logger.LogWarning(
+                    "Not reading the car ({Code}{Owner}): {Message}",
+                    status.Code ?? "problem", status.NeedsOwner ? ", the owner is needed on the plugin's page" : string.Empty, status.Message);
+            }
+            else if (previous is { Healthy: false })
+            {
+                _logger.LogInformation("Reading the car again.");
+            }
         }
     }
 
