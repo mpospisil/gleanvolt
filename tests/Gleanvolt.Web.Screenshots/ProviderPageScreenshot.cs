@@ -27,7 +27,7 @@ internal static class ProviderPageScreenshot
 {
     /// <summary>
     /// A car plugin's own page (#410, #474): the car layer's shared page, as the Volkswagen plugin in gleanvolt-cars
-    /// shows it, with a reading taken two minutes ago and a sign-in section of the plugin's own. The plugin itself is
+    /// shows it, with a reading the car took nine minutes ago, read just now, and a sign-in section of the plugin's own. The plugin itself is
     /// not in this repository, so its section is drawn here in its shape.
     /// </summary>
     public static string CarPlugin(DateTimeOffset now)
@@ -71,12 +71,14 @@ internal static class ProviderPageScreenshot
                 "<p class=\"muted\" id=\"not-connected\">[^<]*</p>",
                 $"<dl id=\"car\"><dt>{CarText.GleanvoltCar.En}</dt><dd>Rosie (Volkswagen ID.4)</dd></dl><p id=\"session\" class=\"muted\">{CarText.SessionClosed.En}</p>");
 
+            // The frame is shorter than the page: scrolled, as the owner would, to the car's reading and the sign-in
+            // under it, which is what the manual's step is about.
             var css = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Gleanvolt.Plugins.Hosting", "wwwroot", "app.css"));
             return $"""
                 <!DOCTYPE html>
                 <html lang="en" data-theme="light">
                 <head><meta charset="utf-8" /><style>{css}</style></head>
-                <body>{markup}</body>
+                <body onload="document.getElementById('reading').scrollIntoView()">{markup}</body>
                 </html>
                 """;
         }

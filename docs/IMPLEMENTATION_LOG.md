@@ -40,6 +40,9 @@ fix ships without a Gleanvolt release and more cars can be added there.
 - A car blocked in its constructor (no account yet) isn't logged, because `CarPoller` subscribes afterwards. This is a
   follow-up for the SDK.
 - The new repository's CI is red on restore until preview.6 is on nuget.org.
+- The car layer's page puts Gleanvolt's car and a longer reading above the plugin's own sections, so in the Car page's
+  fixed-height frame the sign-in fell below the fold. The picture's document scrolls itself to the reading, as an owner
+  would, so the reading and the sign-in are both in it.
 
 **Not done here.** The Pi still runs its hand-built Volkswagen container. Swapping it for the gleanvolt-cars build
 waits for the owner's word. Nothing is released: shipping is #476.
