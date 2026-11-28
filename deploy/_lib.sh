@@ -38,6 +38,23 @@ env_value() {
         || true
 }
 
+# built_in_car_plugin: reads an overrides file (data/pv-system.json, nested as appsettings.json is) on stdin and
+# prints the car plugin replacing the built-in feed it switches on (#477), or nothing. The Website, Skoda and
+# DataAct sections hold no nested objects, so the section a line is in is the last one opened.
+built_in_car_plugin() {
+    awk '
+        /"Website"[[:space:]]*:[[:space:]]*\{/ { section = "volkswagen"; next }
+        /"Skoda"[[:space:]]*:[[:space:]]*\{/   { section = "skoda"; next }
+        /"DataAct"[[:space:]]*:[[:space:]]*\{/ { section = "vwgroup"; next }
+        /\}/ { section = "" }
+        section != "" && /"Enabled"[[:space:]]*:[[:space:]]*"?[Tt]rue"?/ { found[section] = 1 }
+        END {
+            if ("volkswagen" in found) print "volkswagen"
+            else if ("skoda" in found) print "skoda"
+            else if ("vwgroup" in found) print "vwgroup"
+        }'
+}
+
 # ensure_owned_dir <subdir> <mode> <consequence>
 #
 # Makes sure $REMOTE_DIR/<subdir> exists and uid 1654, the images' non-root user, can write to it,
@@ -238,6 +255,44 @@ replaced the built-in driver this .env ran on. Add it to GLEANVOLT_PLUGINS to sa
     GLEANVOLT_PLUGINS=$(echo $enabled $replacing | tr ' ' ',')
 EOF
             enabled="$enabled $replacing"
+        fi
+    fi
+
+    # An .env or a Car page from before the built-in car feeds were removed (#477): run the plugin that replaced the
+    # one switched on, and say so. Read from .env, then from the overrides file the Car page writes (owned by the
+    # image's user, so read through a throwaway container, as ensure_owned_dir does). Nothing is removed.
+    if [ -z "$car_plugins" ]; then
+        local car_replacing=""
+        if [ "$(env_value VW_WEBSITE_ENABLED)" = true ]; then car_replacing=volkswagen
+        elif [ "$(env_value SKODA_ENABLED)" = true ]; then car_replacing=skoda
+        elif [ "$(env_value VW_ENABLED)" = true ]; then car_replacing=vwgroup
+        else
+            car_replacing=$(ssh_pi "test -f '$REMOTE_DIR/data/pv-system.json' && docker run --rm -v '$REMOTE_DIR/data:/data:ro' alpine \
+                    cat /data/pv-system.json" 2>/dev/null | built_in_car_plugin || true)
+        fi
+
+        if [ -n "$car_replacing" ]; then
+            if ssh_pi "docker container inspect gleanvolt-$car_replacing >/dev/null 2>&1"; then
+                # A plugin started by hand under its own name (the Pi's gleanvolt-volkswagen) holds the port.
+                say "Not starting the $car_replacing car plugin: a container named gleanvolt-$car_replacing runs already"
+                cat <<EOF
+Gleanvolt no longer reads the car itself (#477), and the $car_replacing plugin replaces the built-in feed this
+installation used. A container named gleanvolt-$car_replacing, started outside compose, already uses its port. Stop
+it, keep its data (copy its volume into $REMOTE_DIR/plugins/$car_replacing), then add the plugin to GLEANVOLT_PLUGINS:
+
+    GLEANVOLT_PLUGINS=$(echo $enabled $car_replacing | tr ' ' ',')
+EOF
+            else
+                say "Running the $car_replacing car plugin: Gleanvolt no longer reads the car itself"
+                cat <<EOF
+A built-in car feed is switched on, and GLEANVOLT_PLUGINS names no car plugin. The $car_replacing plugin replaced
+it: accept it under Settings -> Plugins, then enter the password or API key on its page. Add it to
+GLEANVOLT_PLUGINS to say so yourself:
+
+    GLEANVOLT_PLUGINS=$(echo $enabled $car_replacing | tr ' ' ',')
+EOF
+                enabled="$enabled $car_replacing"
+            fi
         fi
     fi
 

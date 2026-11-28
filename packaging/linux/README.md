@@ -106,17 +106,16 @@ can be set here ahead of time, as a hash:
 |---|---|
 | `/opt/gleanvolt/` | the program: replaced on every upgrade, never edit it |
 | `/etc/gleanvolt/gleanvolt.env` | your settings |
-| `/var/lib/gleanvolt/` | the data: `sessions.db` (charging-session history), `energy.db`, what was saved on Settings (`pv-system.json`, `tariff.json`), vehicle sign-in files. Back this up — **carefully**, see below |
+| `/var/lib/gleanvolt/` | the data: `sessions.db` (charging-session history), `energy.db`, what was saved on Settings (`pv-system.json`, `tariff.json`), the secret store. Back this up — **carefully**, see below |
 | `/var/log/gleanvolt/` | the log files, one per day, kept 14 days |
 | `journalctl -u gleanvolt` | the same log in the system journal. On a Raspberry Pi the journal is lost at reboot; the files above are not |
 
 ### The data directory holds secrets
 
-`/var/lib/gleanvolt` (owner `gleanvolt`, mode `0750`) holds the car's sign-in — a volkswagen.de
-session, a MyŠkoda API key — and the keys entered in the web UI, each file mode `0600`. **That is a file
-permission, not encryption**: a copy of the directory hands over the car. Back it up onto an encrypted
-volume, never into a shared drive or an issue attachment. **Sign out** on the web UI's Car page deletes
-the stored car sign-in. See
+`/var/lib/gleanvolt` (owner `gleanvolt`, mode `0750`) holds the keys and passwords entered in the web UI,
+each file mode `0600`. **That is a file permission, not encryption**: a copy of the directory hands over
+those accounts. Back it up onto an encrypted volume, never into a shared drive or an issue attachment. The
+car's account is a car plugin's, kept in the plugin's own directory (#477). See
 [The data directory holds secrets](../../docs/CONFIGURATION.md#the-data-directory-holds-secrets-the-secrets-section).
 
 ## Setting it up from the command line

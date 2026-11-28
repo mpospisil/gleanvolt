@@ -109,8 +109,7 @@ before it could reach WinGet.
 **`PortableCommandAlias: gleanvolt`.** What the command is called once WinGet has put it on `PATH`.
 
 **"Writes nothing outside its own directory" is also a warning.** The controller keeps its state in
-`data\` beside the executable, and two of those files are passwords in all but name: a live
-volkswagen.de session and the MyŠkoda API key
+`data\` beside the executable, and its secret store holds passwords and keys entered in the web UI
 ([issue #215](https://github.com/mpospisil/gleanvolt/issues/215)). Because that directory sits inside
 the package directory — which an upgrade may replace and which people zip up and copy around
 wholesale — the Windows build seals them with DPAPI at `CurrentUser` scope, and `/health` says so:

@@ -37,8 +37,8 @@ Every mode stops by itself when the car is full or unplugged. The service always
   hours (Czech HDO) and let `Fast` and `Solar + grid` wait for them.
 - **[Web UI](docs/WEB_UI.md)** — live figures, the charging plan, the forecast, every control, and the
   history of every charge and every 15 minutes of your site. On by default, behind a password.
-- **[The car's own battery level](docs/VEHICLE.md)** — from volkswagen.de, MyŠkoda, the VW Group EU
-  Data Act portal, or any car Home Assistant can see, so a target can be a percentage.
+- **[The car's own battery level](docs/VEHICLE.md)** — from a car plugin (Volkswagen, MyŠkoda, the VW Group
+  EU Data Act portal, or your own), or any car Home Assistant can see, so a target can be a percentage.
 - **[HTTP API](docs/HTTP_API.md)** — everything the web UI can do, described by OpenAPI, for scripts
   and for an MCP server that lets an AI assistant read and drive it.
 - **[Home Assistant](docs/HOME_ASSISTANT.md)** (optional) — a device with a button per mode and a

@@ -240,6 +240,11 @@ was in before. Read the flag, not the status code.
 Most changes only add: a new field, a new endpoint. These changed or removed something a client may
 read, newest first.
 
+- **#477:** `vehicleSource.source` in `GET /status` is only ever `external` now (or `vehicleSource` is
+  `null`): the built-in car feeds are gone, and with them `vw-website`, `skoda` and `vw-group`. An installation
+  that used one reads its car from the matching car plugin. `vehicleSource.name` is the plugin's name
+  ("Volkswagen", "MyŠkoda", "VW Group Data Act") rather than "volkswagen.de" or "MyŠkoda". `health` is the
+  plugin's: `needsOwner` when the plugin says its login needs you.
 - **#425:** `weatherSource` in `GET /health` no longer says `openWeather`: the built-in OpenWeatherMap
   integration is gone, and an installation that used it reports `external`, with the weather from the
   OpenWeather plugin. A client that matched on `openWeather` should treat `external` as "on".

@@ -3,7 +3,7 @@
 Which cars Gleanvolt can charge, and which it can read. Those are **two different questions**, and
 the answer to the first does not depend on the second.
 
-> **Last reviewed 2026-09-16.** The charging half is a fact about the charging standard and changes
+> **Last reviewed 2026-11-28.** The charging half is a fact about the charging standard and changes
 > slowly. The reading half depends on manufacturers' cloud services, which change without notice —
 > VW closed its app API to third parties in May 2026. Treat every row marked *not tested* as a
 > pointer, not a promise.
@@ -13,9 +13,9 @@ the answer to the first does not depend on the second.
 | Your car | Can Gleanvolt charge it? | Can Gleanvolt read its battery? | Tested |
 |---|---|---|---|
 | **Any EV or plug-in hybrid with a Type 2 AC inlet** | Yes — the charger drives it, the car needs no account | Not by itself; see the rows below | — |
-| **Volkswagen, Audi, Škoda, SEAT, Cupra, Bentley** | Yes | **Built in**: the VW Group EU Data Act portal | VW ID.4 Pro |
-| **Volkswagen** (a car in myVolkswagen) | Yes | **Built in**: volkswagen.de, live while charging | VW ID.4 Pro |
-| **Škoda** (a car in MySkoda) | Yes | **Built in**: the MyŠkoda Public API, live | **Not yet** — built from the published spec |
+| **Volkswagen, Audi, Škoda, SEAT, Cupra, Bentley** | Yes | **The vwgroup plugin**: the VW Group EU Data Act portal | VW ID.4 Pro (as a built-in feed) |
+| **Volkswagen** (a car in myVolkswagen) | Yes | **The volkswagen plugin**: volkswagen.de, live while charging | VW ID.4 Pro |
+| **Škoda** (a car in MySkoda) | Yes | **The skoda plugin**: the MyŠkoda Public API, live | **Not yet** — built from the published spec |
 | **Any other brand** | Yes | Through an [external provider](#route-d--write-a-provider) or your own MQTT topic; otherwise targets are given in kWh instead of % | — |
 
 The reference installation charges a **VW ID.4 Pro** (77 kWh usable, three-phase, 16 A). It is the
@@ -81,31 +81,32 @@ Reading the car adds three things and removes none:
 charger delivers it. Without a feed, every kWh target, every solar mode and every fast charge works
 unchanged.
 
-There are three routes built into Gleanvolt, and a fourth for any other car: a provider of your own.
+Gleanvolt reads no car itself: each route is a car plugin from
+[gleanvolt-cars](https://github.com/mpospisil/gleanvolt-cars), run beside it with **A plugin** chosen on `/car`. Until
+#477 the first three were built into Gleanvolt; the plugins carry over what those feeds learnt. There are three of
+ours, and a fourth for any other car: a provider of your own.
 
-### Route A — VW Group EU Data Act portal (built in)
+### Route A — VW Group EU Data Act portal (the `vwgroup` plugin)
 
-The EU Data Act obliges the manufacturer to hand the owner their car's data, free. Gleanvolt signs in
+The EU Data Act obliges the manufacturer to hand the owner their car's data, free. The plugin signs in
 to VW Group's statutory portal as the owner and reads it every fifteen minutes.
 
 | | |
 |---|---|
-| **Brands** | Volkswagen (passenger cars and commercial vehicles), Audi, Škoda, SEAT, Cupra, Bentley — `VW_BRAND=vw`, `audi`, `skoda`, `seat`, `cupra`, `bentley` |
+| **Brands** | Volkswagen (passenger cars and commercial vehicles), Audi, Škoda, SEAT, Cupra, Bentley |
 | **Cars** | Any connected car the portal lists for your account. For Gleanvolt that means EVs and plug-in hybrids: a combustion car has no battery to report |
 | **Reads** | State of charge, range, charge state, charge time remaining, the car's own target SOC |
 | **Does not read** | Plug state — never, on 568 of 568 reads on the reference car |
 | **Freshness** | **Hours behind the car**: 1 h 48 m to 7 h 16 m measured. Good for planning, too late to follow a charge |
 | **Needs you** | A one-off consent in a browser, and a continuous data request set up in the portal |
-| **Tested** | VW ID.4 Pro only. Field names come from a real ID.4 (MEB) download; the flat layout older plug-in hybrids use is from a description, not a capture |
-| **Setup** | **`/car` → the brand** (the list is the client's own, so there is no GUID to find), then [VW_PORTAL_SETUP.md](VW_PORTAL_SETUP.md) for the browser steps the portal needs first |
+| **Tested** | As the built-in feed, on a VW ID.4 Pro only; the plugin is a port, not yet tried on a car. Field names come from a real ID.4 (MEB) download; the flat layout older plug-in hybrids use is from a description, not a capture |
+| **Setup** | Run the [vwgroup plugin](https://github.com/mpospisil/gleanvolt-cars/tree/main/vwgroup); its page takes the brand, the account and the VIN, and its README has the browser steps the portal needs first |
 
-A brand missing from the table, or one whose sign-in id has changed, can still be used with
-`VW_CLIENT_ID` — on `/car` it is behind the disclosure under the brand list, and in `.env` it is the
-same key; see the setup guide. If battery or range comes back blank on a model other than an
-ID.4, the **Diagnostics** disclosure on `/car` lists the field names it did not recognise, and those are what
-`VwGroupFieldNames` is missing.
+A brand missing from the plugin's table, or one whose sign-in id has changed, can still be used with a client
+id; the plugin's README says how. If battery or range comes back blank on a model other than an ID.4, the
+plugin's own check lists the field names it did not recognise.
 
-### Route B — volkswagen.de (built in)
+### Route B — volkswagen.de (the `volkswagen` plugin)
 
 The live source, as the portal is the batch one. It reads the charging status the myVolkswagen pages
 on volkswagen.de show, and it asks **only while a charging session is open**.
@@ -117,12 +118,11 @@ on volkswagen.de show, and it asks **only while a charging session is open**.
 | **Account** | A Czech Volkswagen ID works on volkswagen.de; other countries' accounts are expected to, and are not tested |
 | **Reads** | State of charge, range, charge state, charging power, **plug state** |
 | **Freshness** | About 20 seconds behind the car |
-| **Needs you** | An email one-time code on every cold sign-in, entered on **`/car` → Account → Sign in**. The remembered session survives restarts |
-| **Setup** | **`/car` → Volkswagen**: VW ID, password, VIN — or [`Vehicle:Website`](VEHICLE.md#volkswagende-vehiclewebsite) in the README |
+| **Needs you** | An email one-time code on every cold sign-in, entered on the plugin's page. The remembered session survives restarts |
+| **Setup** | Run the [volkswagen plugin](https://github.com/mpospisil/gleanvolt-cars/tree/main/volkswagen); its page takes the VW ID, the password and the VIN |
 
-Routes A and B complement each other and run side by side on the reference install: the portal carries
-the target SOC and time remaining, the website carries plug state and a curve while charging, and the
-freshest reading wins.
+Routes A and B complemented each other as built-in feeds on the reference install. As plugins they don't run
+together: one car plugin reads the car, and the volkswagen plugin is the better one for a Volkswagen.
 
 > **This is not the app API that closed.** In May 2026 VW shut third-party access to its "Brand App
 > Interface" for the ID. family across VW, Audi, Cupra and Škoda
@@ -131,7 +131,7 @@ freshest reading wins.
 > instead. It is still undocumented, so VW can change it without notice; when it does, Route A is the
 > fallback and nothing about charging is affected.
 
-### Route C — MyŠkoda Public API (built in, not yet verified on a car)
+### Route C — MyŠkoda Public API (the `skoda` plugin, not yet verified on a car)
 
 The live source for a Škoda, in Route B's place. Škoda published a documented REST API for owners on
 2026-08-31 (MySkoda app 8.16): an [OpenAPI spec](https://public.api.connect.skoda-auto.cz/v3/api-docs),
@@ -139,34 +139,29 @@ typed problem responses and rate-limit headers.
 
 | | |
 |---|---|
-| **Brands** | Škoda only. Nothing says the other VW Group brands will follow; `Vehicle:Skoda:BaseUrl` is there to try it if one does |
+| **Brands** | Škoda only. Nothing says the other VW Group brands will follow |
 | **Cars** | A connected Škoda EV or plug-in hybrid in your MySkoda account |
 | **Reads** | State of charge, range, charge state, charge time remaining, **plug state** (derived: `CONNECT_CABLE` means unplugged) |
 | **Freshness** | As fresh as Škoda's cloud: every 15 minutes idle, every 5 while charging. How often the car itself reports while charging is not yet known |
-| **Needs you** | An API key created in the MySkoda app, pasted once under **`/car` → Account**. It expires; renewing is pasting a new one |
+| **Needs you** | An API key created in the MySkoda app, pasted once on the plugin's page. It expires; renewing is pasting a new one |
 | **Quota** | 20 requests an hour per VIN, shared with *Ask the car* |
 | **Tested** | **No.** Built from the published spec with spec-built fixtures; nobody has run it against a Škoda yet. Reports in [issue #193](https://github.com/mpospisil/gleanvolt/issues/193) are very welcome |
-| **Setup** | **`/car` → Škoda**: the VIN. The key is pasted under **Account** on the same page, not in the form. Or [`Vehicle:Skoda`](VEHICLE.md#myškoda-vehicleskoda) in the README |
+| **Setup** | Run the [skoda plugin](https://github.com/mpospisil/gleanvolt-cars/tree/main/skoda); its page takes the VIN and the key |
 
-Route C and Route B cannot run together — they read two different cars, and an installation has one.
-Picking a manufacturer on `/car` makes that unarrangeable: the choice disables whichever feed it
-replaces in the same save.
-Route A (`VW_BRAND=skoda`) may run beside Route C, and the freshest reading wins. The key Route C uses
+One car plugin reads the car, so Routes A, B and C never run together. The key Route C uses
 is scoped to the cars it names, expires, and is revocable in the app — a much smaller secret than a
 brand password — and it clears Gleanvolt's bar below more comfortably than Route B: a documented
 interface the manufacturer published for exactly this use.
 
 **Prefer the weakest credential that does the job, because whichever one you choose ends up on the
-Pi.** All three routes leave something bearer-equivalent in the data directory — Route C an expiring,
+Pi.** All three routes leave something bearer-equivalent in the plugin's data directory — Route C an expiring,
 revocable, VIN-scoped key; Route B a live volkswagen.de session; Route A the portal credentials — and
 what protects it there is a file mode on Linux and DPAPI on a Windows install, never encryption the
-controller could claim with a straight face. That is the whole argument for the ranking above, and
-[the data directory holds secrets](CONFIGURATION.md#the-data-directory-holds-secrets-the-secrets-section)
-is where it is written down.
+controller could claim with a straight face. That is the whole argument for the ranking above.
 
-### Why only VW Group is built in
+### Why only VW Group has plugins of ours
 
-Gleanvolt's rule is that a manufacturer earns a built-in client only through a **documented statutory
+Gleanvolt's rule is that a manufacturer earns a plugin of ours only through a **documented statutory
 interface**: the owner's own data by law, free, and publicly accountable when it breaks. An
 undocumented app API can disappear in a release note, as VW's did.
 
@@ -177,14 +172,14 @@ Most manufacturers' EU Data Act offerings do not yet meet that bar. What owners 
 |---|---|---|
 | VW Group | Portal, scheduled JSON/CSV deliveries | **Yes — Route A** |
 | Škoda (beyond the Data Act) | A documented owner API with keys, since 2026-08 | **Yes — Route C** |
-| BMW, MINI | CarData: API and a real-time MQTT stream, free | **Yes** — the strongest candidate for a second built-in client |
+| BMW, MINI | CarData: API and a real-time MQTT stream, free | **Yes** — the strongest candidate for the next car plugin |
 | Tesla | The existing Fleet API, with a free tier | Possibly, but it wakes the car |
 | Hyundai, Kia, Genesis | A file sent by email on request | No |
 | Stellantis (Peugeot, Citroën, Opel, Fiat, Jeep, DS) | A ticket in a privacy portal | No |
 | Renault | A paid commercial data service | No |
 | Porsche, Volvo, Mazda | Manual download requests | No |
 
-Until one of those becomes a continuous feed, those cars are charged but not read by Gleanvolt itself.
+Until one of those becomes a continuous feed, those cars are charged but not read by a plugin of ours.
 Route D below reads them anyway, from outside.
 
 ### Route D — write a provider

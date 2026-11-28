@@ -4,6 +4,47 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-28 — The built-in car feeds are removed; a start moves an installation to its plugin once (#477)
+
+**Found.** With the three car plugins shipped and the built-ins deprecated (#476), the built-ins were about a third of
+the vehicle code: their clients, sign-ins, stores and options, the Car page's Account and Diagnostics, the editor's
+secrets and cross-feed rules, and 26 test files. An installation that used one has its flag in `.env`
+(`VW_WEBSITE_ENABLED`, `SKODA_ENABLED`, `VW_ENABLED`) or in the overrides file, and its password, session or key in
+Gleanvolt's secret store. The Pi's `.env` has both `VW_WEBSITE_ENABLED` and `VW_ENABLED` on, and its Volkswagen plugin
+is a hand-run container named `gleanvolt-volkswagen` on port 8095.
+
+**Decided.**
+- **Gone from Gleanvolt:** `Infrastructure/Vehicles/{VwWebsite,Skoda,VwGroup}`, `IVehicleAccountSignIn`,
+  `IVehiclePortalReader` and their models, `VehicleAccount.razor`, `PortalDiagnostics.razor`, the built-in keys in
+  `EvSettingKeys`, `VehicleFeed.{Volkswagen,Skoda,DataAct}`, the Car page's secrets, and the password configuration
+  source (`VehicleAccountSecret`, now `SecretStoreLocation` with only the directory and the store).
+- **The Car page offers *A plugin*, *A feed I publish myself* or *Another manufacturer — charge only*.** The owner's
+  own MQTT topic stays a choice, as #477 says it stays: it is something the owner publishes, not a manufacturer feed.
+- **The move happens once** (`RetiredCarFeed`, mirroring `WeatherSourceSelection`). A start that finds a built-in flag
+  on and no `Vehicle:RetiredFeed` writes `Vehicle:External:Enabled`, `Vehicle:RetiredFeed` (the plugin's id) and
+  `Vehicle:RetiredFeedNotice` to the overrides file, and warns. The composition root reads the same rule, so that
+  first start already runs the plugin's feed. `Vehicle:RetiredFeed` is never removed, so an owner who later picks
+  another feed is not moved back by a `.env` that still says so.
+- **The notice stays until a car plugin connects** (`RetiredCarFeedWatcher` on the registry), across restarts.
+- **The old flags are ignored with a warning at every start, not refused.** Compose keeps passing the three flags to
+  the controller (and nothing else of the built-ins), because the move reads them and the deploy script runs the
+  plugin from them. Passwords no longer reach the controller's environment.
+- **The built-ins' secrets are deleted at every start that finds one**, whatever feed is chosen: `vehicle-account-password`,
+  `vw-website-session`, `skoda-api-key`. Never handed to a plugin.
+- **A setup document with any key of the three sections is refused,** naming the plugin.
+- **The deploy script adds the plugin** for a flag on in `.env` or the overrides file when `GLEANVOLT_PLUGINS` names no
+  car plugin, as #445 did for chargers. It skips it, saying so, while a container named `gleanvolt-<plugin>` that
+  compose didn't start exists, so the Pi's hand-run plugin and the compose one never fight over port 8095.
+
+**Consequences accepted.**
+- An owner of a built-in loses car readings from the upgrade until the plugin runs and has the password again. The
+  notice, the log, the deploy script and the manual all say so.
+- `Vehicle:OnDemandOnly` changes nothing now: no remaining feed is polled. It stays for a polled feed later.
+- `vehicleSource.source` in `GET /status` is only ever `external`; listed under the API's breaking changes.
+- This must merge after the release that carries #476 is cut, so the deprecation ships on its own first.
+
+---
+
 ## 2026-11-28 — The car plugins ship with compose; the built-in feeds are deprecated, not switched (#476)
 
 **Found.** The three car plugins were released from gleanvolt-cars (volkswagen, skoda and vwgroup, 1.0.0), and the

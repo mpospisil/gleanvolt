@@ -133,14 +133,11 @@ plugin's address.
 
 ## The data directory holds secrets (the `Secrets` section)
 
-**Whoever can read the data directory can read — and charge — your car.** Besides the databases, it
-holds:
-
-| File | What it holds | What it lets someone do |
-|---|---|---|
-| `vw-website-session.json` | a live volkswagen.de session | read the car as you, with no password and no emailed code |
-| `skoda-api-key.json` | the MyŠkoda Public API key | read the car, and start and stop charging |
-| the secret store's other entries | keys and passwords entered in the web UI (Solcast, MQTT, the car) | use those accounts |
+**Whoever can read the data directory can use the accounts it holds.** Besides the databases, it holds the
+secret store: keys and passwords entered in the web UI (the web password's recovery, Solcast, MQTT, the API
+keys, the provider token). The car's account is not among them since #477: a car plugin keeps it in its own
+data directory, which deserves the same care. The built-in feeds' `vw-website-session.json`,
+`skoda-api-key.json` and `vehicle-account-password` are deleted at the first start that finds them.
 
 ```jsonc
 "Secrets": {
@@ -162,7 +159,7 @@ it must be able to read its own secrets. The startup log and **Settings → Syst
 is in use. Against a stolen SD card, use full-disk encryption on the host.
 
 **Back the directory up accordingly**: onto an encrypted volume, and never into an issue attachment or a
-shared drive. **Sign out** on the [Car](WEB_UI.md#car) page deletes the stored car credentials.
+shared drive.
 
 A secret that can't be read back (a truncated file, or a Windows profile that no longer exists) is
 reported as *sign in again*.

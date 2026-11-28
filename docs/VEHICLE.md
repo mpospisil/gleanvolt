@@ -11,7 +11,7 @@ Two things are configured separately:
   how a charge is delivered.
 
 **Set both on the [Car page](WEB_UI.md#car) of the web UI** (or in the setup wizard's **Car** step):
-choose the manufacturer and it shows the fields that feed needs. That is the recommended way. The
+choose what reads the car and it shows the fields that feed needs. That is the recommended way. The
 configuration keys below are what that page writes, given for reference and as an optional
 alternative.
 
@@ -83,21 +83,15 @@ installation's maximum could never charge, so it is **refused at startup**, nami
 
 ## Where the car's state of charge comes from
 
-**One car, one feed.**
+**One car, one feed.** Gleanvolt reads no car itself: a manufacturer's account is read by a car plugin.
 
 | Feed | For | Freshness | Section |
 |---|---|---|---|
-| **volkswagen.de** | Volkswagen | ~20 s; plug state; live while charging | [`Vehicle:Website`](#volkswagende-vehiclewebsite) |
-| **MyŠkoda Public API** | Škoda | 5–15 min; plug state | [`Vehicle:Skoda`](#myškoda-vehicleskoda) |
-| **EU Data Act portal** | Audi, SEAT, Cupra, Bentley, VW commercial (and any VW Group car) | hours behind; no plug state | [`Vehicle:DataAct`](#eu-data-act-portal-vehicledataact) |
-| **A plugin** | any car a program can read | whenever the plugin publishes | [`Vehicle:External`](#a-plugin-vehicleexternal) |
+| **A plugin** | any car a program can read; gleanvolt-cars has Volkswagen, Škoda and the VW Group Data Act portal | whenever the plugin publishes | [`Vehicle:External`](#a-plugin-vehicleexternal) |
 | **Your own MQTT topic** | any car Home Assistant can see | whatever publishes it | [`Vehicle`](#your-own-feed-over-mqtt-the-vehicle-section) |
 | **None** | any car | — | targets in kWh only |
 
-- `Vehicle:Website` and `Vehicle:Skoda` both enabled **stops startup**: an installation has one car.
-  So does `Vehicle:External` beside either of them.
-- With any of them configured, **the Data Act portal is not started** (one log line says so).
-- The Data Act portal and your own MQTT topic *can* both run; the most recent reading wins.
+A plugin and your own MQTT topic *can* both run; the most recent reading wins.
 
 **The feed is advisory.** Nothing that writes to the charger or the inverter reads it, so a feed that
 is stale, failing or absent changes nothing about how a charge is driven. A reading older than
@@ -109,105 +103,6 @@ The feed's health is shown on the Overview's vehicle card, as a band across ever
 you, on **Settings → System**, and as the [**Car feed**](HOME_ASSISTANT.md#what-each-entity-means)
 entity in Home Assistant: `Ok`, `Degraded` (it retries and clears itself) or `NeedsOwner` (it has
 stopped and waits for you).
-
-### volkswagen.de (`Vehicle:Website`)
-
-On the **Car** page: choose **Volkswagen**, and enter the VW ID, the password and the VIN.
-
-```jsonc
-"Vehicle": { "Website": { "Enabled": true, "Vin": "WVGZZZ…", "PollInterval": "00:05:00", "IdlePollInterval": "00:15:00" } }
-```
-
-| Setting | Default | |
-|---|---|---|
-| `PollInterval` | `00:05:00` | While a charging session is open (`VW_WEBSITE_POLL_INTERVAL`) |
-| `IdlePollInterval` | `00:15:00` | Otherwise (`VW_WEBSITE_IDLE_POLL_INTERVAL`) |
-
-**Sign in on the Car page, under Account.** A first sign-in always asks for a one-time code emailed to
-the account owner, so it is done by hand: **Car → Account → Sign in**, then the code. Nothing signs in
-by itself.
-
-**Any failure stops the feed until you sign in again** — a code wanted, an unexpected answer, or no
-answer. It does not retry on a clock, because repeated sign-ins are how accounts get locked. Sign in
-again on the Car page and the feed resumes within a minute, without a restart. A charge in progress is
-unaffected.
-
-**The session is kept in the data directory** as `vw-website-session.json`, which is why a restart
-does not cost another code. **Treat it as a password**: anyone holding it is signed in as you. It is
-protected by [the secret store](CONFIGURATION.md#the-data-directory-holds-secrets-the-secrets-section).
-
-The Data Act portal is the only source of the car's own **target SOC**; with volkswagen.de it is
-unknown, and nothing plans on it.
-
-### MyŠkoda (`Vehicle:Skoda`)
-
-On the **Car** page: choose **Škoda** and enter the VIN; then paste an API key under **Account**.
-
-```jsonc
-"Vehicle": {
-  "Skoda": { "Enabled": true, "Vin": "TMBJ…" }    // SKODA_ENABLED / SKODA_VIN in deploy/.env
-}
-```
-
-| Setting | Default | |
-|---|---|---|
-| `Enabled`, `Vin` | off, empty | Both required. **This section chooses the feed** — `Ev:Vehicles[].Make` never does |
-| `ChargingPollInterval` | `00:05:00` | While a charge is running |
-| `IdlePollInterval` | `00:15:00` | Between charges |
-| `BaseUrl`, `SourceId` | Škoda's API, `skoda` | For Škoda's test environment |
-
-It uses the [MyŠkoda Public API](https://public.api.connect.skoda-auto.cz/docs). **It is built from the
-published spec and not yet verified on a car** — see
-[issue #193](https://github.com/mpospisil/gleanvolt/issues/193).
-
-**The API key.** Create one for this car in the MySkoda app and paste it under **Account** on the Car
-page. One request checks the key and the VIN; the page then says *Key valid until … · your car's name*
-and the feed starts without a restart. Problems with the key or the VIN each get their own message and
-nothing is stored. From a week before the key expires the feed is *Degraded* and says when; renewing
-is pasting a new key. **Sign out** deletes the stored key, but the key keeps working at Škoda until you
-revoke it in the app.
-
-**The key can also start and stop charging**, so it is treated as a password: never logged or shown,
-kept in [the secret store](CONFIGURATION.md#the-data-directory-holds-secrets-the-secrets-section) as
-`skoda-api-key.json`. Gleanvolt only reads with it.
-
-**Twenty requests an hour per VIN**, shared with *Ask the car* and the key check. The feed uses four an
-hour idle and twelve while charging, pauses when only three are left, and honours `Retry-After`.
-
-### EU Data Act portal (`Vehicle:DataAct`)
-
-For a VW Group car with no live feed above. On the **Car** page: choose the brand (Audi, SEAT, Cupra,
-Bentley, VW commercial), and enter the VW ID, its password and the VIN. Setting up the portal itself —
-the account, the consent and the continuous data request — is in [VW_PORTAL_SETUP.md](VW_PORTAL_SETUP.md).
-
-```jsonc
-"Vehicle": {
-  "DataAct": {
-    "Enabled": false          // read the portal on a clock, as opposed to only when the button is pressed
-  }
-}
-```
-
-Optionally, in configuration: `Vehicle__DataAct__Username`, `__Password`, `__Brand` and, with more
-than one car on the account, `__Vin` — secrets, in `.env` or an environment variable (the shorter
-`VW_*` names work too). **The password is not read-only**: the same account unlocks and locates the car, and there is no
-scoped token instead.
-
-**Press *Ask the car* first, then switch the feed on.** The button on the Car page works as soon as the
-credentials are set and proves them; reading the portal on a clock waits for `Enabled`.
-
-- **It reads every fifteen minutes.** The portal publishes in batches at that rate; asking faster gains
-  nothing. Readings are typically **2–4 hours** behind the car.
-- **One reading may combine several deliveries.** The portal sends partial deliveries, so a read merges
-  up to four (`Vehicle:DataAct:MaxDatasetsPerRead`, or `VW_MAX_DATASETS`) until it has the battery,
-  range, charging state, plug and remaining time. The log says what a read is still missing. A reading
-  is dated by its **state of charge's** own capture time.
-- **It keeps one session** and signs in again only when the portal ends it.
-- **A failure you have to fix stops the feed**: a refused password, a consent screen, a one-time code,
-  a CAPTCHA, or no continuous data request. Fix it in a browser, check with *Ask the car*, and restart
-  the controller. While it is stopped, a warning is logged every six hours. Ordinary failures — a 5xx,
-  a timeout, an expired session, a delivery not filled yet — are *Degraded* and back off (to at most an
-  hour) and clear themselves.
 
 ### A plugin (`Vehicle:External`)
 
@@ -229,11 +124,27 @@ new tab* beside it, and only to someone signed in to Gleanvolt: the frame goes t
 adds a short-lived ticket the provider checks. How a provider does it is in
 [PROVIDERS.md](PROVIDERS.md#the-providers-own-page).
 
-**Volkswagen as a plugin.** The [Volkswagen plugin](https://github.com/mpospisil/gleanvolt-cars/tree/main/volkswagen)
-in gleanvolt-cars is the volkswagen.de feed below, as a car plugin with its own page for the account, the sign-in
-and the code (#410, #474). Run it only with *A plugin* chosen, so it and `Vehicle:Website` never use the VW account
-at the same time. Its README says how to run it and what differs from the built-in. The built-in feeds move there
-too (#478).
+**The car plugins.** [gleanvolt-cars](https://github.com/mpospisil/gleanvolt-cars) has three, each with its own
+page for the account and the sign-in, its own image and its own release:
+
+| Plugin | Compose profile, port | Reads |
+|---|---|---|
+| Volkswagen | `volkswagen`, 8095 | volkswagen.de, live; a first sign-in asks for an emailed code |
+| MyŠkoda | `skoda`, 8101 | the MyŠkoda Public API, every 5–15 min, with an API key from the MySkoda app |
+| VW Group Data Act | `vwgroup`, 8102 | the EU Data Act portal, 2–4 hours behind, any VW Group brand |
+
+Each README says how to run it and what it needs from you. Compose hands each the VIN, the username, the brand
+and the client id from the `.env` lines the built-in feeds read (`VW_WEBSITE_*`, `SKODA_*`, `VW_*`); a password
+or a key is only ever entered on the plugin's page.
+
+**The built-in feeds are gone (#477).** volkswagen.de, MyŠkoda and the Data Act portal were read by Gleanvolt
+itself until then. An installation that had one switched on (`Vehicle:Website:Enabled`, `Vehicle:Skoda:Enabled`,
+`Vehicle:DataAct:Enabled` or `VW_ENABLED`) is moved at its first start: `Vehicle:External:Enabled` is written to
+the overrides file with `Vehicle:RetiredFeed` naming the plugin, so this happens once, and the Car page names the
+plugin until a car plugin connects (`Vehicle:RetiredFeedNotice`). One warning a start names any flag still on;
+the flags are ignored, not refused. The built-ins' secrets (`vehicle-account-password`, `vw-website-session`,
+`skoda-api-key`) are deleted from the secret store at every start, whatever feed is chosen, and never handed to a
+plugin. A setup document with a key of those sections is refused, naming the plugin.
 
 | Key | Default | |
 |---|---|---|
@@ -365,8 +276,8 @@ item, indented four spaces further.) Then set `Ev:Vehicles:0:Telemetry:Topic` to
 ```
 
 Off by default. On, **nothing polls**: the car is read only when you press *Ask the car* or prepare a
-plan, so a reading on screen is always one you asked for. Worth it for the Data Act portal, whose
-readings are hours old. The cost: no state of charge is recorded during charging sessions.
+plan. Since #477 no feed is polled (a plugin and your own topic both push), so it changes nothing today;
+a plugin that reads a slow source, such as the Data Act portal, decides its own cadence.
 
 ## Old keys
 
