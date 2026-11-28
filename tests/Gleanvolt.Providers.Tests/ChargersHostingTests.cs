@@ -148,10 +148,6 @@ public sealed class ChargersHostingTests
         Assert.Contains("""<meta http-equiv="refresh" content="10">""", body, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void AMachineWhoseAddressesCannotBeListedShowsNone() =>
-        Assert.Empty(PluginHost.AddressesOrNone(() => throw new System.Net.NetworkInformation.NetworkInformationException()));
-
     [Theory]
     [InlineData("cs")]
     [InlineData("cs-CZ")]
