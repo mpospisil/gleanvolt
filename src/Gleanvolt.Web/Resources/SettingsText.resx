@@ -175,36 +175,6 @@
   <data name="Out" xml:space="preserve">
     <value>out</value>
   </data>
-  <data name="VehicleTelemetry" xml:space="preserve">
-    <value>Vehicle telemetry</value>
-  </data>
-  <data name="VehicleTelemetryTopic" xml:space="preserve">
-    <value>vehicle telemetry</value>
-  </data>
-  <data name="VehicleTelemetryTip_1" xml:space="preserve">
-    <value>retained</value>
-  </data>
-  <data name="VehicleTelemetryTip" xml:space="preserve">
-    <value>One specific topic, not a wildcard: this version tracks one car, and a {0} across several topics would silently let the newest message win, whichever car it described. Messages should be {1}, so after a restart the last reading arrives at once instead of waiting for the car's next cloud update. Note that this client id does not include the system id, so two controllers on one machine would clash on the broker.</value>
-  </data>
-  <data name="SubscribedTo" xml:space="preserve">
-    <value>Subscribed to</value>
-  </data>
-  <data name="Nothing" xml:space="preserve">
-    <value>nothing</value>
-  </data>
-  <data name="StaleAfter" xml:space="preserve">
-    <value>Stale after</value>
-  </data>
-  <data name="RetryEvery" xml:space="preserve">
-    <value>Retry every</value>
-  </data>
-  <data name="NoTopic" xml:space="preserve">
-    <value>The feed is on but has no topic, so it connects to no broker and reads nothing — on the Overview this looks the same as a car that never reports. Enter the topic your publisher writes to on the {0} page.</value>
-  </data>
-  <data name="OneBroker" xml:space="preserve">
-    <value>Both connections use the same broker, {0}. They are still two connections with two client ids, and either can be pointed elsewhere without affecting the other.</value>
-  </data>
   <!-- API -->
   <data name="ApiTopic" xml:space="preserve">
     <value>API</value>
@@ -1028,7 +998,7 @@
     <comment>{0} what the provider said, in English.</comment>
   </data>
   <data name="ExternalState_OffVehicle" xml:space="preserve">
-    <value>Off. Choose A plugin on the Car page, save and restart to turn it on.</value>
+    <value>Off. Choose A car plugin on the Car page, save and restart to turn it on.</value>
   </data>
   <data name="ExternalPage" xml:space="preserve">
     <value>Page</value>
@@ -1142,9 +1112,6 @@
   </data>
   <data name="RunningDetailsNote" xml:space="preserve">
     <value>As the running controller uses them; a change saved above applies from the next start.</value>
-  </data>
-  <data name="VehicleTelemetryOff" xml:space="preserve">
-    <value>Off: the car's state of charge is not read over MQTT. It is turned on, with the topic your publisher writes to, on the {0} page.</value>
   </data>
   <data name="GroupAdvanced" xml:space="preserve">
     <value>Advanced</value>

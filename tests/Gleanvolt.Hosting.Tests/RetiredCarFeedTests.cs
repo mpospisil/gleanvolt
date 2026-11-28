@@ -141,6 +141,41 @@ public sealed class RetiredCarFeedTests : IDisposable
     }
 
     [Fact]
+    public void TheCarsMqttTopicSavedOnTheCarPageIsTakenOutOfTheFile()
+    {
+        // #486: the topic is not read any more, and nothing can edit it there now.
+        PvSystemOverrides.Write(OverridesPath, new Dictionary<string, string>
+        {
+            ["Vehicle:Enabled"] = "true",
+            ["Ev:Vehicles:0:Telemetry:Topic"] = "gleanvolt/vehicle/id4/state",
+            [EvSettingKeys.Phases] = "3",
+        });
+
+        Retired();
+
+        Assert.Equal([EvSettingKeys.Phases], PvSystemOverrides.Read(OverridesPath).Keys.ToArray());
+        Assert.Single(_log.Warnings, warning => warning.Contains("no longer reads the car over MQTT", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TheCarsMqttSwitchInTheEnvironmentWarnsAtEveryStart()
+    {
+        Retired(("Vehicle:Enabled", "true"));
+        Retired(("Vehicle:Enabled", "true"));
+
+        Assert.Equal(2, _log.Warnings.Count(warning => warning.Contains("VEHICLE_ENABLED", StringComparison.Ordinal)));
+        Assert.False(File.Exists(OverridesPath));
+    }
+
+    [Fact]
+    public void TheCarsMqttSwitchOffSaysNothing()
+    {
+        Retired(("Vehicle:Enabled", "false"));
+
+        Assert.Empty(_log.Warnings);
+    }
+
+    [Fact]
     public void WithoutAnOverridesFileTheMoveIsForThisRun()
     {
         var configuration = new ConfigurationManager();

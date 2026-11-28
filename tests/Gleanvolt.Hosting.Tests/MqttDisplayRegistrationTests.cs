@@ -55,7 +55,6 @@ public class MqttDisplayRegistrationTests
 
         Assert.False(mqtt.AnyEnabled);
         Assert.False(mqtt.HomeAssistant.Connection.Enabled);
-        Assert.False(mqtt.Vehicle.Connection.Enabled);
     }
 
     [Fact]
@@ -99,30 +98,6 @@ public class MqttDisplayRegistrationTests
     }
 
     [Fact]
-    public async Task TheVehicleTopicIsTheOneTheWorkerSubscribedTo()
-    {
-        // The worker takes the topic from the car (#124), not from VehicleOptions.Topic -- which is a
-        // retired key the host refuses outright -- so the page must take it from the same place.
-        await using var provider = Build(
-            ("Vehicle:Enabled", "true"),
-            ("Ev:Vehicles:0:Id", "id4"),
-            ("Ev:Vehicles:0:Telemetry:Topic", "gleanvolt/vehicle/id4/state"));
-
-        var vehicle = provider.GetRequiredService<MqttDisplayOptions>().Vehicle;
-
-        Assert.Equal(provider.GetRequiredService<EvInfo>().TelemetryTopic, vehicle.Topic);
-        Assert.Equal("gleanvolt/vehicle/id4/state", vehicle.Topic);
-    }
-
-    [Fact]
-    public async Task AVehicleFeedWithNoTopicIsShownAsTheMisconfigurationItIs()
-    {
-        await using var provider = Build(("Vehicle:Enabled", "true"));
-
-        Assert.True(provider.GetRequiredService<MqttDisplayOptions>().Vehicle.IsEnabledWithoutTopic);
-    }
-
-    [Fact]
     public async Task TheBrokerPasswordIsWithheldFromAnOpenUi()
     {
         await using var provider = Build([.. HomeAssistantOn, ("Web:PasswordHash", ""), ("Web:RequireAuthentication", "false")]);
@@ -140,12 +115,11 @@ public class MqttDisplayRegistrationTests
     public async Task TheBrokerPasswordIsHandedOverOnceALoginIsEnforced()
     {
         await using var provider = Build(
-            [.. HomeAssistantOn, ("Web:PasswordHash", "a-hash"), ("Vehicle:Enabled", "true"), ("Vehicle:Password", "car-secret")]);
+            [.. HomeAssistantOn, ("Web:PasswordHash", "a-hash")]);
 
         var mqtt = provider.GetRequiredService<MqttDisplayOptions>();
 
         Assert.Equal("broker-secret", mqtt.HomeAssistant.Connection.Password);
-        Assert.Equal("car-secret", mqtt.Vehicle.Connection.Password);
         Assert.False(mqtt.HomeAssistant.Connection.PasswordWithheld);
     }
 
@@ -173,19 +147,5 @@ public class MqttDisplayRegistrationTests
 
         Assert.False(connection.PasswordWithheld);
         Assert.True(connection.IsAnonymous);
-    }
-
-    [Fact]
-    public async Task TwoLinksOnOneBrokerAreSaidToBeOne()
-    {
-        await using var shared = Build(
-            [.. HomeAssistantOn, ("Vehicle:Enabled", "true"), ("Vehicle:BrokerHost", "mosquitto")]);
-
-        Assert.True(shared.GetRequiredService<MqttDisplayOptions>().SharesOneBroker);
-
-        await using var separate = Build(
-            [.. HomeAssistantOn, ("Vehicle:Enabled", "true"), ("Vehicle:BrokerHost", "192.168.2.4")]);
-
-        Assert.False(separate.GetRequiredService<MqttDisplayOptions>().SharesOneBroker);
     }
 }

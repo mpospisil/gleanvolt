@@ -327,7 +327,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
             ProviderId: "vehicle-sample", ProviderName: "Vehicle sample", ProviderVersion: "1.0.0",
             Since: Now.AddHours(-2), LastDataAt: Now.AddMinutes(-3)));
 
-        var car = new EvInfo("model3", "The Model 3", "Tesla", "Model 3 RWD", 57_500, 0.9, 3, 6, 16, string.Empty);
+        var car = new EvInfo("model3", "The Model 3", "Tesla", "Model 3 RWD", 57_500, 0.9, 3, 6, 16);
         Services.AddSingleton(car);
         Services.AddSingleton(ChargingLimits.Intersect(6, 16, 3, car));
         Services.AddSingleton<IVehicleStateRefresh>(new FakeVehicleStateRefresh(canRefresh: true));

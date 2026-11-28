@@ -181,25 +181,6 @@
     <comment>{0}, {1} and {2} are configuration and commands, shown as code.</comment>
   </data>
   <!-- MQTT connection -->
-  <data name="MqttBroker" xml:space="preserve">
-    <value>Broker</value>
-  </data>
-  <data name="MqttBrokerNote" xml:space="preserve">
-    <value>— the address the controller connects to; it may not be reachable from here.</value>
-  </data>
-  <data name="MqttUsername" xml:space="preserve">
-    <value>Username</value>
-  </data>
-  <data name="MqttAnonymous" xml:space="preserve">
-    <value>none (anonymous)</value>
-  </data>
-  <data name="MqttPassword" xml:space="preserve">
-    <value>Password</value>
-  </data>
-  <data name="MqttPasswordWithheld" xml:space="preserve">
-    <value>set, but not shown — this UI has no login, so anyone on the network could read it. Configure {0} ({1}) to show it.</value>
-    <comment>{0} is an environment variable and {1} a command, shown as code.</comment>
-  </data>
   <data name="MqttClientId" xml:space="preserve">
     <value>Client id</value>
   </data>

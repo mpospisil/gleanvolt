@@ -35,7 +35,7 @@ too high. Charging still works, but plans finish late and nothing looks wrong. C
 
 ## The battery level
 
-Under **What reads this car**, choose **A plugin**, and run the plugin for your car. Gleanvolt doesn't
+Under **What reads this car**, choose **A car plugin**, and run the plugin for your car. Gleanvolt doesn't
 read a car itself.
 
 <Tabs syncKey="car">
@@ -55,10 +55,10 @@ Any other program can be one too: developers can find how to write one in
 
 <Steps>
 
-1. On the **Car** page, choose **A plugin** under **What reads this car**. Press **Save**,
+1. On the **Car** page, choose **A car plugin** under **What reads this car**. Press **Save**,
    then **Restart**.
 
-   ![The Car page with A plugin chosen, then the car's own fields.](../../../../assets/screenshots/car-external.png)
+   ![The Car page with A car plugin chosen, then the car's own fields.](../../../../assets/screenshots/car-external.png)
 
 2. Start the plugin. On a Raspberry Pi installed with the deploy script, add it to `GLEANVOLT_PLUGINS` in
    `.env`, such as `GLEANVOLT_PLUGINS=openweather,solax,volkswagen`, and deploy again. Otherwise, follow its
@@ -92,11 +92,8 @@ The MyŠkoda and Data Act plugins haven't been tried on a real car yet. If you h
 </TabItem>
 <TabItem label="Other cars">
 
-Choose **Another manufacturer — charge only**. Charging works exactly the same; you ask for a charge in
-kWh rather than in percent. If a program can read your car, see **A plugin**.
-
-If Home Assistant can see your car's battery level, it can pass it on to Gleanvolt. That is described in
-the repository, with the other advanced integrations.
+Choose **Nothing — targets in kWh**. Charging works exactly the same; you ask for a charge in kWh
+rather than in percent. If a program can read your car, see **A plugin**.
 
 </TabItem>
 </Tabs>
@@ -104,10 +101,10 @@ the repository, with the other advanced integrations.
 ## After upgrading from a built-in feed
 
 Earlier versions of Gleanvolt read Volkswagen, Škoda and the VW Group portal themselves. Those built-in feeds
-are gone. If you used one, the first start after the upgrade chooses **A plugin** for you, and the **Car**
+are gone. If you used one, the first start after the upgrade chooses **A car plugin** for you, and the **Car**
 page names the plugin to run until it connects:
 
-![The Car page after the upgrade: A plugin chosen, and a notice naming the Volkswagen plugin.](../../../../assets/screenshots/car-retired.png)
+![The Car page after the upgrade: A car plugin chosen, and a notice naming the Volkswagen plugin.](../../../../assets/screenshots/car-retired.png)
 
 <Steps>
 

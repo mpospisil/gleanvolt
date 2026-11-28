@@ -3,43 +3,20 @@ using Gleanvolt.Core.Models;
 namespace Gleanvolt.Web;
 
 /// <summary>
-/// The two MQTT links this controller keeps, as the UI should display them (issue #143): the Home
-/// Assistant integration, which publishes state and takes commands, and the vehicle telemetry feed,
-/// which only subscribes.
+/// The MQTT link this controller keeps, as the UI should display it (issue #143): the Home Assistant integration,
+/// which publishes state and takes commands. The car's own telemetry topic was the second link until #486.
 ///
-/// <para>Two of them rather than one broker, because they are separately optional and deliberately
-/// not inherited from one another — you can publish to Home Assistant without reading the car, or
-/// the reverse, and <c>deploy/docker-compose.yml</c> leaves the vehicle's broker host overridable
-/// while pinning Home Assistant's. A page that showed "the broker" as a single row would be wrong on
-/// any installation that took that up.</para>
-///
-/// <para>Handed over by the host exactly as <see cref="WebBuildInfo"/> and
-/// <see cref="VehicleDisplayOptions"/> are: the <c>"HomeAssistant"</c> and <c>"Vehicle"</c> sections
-/// are bound in <c>Gleanvolt.Hosting</c>, an assembly this one must not reference, and the topic
-/// strings belong to <c>HaDiscovery</c> over there rather than to a second copy of the format strings
-/// here.</para>
+/// <para>Handed over by the host exactly as <see cref="WebBuildInfo"/> and <see cref="VehicleDisplayOptions"/> are:
+/// the <c>"HomeAssistant"</c> section is bound in <c>Gleanvolt.Hosting</c>, an assembly this one must not reference,
+/// and the topic strings belong to <c>HaDiscovery</c> over there.</para>
 /// </summary>
-public sealed record MqttDisplayOptions(
-    HomeAssistantMqttDisplay HomeAssistant,
-    VehicleMqttDisplay Vehicle)
+public sealed record MqttDisplayOptions(HomeAssistantMqttDisplay HomeAssistant)
 {
-    /// <summary>Neither link configured — what an installation that speaks no MQTT at all is handed.</summary>
-    public static MqttDisplayOptions None { get; } = new(
-        new HomeAssistantMqttDisplay(MqttConnectionDisplay.Off),
-        new VehicleMqttDisplay(MqttConnectionDisplay.Off));
+    /// <summary>The link not configured — what an installation that speaks no MQTT at all is handed.</summary>
+    public static MqttDisplayOptions None { get; } = new(new HomeAssistantMqttDisplay(MqttConnectionDisplay.Off));
 
-    /// <summary>Whether either link is on, which is what decides between a section and one line saying it is off.</summary>
-    public bool AnyEnabled => HomeAssistant.Connection.Enabled || Vehicle.Connection.Enabled;
-
-    /// <summary>
-    /// Whether both links are on and dialling the same broker. Worth saying out loud: "these are the
-    /// same broker" and "these are two brokers" are both normal, and comparing two addresses a screen
-    /// apart is exactly the check a reader should not have to make for themselves.
-    /// </summary>
-    public bool SharesOneBroker =>
-        HomeAssistant.Connection.Enabled
-        && Vehicle.Connection.Enabled
-        && string.Equals(HomeAssistant.Connection.Broker, Vehicle.Connection.Broker, StringComparison.OrdinalIgnoreCase);
+    /// <summary>Whether the link is on, which is what decides between a section and one line saying it is off.</summary>
+    public bool AnyEnabled => HomeAssistant.Connection.Enabled;
 }
 
 /// <summary>
@@ -47,7 +24,7 @@ public sealed record MqttDisplayOptions(
 /// dials, not one a browser can reach — on the reference install it is <c>mosquitto:1883</c>, a
 /// compose network name — and the page must not blur the two.
 /// </summary>
-/// <param name="Enabled">Whether the worker connects at all. Both links are off by default.</param>
+/// <param name="Enabled">Whether the worker connects at all. Off by default.</param>
 /// <param name="BrokerHost">Broker hostname as configured.</param>
 /// <param name="BrokerPort">Broker port as configured.</param>
 /// <param name="Username">The broker account, which is not a credential on its own and is half of every "why is the broker refusing us".</param>
@@ -130,27 +107,4 @@ public sealed record HomeAssistantMqttDisplay(
 
     /// <summary>Whether anything is being retired, which is the uncommon case and the only one worth showing.</summary>
     public bool IsRetiringAnything => RetiredDeviceIds.Count > 0 || RetiredTopicPrefixes.Count > 0;
-}
-
-/// <summary>The vehicle telemetry link: one subscription, and what makes a reading too old to believe.</summary>
-/// <param name="Connection">Broker, credentials and client id.</param>
-/// <param name="Topic">
-/// The topic the worker actually subscribed to — <c>Ev:Vehicles:0:Telemetry:Topic</c> by way of
-/// <see cref="Core.Models.EvInfo.TelemetryTopic"/>, and <em>not</em> <c>VehicleOptions.Topic</c>,
-/// whose configuration key the host retired. Reading the latter would put a value on the page that
-/// nothing acts on.
-/// </param>
-/// <param name="MaxAge">How old a reading may be before it is shown as stale.</param>
-/// <param name="ReconnectInterval">How long the worker waits before retrying a failed connection.</param>
-public sealed record VehicleMqttDisplay(
-    MqttConnectionDisplay Connection,
-    string Topic = "",
-    TimeSpan MaxAge = default,
-    TimeSpan ReconnectInterval = default)
-{
-    /// <summary>
-    /// Enabled with nothing to subscribe to: the exact case the worker logs a warning for and then
-    /// does nothing, which from the dashboard looks indistinguishable from a car that never reports.
-    /// </summary>
-    public bool IsEnabledWithoutTopic => Connection.Enabled && string.IsNullOrWhiteSpace(Topic);
 }

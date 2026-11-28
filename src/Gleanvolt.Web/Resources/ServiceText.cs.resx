@@ -243,9 +243,6 @@
   <data name="Config_NotWritten" xml:space="preserve">
     <value>Nepodařilo se zapsat {0}: {1}</value>
   </data>
-  <data name="Config_FeedNeeds" xml:space="preserve">
-    <value>Zapnutý zdroj potřebuje {0}, ale hodnota je prázdná.</value>
-  </data>
   <data name="Solcast_EnterKey" xml:space="preserve">
     <value>Zadejte klíč API ze svého účtu Solcast.</value>
   </data>
@@ -626,6 +623,6 @@
     <value>{0}: nabíječka už není součástí nastavení. Nabíječka je plugin s vlastní stránkou nastavení, který přijmete v Nastavení → Pluginy. Klíče nabíječky z instalačního souboru odstraňte.</value>
   </data>
   <data name="Config_SetupRetiredCarKey" xml:space="preserve">
-    <value>{0}: Gleanvolt už auto sám nečte. Čte ho plugin {1}: spusťte ho, přijměte ho v Nastavení → Pluginy, na jeho stránce nastavte účet a na stránce Auto zvolte Plugin. Klíč z instalačního souboru odstraňte.</value>
+    <value>{0}: Gleanvolt už auto sám nečte. Čte ho plugin {1}: spusťte ho, přijměte ho v Nastavení → Pluginy, na jeho stránce nastavte účet a na stránce Auto zvolte Plugin auta. Klíč z instalačního souboru odstraňte.</value>
   </data>
 </root>

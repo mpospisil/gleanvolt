@@ -40,8 +40,8 @@ public class EvResolverTests
             ("Ev:Vehicles:0:BatteryCapacityKWh", "0"),
             ("Ev:Vehicles:0:Telemetry:Topic", "gleanvolt/vehicle/state"));
 
+        // An old topic (#486) is not part of the car.
         Assert.False(ev.IsConfigured);
-        Assert.Equal("gleanvolt/vehicle/state", ev.TelemetryTopic);
         Assert.Contains("no vehicle configured", ev.Describe());
     }
 
@@ -74,8 +74,7 @@ public class EvResolverTests
             ("Ev:Vehicles:0:ChargeEfficiency", "0.9"),
             ("Ev:Vehicles:0:Phases", "3"),
             ("Ev:Vehicles:0:MinChargingCurrentAmps", "6"),
-            ("Ev:Vehicles:0:MaxChargingCurrentAmps", "16"),
-            ("Ev:Vehicles:0:Telemetry:Topic", "gleanvolt/vehicle/id4/state"));
+            ("Ev:Vehicles:0:MaxChargingCurrentAmps", "16"));
 
         Assert.True(ev.IsConfigured);
         Assert.Equal("id4", ev.Id);
@@ -84,7 +83,6 @@ public class EvResolverTests
         Assert.Equal(77_000, ev.BatteryCapacityWh);
         Assert.True(ev.CanTargetSoc);
         Assert.Equal(3, ev.Phases);
-        Assert.Equal("gleanvolt/vehicle/id4/state", ev.TelemetryTopic);
     }
 
     [Fact]

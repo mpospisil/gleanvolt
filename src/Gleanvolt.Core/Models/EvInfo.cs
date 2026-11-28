@@ -25,7 +25,6 @@ namespace Gleanvolt.Core.Models;
 /// </param>
 /// <param name="MinChargingCurrentAmps">The lowest current the car will start on, or null when unstated.</param>
 /// <param name="MaxChargingCurrentAmps">The car's own ceiling, or null when unstated.</param>
-/// <param name="TelemetryTopic">Where this car's readings arrive, or empty when no feed names one.</param>
 public sealed record EvInfo(
     string Id,
     string Name,
@@ -35,8 +34,7 @@ public sealed record EvInfo(
     double ChargeEfficiency,
     int? Phases,
     int? MinChargingCurrentAmps,
-    int? MaxChargingCurrentAmps,
-    string TelemetryTopic)
+    int? MaxChargingCurrentAmps)
 {
     /// <summary>
     /// The car nobody has described. Every figure unstated, so every limit is the installation's and
@@ -51,8 +49,7 @@ public sealed record EvInfo(
         ChargeEfficiency: 0.9,
         Phases: null,
         MinChargingCurrentAmps: null,
-        MaxChargingCurrentAmps: null,
-        TelemetryTopic: string.Empty);
+        MaxChargingCurrentAmps: null);
 
     /// <summary>
     /// Whether anything at all has been said about the car.
@@ -61,10 +58,6 @@ public sealed record EvInfo(
     /// saying nothing must read the same: an absent <c>Ev</c> section and a section holding one entry
     /// with every field left at its default are the same fact, and the shipped <c>appsettings.json</c>
     /// is the second of them.</para>
-    ///
-    /// <para><see cref="TelemetryTopic"/> is deliberately not part of the test. A topic is the link
-    /// between a car and the feed that reports on it, not a fact about the car — and it has a default,
-    /// so counting it would make every installation look like it had described a vehicle.</para>
     /// </summary>
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(Id)

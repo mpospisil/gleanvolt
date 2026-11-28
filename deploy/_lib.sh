@@ -23,7 +23,7 @@ say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 # The plugins released with Gleanvolt (#426): each is the compose service gleanvolt-plugin-<name> under
 # the profile <name>, with its data in plugins/<name>. GLEANVOLT_PLUGINS in the Pi's .env picks which run. The
 # charger plugins (#444) come from gleanvolt-chargers; at most one runs, and since 1.4 (#445) it is the only way the
-# controller reaches the charger. The car plugins (#476) come from gleanvolt-cars; at most one runs, read with "A plugin"
+# controller reaches the charger. The car plugins (#476) come from gleanvolt-cars; at most one runs, read with "A car plugin"
 # chosen on the Car page.
 CHARGER_PLUGINS="solax huawei goe shelly"
 CAR_PLUGINS="volkswagen skoda vwgroup"

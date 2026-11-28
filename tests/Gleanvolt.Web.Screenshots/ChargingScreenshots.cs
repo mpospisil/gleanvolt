@@ -24,7 +24,7 @@ public sealed class ChargingScreenshots : ScreenshotTest
     private static readonly DateTimeOffset Now = new(2026, 6, 14, 9, 30, 0, TimeSpan.Zero);
 
     private static readonly EvInfo Id4 =
-        new("id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77_000, 0.9, 3, 6, 16, "gleanvolt/vehicle/id4/state");
+        new("id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77_000, 0.9, 3, 6, 16);
 
     private readonly ChargeControlStatusHolder _status = new();
     private readonly FakeChargeControlModeSelector _mode = new();

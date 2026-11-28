@@ -100,20 +100,4 @@ public sealed class EvVehicleOptions
     /// accepts 32 A behind a 16 A supply still charges at 16.</para>
     /// </summary>
     public int? MaxChargingCurrentAmps { get; init; }
-
-    /// <summary>Where this car's own telemetry arrives, when a feed is configured.</summary>
-    public EvTelemetryOptions? Telemetry { get; init; }
-}
-
-/// <summary>
-/// The link between a car and the feed that reports on it.
-///
-/// <para>Only the topic lives here. The broker, the credentials, the staleness guard and the reconnect
-/// interval stay in the <c>Vehicle</c> section, because they describe <b>the feed</b> rather than the
-/// car — moving them would repeat the mistake this issue exists to fix. The topic is the one part that
-/// is genuinely per-vehicle: two cars on one broker are two topics.</para>
-/// </summary>
-public sealed class EvTelemetryOptions
-{
-    public string Topic { get; init; } = string.Empty;
 }

@@ -51,7 +51,7 @@ public class CarPageTests : PageTest
 
     /// <summary>An ID.4 Pro: 77 kWh usable, three phases, 6–16 A.</summary>
     private static EvInfo Id4 { get; } = new(
-        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77_000, 0.9, 3, 6, 16, string.Empty);
+        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77_000, 0.9, 3, 6, 16);
 
     private sealed class StubFeed : IVehicleUpdateService
     {
@@ -145,23 +145,12 @@ public class CarPageTests : PageTest
         Assert.Contains("Charging is unaffected", page.Find("#no-feed").TextContent);
     }
 
-    [Fact]
-    public void An_own_topic_is_said_to_run_beside_a_manufacturer_feed()
-    {
-        Services.AddSingleton<IVehicleUpdateService>(new StubFeed());
-
-        var page = Page(Id4 with { TelemetryTopic = "gleanvolt/vehicle/id4/state" }, VehicleFeed.External);
-
-        Assert.Contains("the newest reading wins", page.Find("#own-topic").TextContent);
-    }
-
     // -------------------------------------------------------------------- one page, one outline (#227)
 
     /// <summary>
     /// The heading outline: one <c>h1</c>, above every <c>h2</c>, whatever reads the car.
     /// </summary>
     [Theory]
-    [InlineData(VehicleFeed.OwnTopic)]
     [InlineData(VehicleFeed.External)]
     [InlineData(VehicleFeed.ChargeOnly)]
     public void There_is_one_h1_and_it_precedes_every_h2(VehicleFeed feed)
@@ -178,7 +167,6 @@ public class CarPageTests : PageTest
     /// must never ask the car.
     /// </summary>
     [Theory]
-    [InlineData(VehicleFeed.OwnTopic)]
     [InlineData(VehicleFeed.External)]
     [InlineData(VehicleFeed.ChargeOnly)]
     public void A_render_never_asks_the_car(VehicleFeed feed)
@@ -382,30 +370,6 @@ public class CarPageTests : PageTest
         Assert.Contains("already had this reading", page.Find("#car-ask-source").TextContent);
     }
 
-    /// <summary>An own topic has nothing to fetch, so it gets what to publish and what last arrived.</summary>
-    [Fact]
-    public void An_own_topic_gets_the_payload_it_wants_and_the_last_thing_it_saw()
-    {
-        _held.Set(new VehicleState(Reported, SocPercent: 41));
-
-        var page = Page(Id4 with { TelemetryTopic = "gleanvolt/vehicle/id4/state" }, VehicleFeed.OwnTopic);
-
-        var sentence = page.Find("#car-ask-own-topic").TextContent;
-
-        Assert.Empty(page.FindAll("#car-ask"));
-        Assert.Contains("gleanvolt/vehicle/id4/state", sentence);
-        Assert.Contains("captured_at", sentence);
-        Assert.Contains("41%", sentence);
-    }
-
-    [Fact]
-    public void An_own_topic_with_nothing_on_it_yet_says_so()
-    {
-        var page = Page(Id4 with { TelemetryTopic = "gleanvolt/vehicle/id4/state" }, VehicleFeed.OwnTopic);
-
-        Assert.Contains("No message has arrived yet", page.Find("#car-ask-own-topic").TextContent);
-    }
-
     /// <summary>Charge-only: nothing to press, and nothing that reads as an unfinished form.</summary>
     [Fact]
     public void Charge_only_reads_as_a_supported_installation_rather_than_an_error()
@@ -419,17 +383,15 @@ public class CarPageTests : PageTest
 
     [Theory]
     [InlineData(VehicleFeed.ChargeOnly)]
-    [InlineData(VehicleFeed.OwnTopic)]
     [InlineData(VehicleFeed.External)]
     public void Every_string_on_the_car_page_comes_from_a_resource(VehicleFeed feed)
     {
         Services.AddSingleton<IRetiredCarFeed>(new FakeRetiredCarFeed(CarFeedPlugin.Volkswagen));
-        var page = PseudoLocale.Render(() => Page(Id4 with { TelemetryTopic = "gleanvolt/vehicle/id4/state" }, feed));
+        var page = PseudoLocale.Render(() => Page(Id4, feed));
 
-        // Only names: the car's, the plugin's and the JSON fields a publisher writes.
+        // Only names: the car's and the plugin's.
         PseudoLocale.AssertTranslated(
             page.Markup,
-            "The ID.4", "Volkswagen ID.4 Pro", "id4", "gleanvolt vehicle state", "Volkswagen",
-            "captured_at soc_percent range_km charge_state plug_state");
+            "The ID.4", "Volkswagen ID.4 Pro", "id4", "Volkswagen");
     }
 }

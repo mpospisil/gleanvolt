@@ -52,7 +52,7 @@ public class DashboardPageTests : PageTest
     }
 
     private static EvInfo Id4() => new(
-        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77_000, 0.9, 3, 6, 16, "gleanvolt/vehicle/id4/state");
+        "id4", "The ID.4", "Volkswagen", "ID.4 Pro", 77_000, 0.9, 3, 6, 16);
 
     /// <summary>
     /// A manufacturer feed that only ever answers "here is how I am". Fetching throws on purpose: the

@@ -162,24 +162,6 @@
   <data name="RestartCost" xml:space="preserve">
     <value>Probíhající nabíjení se pozastaví a správce nabíjení pak pokračuje v režimu, který běžel, s jeho cílem nebo limitem a s nastavením nabíjení tak, jak bylo. Toto rozhraní i Home Assistant budou asi půl minuty nedostupné. Při startu se stahuje předpověď solární energie, takže restart spotřebuje jedno z denních volání Solcastu (pokud je nastaven klíč). Pod Dockerem s {0} a pod systemd jednotkou z balíčku .deb se spustí znovu jako nový proces; spuštěný přes {1} nebo ze zipu pro Windows se spustí znovu uvnitř stejného procesu. Jen prostý {2} bez zásady restartu zůstane zastavený a musíte ho spustit znovu ručně.</value>
   </data>
-  <data name="MqttBroker" xml:space="preserve">
-    <value>Broker</value>
-  </data>
-  <data name="MqttBrokerNote" xml:space="preserve">
-    <value>— adresa, ke které se připojuje správce nabíjení; odsud nemusí být dosažitelná.</value>
-  </data>
-  <data name="MqttUsername" xml:space="preserve">
-    <value>Uživatelské jméno</value>
-  </data>
-  <data name="MqttAnonymous" xml:space="preserve">
-    <value>žádné (anonymní)</value>
-  </data>
-  <data name="MqttPassword" xml:space="preserve">
-    <value>Heslo</value>
-  </data>
-  <data name="MqttPasswordWithheld" xml:space="preserve">
-    <value>nastaveno, ale nezobrazuje se — toto rozhraní nemá přihlášení, takže by ho mohl přečíst kdokoli v síti. Chcete-li ho zobrazit, nastavte {0} ({1}).</value>
-  </data>
   <data name="MqttClientId" xml:space="preserve">
     <value>ID klienta</value>
   </data>

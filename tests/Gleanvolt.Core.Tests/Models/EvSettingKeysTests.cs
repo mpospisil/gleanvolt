@@ -43,14 +43,14 @@ public class EvSettingKeysTests
     }
 
     [Fact]
-    public void The_cars_own_fields_are_independent_of_any_feed()
+    public void The_cars_own_fields_are_all_the_car_and_the_plugin_switch()
     {
-        // They are what makes charging correct, and they are editable whichever manufacturer is
-        // picked -- including "charge only", which configures no feed at all.
         Assert.All(EvSettingKeys.Car, key => Assert.StartsWith("Ev:Vehicles:0:", key, StringComparison.Ordinal));
-        Assert.All(
-            VehicleFeeds.All.SelectMany(VehicleFeeds.Fields),
-            key => Assert.DoesNotContain(key, EvSettingKeys.Car));
+        Assert.Equal([.. EvSettingKeys.Car, EvSettingKeys.ExternalEnabled], EvSettingKeys.All);
+
+        // #486: the car's own MQTT topic is gone.
+        Assert.False(EvSettingKeys.IsEditable("Vehicle:Enabled"));
+        Assert.False(EvSettingKeys.IsEditable("Ev:Vehicles:0:Telemetry:Topic"));
     }
 
     [Fact]
@@ -58,50 +58,29 @@ public class EvSettingKeysTests
         Assert.Equal("Vehicle__External__Enabled", EvSettingKeys.EnvironmentVariable(EvSettingKeys.ExternalEnabled));
 }
 
-/// <summary>
-/// The feed table (issue #214): what each manufacturer choice switches on, what it then needs, and
-/// which choice a configuration already selects.
-/// </summary>
+/// <summary>The feed table (issue #214): a car plugin or nothing (#486), and which a configuration selects.</summary>
 public class VehicleFeedsTests
 {
+    [Fact]
+    public void The_choices_are_a_car_plugin_or_nothing() =>
+        Assert.Equal([VehicleFeed.External, VehicleFeed.ChargeOnly], VehicleFeeds.All);
+
     [Fact]
     public void Only_charge_only_switches_nothing_on()
     {
         Assert.Null(VehicleFeeds.EnabledKey(VehicleFeed.ChargeOnly));
-        Assert.All(
-            VehicleFeeds.All.Where(feed => feed != VehicleFeed.ChargeOnly),
-            feed => Assert.True(EvSettingKeys.IsEditable(VehicleFeeds.EnabledKey(feed)!)));
+        Assert.Equal(EvSettingKeys.ExternalEnabled, VehicleFeeds.EnabledKey(VehicleFeed.External));
     }
-
-    [Fact]
-    public void Every_field_a_choice_offers_is_one_the_editor_will_accept() =>
-        Assert.All(
-            VehicleFeeds.All.SelectMany(VehicleFeeds.Fields),
-            key => Assert.True(EvSettingKeys.IsEditable(key)));
-
-    [Fact]
-    public void What_a_feed_requires_is_a_subset_of_what_it_offers() =>
-        Assert.All(
-            VehicleFeeds.All,
-            feed => Assert.All(VehicleFeeds.Required(feed), key => Assert.Contains(key, VehicleFeeds.Fields(feed))));
-
-    [Fact]
-    public void The_choices_are_a_plugin_the_own_topic_or_charge_only() =>
-        Assert.Equal([VehicleFeed.External, VehicleFeed.OwnTopic, VehicleFeed.ChargeOnly], VehicleFeeds.All);
 
     [Fact]
     public void Nothing_enabled_is_charge_only() =>
         Assert.Equal(VehicleFeed.ChargeOnly, VehicleFeeds.Selected(_ => false));
 
-    [Theory]
-    [InlineData(VehicleFeed.External)]
-    [InlineData(VehicleFeed.OwnTopic)]
-    public void One_enabled_key_selects_its_feed(VehicleFeed feed) =>
-        Assert.Equal(feed, VehicleFeeds.Selected(key => key == VehicleFeeds.EnabledKey(feed)));
+    [Fact]
+    public void The_plugin_switch_selects_the_plugin() =>
+        Assert.Equal(VehicleFeed.External, VehicleFeeds.Selected(key => key == EvSettingKeys.ExternalEnabled));
 
     [Fact]
-    public void A_plugin_beside_the_own_topic_is_the_one_named() =>
-        Assert.Equal(
-            VehicleFeed.External,
-            VehicleFeeds.Selected(key => key is EvSettingKeys.ExternalEnabled or EvSettingKeys.MqttEnabled));
+    public void The_old_mqtt_switch_selects_nothing() =>
+        Assert.Equal(VehicleFeed.ChargeOnly, VehicleFeeds.Selected(key => key == "Vehicle:Enabled"));
 }

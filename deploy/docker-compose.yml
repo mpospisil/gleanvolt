@@ -145,7 +145,7 @@ services:
       # usually `homeassistant`) profiles need to agree, which is why .env.example ships them
       # together under one heading rather than as independent-looking settings.
       HomeAssistant__Enabled: ${HOMEASSISTANT_ENABLED:-false}
-      # MQTT_BROKER_HOST is the one broker address both MQTT links dial (this one and Vehicle__ below).
+      # MQTT_BROKER_HOST is the broker address the Home Assistant link dials.
       # The default is the `mosquitto` service on this Pi, which on the host's network is localhost; a
       # broker on another device is its address in .env.
       HomeAssistant__BrokerHost: ${MQTT_BROKER_HOST:-localhost}
@@ -172,21 +172,9 @@ services:
       # every connect for as long as it is set.
       HomeAssistant__RetireTopicPrefixes__0: ${HA_RETIRE_TOPIC_PREFIX:-}
 
-      # Vehicle telemetry (issue #73). Reads the car's own SOC off MQTT; writes nothing, so there is no
-      # dry-run and the worst a wrong topic can do is leave the dashboard's Vehicle card absent.
-      #
-      # The same MQTT_BROKER_HOST as the block above. VEHICLE_BROKER_HOST/_PORT are the older names
-      # for this one link and still win when set, so an .env written before MQTT_BROKER_HOST existed
-      # keeps working untouched; nothing new needs them.
-      #
-      # The credentials are deliberately the same MQTT_USERNAME/MQTT_PASSWORD the block above uses:
-      # publishing status to a broker and subscribing to it are the same broker in every deployment
-      # this file describes, and a second pair of variables would only be a way to get them out of sync.
+      # The car's reading, from a car plugin. Gleanvolt reads no car over MQTT since #486: VEHICLE_ENABLED reaches the
+      # controller only so that it can warn that it is ignored.
       Vehicle__Enabled: ${VEHICLE_ENABLED:-false}
-      Vehicle__BrokerHost: ${VEHICLE_BROKER_HOST:-${MQTT_BROKER_HOST:-localhost}}
-      Vehicle__BrokerPort: ${VEHICLE_BROKER_PORT:-${MQTT_BROKER_PORT:-1883}}
-      Vehicle__Username: ${MQTT_USERNAME:-}
-      Vehicle__Password: ${MQTT_PASSWORD:-}
       Vehicle__MaxAge: ${VEHICLE_MAX_AGE:-12:00:00}
       Vehicle__OnDemandOnly: ${VEHICLE_ON_DEMAND_ONLY:-false}
       # The built-in car feeds' switches, which #477 removed: only their flags still reach the controller, so the
@@ -200,8 +188,8 @@ services:
       # unconfigured, and costs exactly one thing: the targeted plan's "Battery target (%)" basis, which
       # cannot convert 80% into kilowatt-hours without it. Efficiency is charger-meter to cells -- not
       # the home battery's Forecast__ChargeEfficiency, which describes different hardware.
-      # The car itself (issue #124). Separate from the Vehicle section above, which describes the
-      # *feed* -- the broker, the credentials, how stale a reading may be. These describe the car, and
+      # The car itself (issue #124). Separate from the Vehicle section above, which says how stale a
+      # reading may be. These describe the car, and
       # the last three are the ones the controller previously had to borrow from the charger's
       # settings: a single-phase car behind a three-phase wallbox had every power figure it reasoned
       # with overstated threefold.
@@ -217,7 +205,6 @@ services:
       Ev__Vehicles__0__Phases: ${EV_PHASES:-}
       Ev__Vehicles__0__MinChargingCurrentAmps: ${EV_MIN_CHARGING_CURRENT_AMPS:-}
       Ev__Vehicles__0__MaxChargingCurrentAmps: ${EV_MAX_CHARGING_CURRENT_AMPS:-}
-      Ev__Vehicles__0__Telemetry__Topic: ${VEHICLE_TOPIC:-gleanvolt/vehicle/state}
 
       Solcast__ApiKey: ${SOLCAST_API_KEY:-}
       Solcast__ResourceId: ${SOLCAST_RESOURCE_ID:-}
@@ -442,7 +429,7 @@ services:
 
   # The Volkswagen car plugin (#474): a Volkswagen ID. read live from volkswagen.de, with the owner's VW ID. From gleanvolt-cars,
   # released on its own tags, so its version is VOLKSWAGEN_PLUGIN_TAG, not IMAGE_TAG. At most one car plugin runs: the
-  # deploy scripts refuse two. It reads the car with "A plugin" chosen on the Car page.
+  # deploy scripts refuse two. It reads the car with "A car plugin" chosen on the Car page.
   gleanvolt-plugin-volkswagen:
     image: ghcr.io/mpospisil/gleanvolt-plugin-volkswagen:${VOLKSWAGEN_PLUGIN_TAG:-latest}
     container_name: gleanvolt-plugin-volkswagen
@@ -472,7 +459,7 @@ services:
 
   # The MyŠkoda car plugin (#475): a Škoda read through the MyŠkoda Public API, with an API key from the MySkoda app. From gleanvolt-cars,
   # released on its own tags, so its version is SKODA_PLUGIN_TAG, not IMAGE_TAG. At most one car plugin runs: the
-  # deploy scripts refuse two. It reads the car with "A plugin" chosen on the Car page.
+  # deploy scripts refuse two. It reads the car with "A car plugin" chosen on the Car page.
   gleanvolt-plugin-skoda:
     image: ghcr.io/mpospisil/gleanvolt-plugin-skoda:${SKODA_PLUGIN_TAG:-latest}
     container_name: gleanvolt-plugin-skoda
@@ -501,7 +488,7 @@ services:
 
   # The VW Group Data Act car plugin (#475): any VW Group brand read from the EU Data Act portal, with the brand account. From gleanvolt-cars,
   # released on its own tags, so its version is VWGROUP_PLUGIN_TAG, not IMAGE_TAG. At most one car plugin runs: the
-  # deploy scripts refuse two. It reads the car with "A plugin" chosen on the Car page.
+  # deploy scripts refuse two. It reads the car with "A car plugin" chosen on the Car page.
   gleanvolt-plugin-vwgroup:
     image: ghcr.io/mpospisil/gleanvolt-plugin-vwgroup:${VWGROUP_PLUGIN_TAG:-latest}
     container_name: gleanvolt-plugin-vwgroup

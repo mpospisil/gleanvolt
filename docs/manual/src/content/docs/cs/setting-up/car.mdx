@@ -35,7 +35,7 @@ příručky k autu.
 
 ## Stav baterie
 
-V **Odkud se čtou údaje auta** zvolte **Plugin** a spusťte plugin pro své auto. Gleanvolt sám žádné auto
+V **Odkud se čtou údaje auta** zvolte **Plugin auta** a spusťte plugin pro své auto. Gleanvolt sám žádné auto
 nečte.
 
 <Tabs syncKey="car">
@@ -55,10 +55,10 @@ Pluginem může být i jakýkoli jiný program: vývojáři najdou postup v
 
 <Steps>
 
-1. Na stránce **Auto** zvolte u **Odkud se čtou údaje auta** možnost **Plugin**. Stiskněte
+1. Na stránce **Auto** zvolte u **Odkud se čtou údaje auta** možnost **Plugin auta**. Stiskněte
    **Uložit** a pak **Restartovat**.
 
-   ![Stránka Auto se zvolenou možností Plugin a pod tím údaje o autě.](../../../../assets/screenshots/car-external.png)
+   ![Stránka Auto se zvolenou možností Plugin auta a pod tím údaje o autě.](../../../../assets/screenshots/car-external.png)
 
 2. Spusťte plugin. Na Raspberry Pi nainstalovaném skriptem deploy ho přidejte do `GLEANVOLT_PLUGINS`
    v `.env`, například `GLEANVOLT_PLUGINS=openweather,solax,volkswagen`, a nasaďte znovu. Jinak postupujte
@@ -92,11 +92,7 @@ se na issues „Looking for testers“ v repozitáři Gleanvoltu.
 </TabItem>
 <TabItem label="Ostatní auta">
 
-Zvolte **Jiný výrobce — jen nabíjení**. Nabíjení funguje úplně stejně; jen ho zadáváte v kWh místo
-v procentech. Pokud vaše auto umí číst nějaký program, viz **Plugin**.
-
-Pokud stav baterie vašeho auta vidí Home Assistant, může ho Gleanvoltu předávat. To je popsané
-v repozitáři, spolu s dalšími pokročilými propojeními.
+Zvolte **Nic — cíle v kWh**. Nabíjení funguje úplně stejně; jen ho zadáváte v kWh místo v procentech. Pokud vaše auto umí číst nějaký program, viz **Plugin**.
 
 </TabItem>
 </Tabs>
@@ -104,10 +100,10 @@ v repozitáři, spolu s dalšími pokročilými propojeními.
 ## Po aktualizaci z vestavěného zdroje
 
 Dřívější verze Gleanvoltu četly Volkswagen, Škodu a portál koncernu VW samy. Tyto vestavěné zdroje už nejsou.
-Pokud jste některý používali, první start po aktualizaci za vás zvolí **Plugin** a stránka **Auto** jmenuje
+Pokud jste některý používali, první start po aktualizaci za vás zvolí **Plugin auta** a stránka **Auto** jmenuje
 plugin, který máte spustit, dokud se nepřipojí:
 
-![Stránka Auto po aktualizaci: zvolený Plugin a upozornění, které jmenuje plugin Volkswagen.](../../../../assets/screenshots/car-retired.png)
+![Stránka Auto po aktualizaci: zvolený Plugin auta a upozornění, které jmenuje plugin Volkswagen.](../../../../assets/screenshots/car-retired.png)
 
 <Steps>
 
