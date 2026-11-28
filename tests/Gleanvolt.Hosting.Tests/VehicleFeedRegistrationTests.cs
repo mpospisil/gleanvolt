@@ -66,6 +66,18 @@ public class VehicleFeedRegistrationTests
     }
 
     [Fact]
+    public async Task The_portal_that_runs_is_the_built_in_named_even_beside_an_unconfigured_website_feed()
+    {
+        // VW_WEBSITE_ENABLED without a username or VIN registers no website feed, so the portal is the one that
+        // runs; the warning names the plugin for what runs.
+        var services = Services(Credentials.Concat(TheCar)
+            .Concat([("Vehicle:DataAct:Enabled", "true"), ("Vehicle:Website:Enabled", "true")]).ToArray());
+        await using var provider = services.BuildServiceProvider();
+
+        Assert.Equal(VehicleFeed.DataAct, provider.GetRequiredService<ConfiguredVehicleFeed>().BuiltIn);
+    }
+
+    [Fact]
     public void Off_by_default_the_MQTT_feed_is_the_one_that_runs()
     {
         // Nothing that leaves the LAN starts itself, and an installation that has never heard of the

@@ -53,6 +53,14 @@ without switching anybody; the next one removes the built-ins (#477).
 - On the Pi: the controller on `sha-1d55add`, and the Volkswagen plugin 1.0.0 on the old volume read the ID.4 (SOC
   45%).
 
+**Review.** A fresh reviewer found nothing critical and fixed, test-first:
+- the Car page notice asked a Škoda owner for a password, not the API key, and was unclear about which values to copy;
+- the startup warning claimed a username for every feed and printed the enum name;
+- a website flag without its settings named the wrong built-in beside a running portal.
+
+Smaller wording fixes went into `.env.example` and the manual. Release order: `volkswagen-v1.0.1` before this
+Gleanvolt release, or the compose service's `latest` (1.0.0) ignores the carried username and VIN.
+
 **Files.** `deploy/docker-compose.yml`, `deploy/docker-compose.nas.yml`, `deploy/_lib.sh`, `deploy/.env.example`,
 `deploy/README.md`, `src/Gleanvolt.Core/Models/EvSettings.cs`, `src/Gleanvolt.Core/Models/ConfiguredVehicleFeed.cs`,
 `src/Gleanvolt.Hosting/GleanvoltHostingExtensions.cs`, `src/Gleanvolt.Hosting/Vehicles/VehicleUpdateWorker.cs`,

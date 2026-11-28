@@ -203,6 +203,11 @@ public class VehicleUpdateWorkerTests
         Assert.Contains("deprecated", warning, StringComparison.Ordinal);
         Assert.Contains("MyŠkoda plugin", warning, StringComparison.Ordinal);
         Assert.Contains("A plugin", warning, StringComparison.Ordinal);
+
+        // Named as the owner knows it, and no claim about a username or a password a Škoda doesn't have.
+        Assert.DoesNotContain("Skoda car feed", warning, StringComparison.Ordinal);
+        Assert.DoesNotContain("username", warning, StringComparison.Ordinal);
+        Assert.Contains("API key", warning, StringComparison.Ordinal);
     }
 
     [Fact]

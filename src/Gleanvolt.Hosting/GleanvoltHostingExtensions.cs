@@ -969,10 +969,11 @@ public static class GleanvoltHostingExtensions
         // The one feed, resolved once (#212), so that every surface quoting its health -- the dashboard,
         // the sign-in banner, Health, Home Assistant -- quotes the feed behind the reading. At most one
         // IVehicleUpdateService is ever registered above; this makes that a type rather than a habit.
-        // The built-in this installation runs, for the deprecation warning (#476). The portal counts only when it runs.
-        VehicleFeed? builtIn = website.Enabled ? VehicleFeed.Volkswagen
+        // The built-in this installation runs, for the deprecation warning (#476). The portal first: when it runs, it
+        // is the feed, whatever a website or Škoda flag without its settings says.
+        VehicleFeed? builtIn = VwGroupPortalOptionsResolver.IsFeedEnabled(configuration) && portalSetAside is null ? VehicleFeed.DataAct
+            : website.Enabled ? VehicleFeed.Volkswagen
             : skoda.Enabled ? VehicleFeed.Skoda
-            : VwGroupPortalOptionsResolver.IsFeedEnabled(configuration) && portalSetAside is null ? VehicleFeed.DataAct
             : null;
         services.AddSingleton(provider => new ConfiguredVehicleFeed(
             provider.GetService<IVehicleUpdateService>(), portalSetAside, builtIn));

@@ -81,6 +81,16 @@ public class CarEditorFormTests : BunitContext
         Assert.DoesNotContain("deprecated", form.Find("#car-feed option[value='External']").TextContent);
     }
 
+    [Fact]
+    public void The_Skoda_notice_asks_for_the_API_key_not_a_password()
+    {
+        _editor.Running[EvSettingKeys.SkodaVin] = "TMBZZZNY0RP000001";
+        var notice = Form(VehicleFeed.Skoda).Find("#car-feed-deprecated").TextContent;
+
+        Assert.Contains("API key", notice);
+        Assert.DoesNotContain("password", notice);
+    }
+
     [Theory]
     [InlineData(VehicleFeed.External)]
     [InlineData(VehicleFeed.ChargeOnly)]

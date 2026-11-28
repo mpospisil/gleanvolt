@@ -107,9 +107,9 @@ public sealed class VehicleUpdateWorker : BackgroundService
         {
             _logger.LogWarning(
                 "The built-in {Feed} car feed is deprecated and goes in the next release: run the {Plugin} plugin from "
-                + "gleanvolt-cars and choose 'A plugin' on the Car page. Its username and VIN carry over from .env; the "
-                + "password doesn't.",
-                builtIn, plugin.Name);
+                + "gleanvolt-cars and choose 'A plugin' on the Car page. Its settings in .env carry over; enter the "
+                + "{Secret} on the plugin's page.",
+                plugin.Name, plugin.Name, builtIn == VehicleFeed.Skoda ? "API key" : "password");
         }
 
         // A feed that pushes (#408) has nothing for a clock to ask: its provider publishes whenever the
