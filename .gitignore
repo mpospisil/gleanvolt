@@ -443,7 +443,5 @@ src/Gleanvolt.Worker/data/
 *.db-wal
 *.db-shm
 
-# The Volkswagen plugin's data directory from a local run: the VW account and session (#410).
-plugins/Gleanvolt.Plugin.Volkswagen/data/
 # The OpenWeather plugin's data directory from a local run: the OpenWeatherMap key (#424).
 plugins/Gleanvolt.Plugin.OpenWeather/data/

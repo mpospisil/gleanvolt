@@ -68,16 +68,14 @@ are the charger's current range and phases, sent in every hello (#440). `ReadAsy
 The SDK answers every request, says how each command ended, and runs one call to the charger at a time.
 Its connection is `ChargerProviderConnection`.
 
-Three complete providers send fixed data:
-[`plugins/Gleanvolt.Plugin.TariffSample`](../plugins/Gleanvolt.Plugin.TariffSample) a tariff pattern,
+Two complete providers send fixed data:
+[`plugins/Gleanvolt.Plugin.TariffSample`](../plugins/Gleanvolt.Plugin.TariffSample) a tariff pattern, and
 [`plugins/Gleanvolt.Plugin.SolarForecastSample`](../plugins/Gleanvolt.Plugin.SolarForecastSample)
-a sunny bell curve, and [`plugins/Gleanvolt.Plugin.VehicleSample`](../plugins/Gleanvolt.Plugin.VehicleSample)
-a car charging from 40 % to 80 %, with a small page of its own. Don't run any of them against a live
-installation: Gleanvolt acts on what they send.
+a sunny bell curve. Don't run either against a live installation: Gleanvolt acts on what they send.
 
-[`plugins/Gleanvolt.Plugin.Volkswagen`](../plugins/Gleanvolt.Plugin.Volkswagen) is a real one: a copy
-of the built-in volkswagen.de feed, run as a plugin, with its own page for the account and the sign-in
-(#410). It is a test of moving a car integration out of Gleanvolt, not part of the release.
+**The car plugins live in a repository of their own**, [gleanvolt-cars](https://github.com/mpospisil/gleanvolt-cars)
+(#474), MIT, laid out as gleanvolt-chargers is: Volkswagen (the volkswagen.de feed, with its own page for the account
+and the sign-in, #410) and a sample car charging from 40 % to 80 %, the template for a new one.
 
 **The charger plugins live in a repository of their own**, [gleanvolt-chargers](https://github.com/mpospisil/gleanvolt-chargers) (#443), MIT, each
 released on its own tag with an image and self-contained zips: the Shelly TopAC (moved from here, #429),

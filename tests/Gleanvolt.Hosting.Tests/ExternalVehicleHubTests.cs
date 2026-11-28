@@ -16,7 +16,6 @@ using Gleanvolt.Hosting.Configuration;
 using Gleanvolt.Hosting.HomeAssistant;
 using Gleanvolt.Hosting.Vehicles;
 using Gleanvolt.Hosting.Vehicles.External;
-using Gleanvolt.Plugin.VehicleSample;
 using Gleanvolt.Providers.Client;
 using Gleanvolt.Providers.Client.Vehicle;
 using Gleanvolt.Providers.Contracts;
@@ -80,7 +79,7 @@ public sealed class ExternalVehicleHubTests : IAsyncDisposable
         Assert.Equal(new VehicleInfo("id4", "Rosie", "Volkswagen", "ID.4", 77, "Europe/Prague"), welcome!.Car);
 
         var reading = _app!.Services.GetRequiredService<IVehicleTelemetry>().GetCurrentState()!;
-        Assert.Equal(SimulatedCar.StartSocPercent, reading.SocPercent);
+        Assert.Equal(StandInCar.StartSocPercent, reading.SocPercent);
         Assert.Equal(VehicleChargeState.Charging, reading.ChargeState);
         Assert.Equal(VehiclePlugState.Connected, reading.PlugState);
         Assert.Equal(_time.GetUtcNow(), reading.CapturedAt);
@@ -421,7 +420,7 @@ public sealed class ExternalVehicleHubTests : IAsyncDisposable
             RefusedRetryDelay = TimeSpan.FromMilliseconds(100),
             ConfigureHttp = Configure,
         }),
-        new SimulatedCar(_time),
+        new StandInCar(_time),
         NullLogger<VehicleProviderConnection>.Instance);
 
     private async Task<HubConnection> ConnectAsync()
@@ -471,5 +470,23 @@ public sealed class ExternalVehicleHubTests : IAsyncDisposable
         }
 
         Assert.True(condition(), because);
+    }
+
+    /// <summary>
+    /// The vehicle sample's car as it is when it starts (the sample itself now lives in gleanvolt-cars, #474): plugged
+    /// in and charging at 40 %, captured now, with the range from the welcome's pack at 18 kWh per 100 km.
+    /// </summary>
+    private sealed class StandInCar(TimeProvider time) : IVehicleSource
+    {
+        public const double StartSocPercent = 40;
+
+        public Task<VehicleReading?> GetReadingAsync(VehicleInfo car, CancellationToken cancellationToken) =>
+            Task.FromResult<VehicleReading?>(new VehicleReading(
+                time.GetUtcNow(),
+                SocPercent: StartSocPercent,
+                RangeMetres: Math.Round(StartSocPercent / 100 * (car.BatteryCapacityKWh ?? 60) / 0.18) * 1000,
+                ChargeTimeRemaining: TimeSpan.FromMinutes(3 * (80 - StartSocPercent)),
+                ChargeState: CarChargeState.Charging,
+                PlugState: CarPlugState.Connected));
     }
 }

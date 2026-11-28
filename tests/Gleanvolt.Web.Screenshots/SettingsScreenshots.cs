@@ -294,8 +294,8 @@ public sealed class SettingsScreenshots : ScreenshotTest
     }
 
     /// <summary>
-    /// The Volkswagen plugin connected, with its own page in the Car page's frame (#410): where the owner
-    /// signs in to the car's account.
+    /// A car plugin connected (Volkswagen, from gleanvolt-cars), with its own page in the Car page's frame (#410,
+    /// #474): where the owner signs in to the car's account.
     /// </summary>
     [Fact]
     public void The_external_car_providers_page()
@@ -307,7 +307,7 @@ public sealed class SettingsScreenshots : ScreenshotTest
             Since: Now.AddHours(-2), LastDataAt: Now.AddMinutes(-2), PageUrl: new Uri("http://192.168.2.7:8095/")));
 
         Capture(RenderPage<Car>("/car"), "car-external-page", selector: "#external-vehicle-page",
-            frames: new Dictionary<string, string> { ["/external/vehicle/page"] = ProviderPageScreenshot.Volkswagen(Now) });
+            frames: new Dictionary<string, string> { ["/external/vehicle/page"] = ProviderPageScreenshot.CarPlugin(Now) });
     }
 
     private const string Main = "main.content";

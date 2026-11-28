@@ -4,6 +4,30 @@ Append-only. A new record goes here whenever we adopt a library or establish a c
 
 ---
 
+## 2026-11-28 — The car plugins get a repository of their own, gleanvolt-cars (#474)
+
+**Found.** With the car layer released as a preview (#473), nothing kept the Volkswagen plugin and the vehicle sample
+here but that they were here. Gleanvolt's own tests used the sample's car, and the manual's screenshot used the
+Volkswagen plugin's page.
+
+**Decided.**
+- **One public MIT repository for every car plugin, `gleanvolt-cars`,** laid out as gleanvolt-chargers. Each car has
+  its own folder, solution, image, zips and tag (`volkswagen-v1.0.0`). The sample is not released.
+- **The Volkswagen plugin keeps its identity across the move:** provider id `volkswagen`, section `Volkswagen`, port
+  8095, and the files `account.json` and `session.json`. A data directory from before stays signed in.
+- **It keeps the built-in's lockout rule on the car layer:** `OnFetchFailed` blocks for a sign-in instead of
+  reporting `unreachable`, because a retry on a clock is how a VW ID gets a stream of emailed codes.
+- **Gleanvolt's tests and the manual no longer depend on any car plugin.** The hub tests use a stand-in car. The
+  manual's plugin-page picture is the car layer's shared page, with the Volkswagen plugin's sign-in drawn in its
+  shape.
+
+**Consequences accepted.**
+- The manual's picture of a car plugin's page is a stand-in, and can drift from the Volkswagen plugin's real page.
+- The new repository's CI needs an SDK preview on nuget.org, which the owner uploads by hand.
+- A car plugin fix there no longer runs in this repository's CI.
+
+---
+
 ## 2026-11-28 — A car plugin implements one read; the gate, the clock and the page are the car layer's (#473)
 
 **Found.** Gleanvolt's own car feeds and the Volkswagen plugin each carry the same machinery around one request to the

@@ -4,6 +4,59 @@ Reverse-chronological. Newest entry at the top.
 
 ---
 
+## 2026-11-28 — The Volkswagen plugin and the vehicle sample move to gleanvolt-cars (#474)
+
+**Why.** Step 3 of #478. Car plugins get a public MIT repository of their own, as the chargers did (#443), so a car
+fix ships without a Gleanvolt release and more cars can be added there.
+
+**What.**
+- **New repository [gleanvolt-cars](https://github.com/mpospisil/gleanvolt-cars),** laid out as gleanvolt-chargers:
+  a folder per car with its own `.slnx`, `src/`, `tests/` and README, the shared `docker/Dockerfile`, CI, a release
+  workflow per `<name>-v<version>` tag, `plugins.json` and the `PageText` resx convention. It builds on SDK
+  `1.3.3-preview.6` (gleanvolt's main at c2e9d59, the first with `Gleanvolt.Cars.Hosting`), packed here and uploaded
+  by the owner.
+- **Volkswagen there, on the car layer:**
+  - `VolkswagenFeed` and `VolkswagenPoller` became one `VolkswagenCar : PluginCar`, which keeps the built-in's
+    lockout rule: any failure blocks for a sign-in, and so does another account or car.
+  - The page is `CarFrame`, with the sign-in and the account in its `Settings`.
+  - The texts moved to resx.
+  - The client, the sign-in and the session store are unchanged.
+  - The id, the section, port 8095 and the files `account.json` and `session.json` are kept, so an existing data
+    directory stays signed in.
+  - The 23 tests moved with it. The mapping is now checked through `VehicleTestHub`.
+  - Two tests are new: an existing data directory reuses its session, and an account changed during a read still
+    blocks.
+- **The sample there,** as the template for a new car. `Gleanvolt.Plugin.Sample`, port 8103, is never released. It
+  shows a read, a `not-set-up` and a `needs-sign-in` block, a saved setting and a page section of its own.
+- **Here:**
+  - `plugins/Gleanvolt.Plugin.Volkswagen` and `plugins/Gleanvolt.Plugin.VehicleSample` are gone.
+  - `ExternalVehicleHubTests` use a stand-in car with the sample's starting reading.
+  - The manual's `car-external-page` is rendered from `Gleanvolt.Cars.Hosting`'s `CarFrame`, with a sign-in section in
+    the Volkswagen plugin's shape, and paired.
+  - The manual's car page (en + cs), `VEHICLE.md`, `SUPPORTED_EVS.md` and `PROVIDERS.md` point at gleanvolt-cars.
+
+**Quirks.**
+- The SDK's version is `<major>.<minor>.<BuildNumber>`, so a preview needs `-p:BuildNumber=3`. 4 gave 1.3.4.
+- A car blocked in its constructor (no account yet) isn't logged, because `CarPoller` subscribes afterwards. This is a
+  follow-up for the SDK.
+- The new repository's CI is red on restore until preview.6 is on nuget.org.
+- The car layer's page puts Gleanvolt's car and a longer reading above the plugin's own sections, so in the Car page's
+  fixed-height frame the sign-in fell below the fold. The picture's document scrolls itself to the reading, as an owner
+  would, so the reading and the sign-in are both in it.
+
+**Not done here.** The Pi still runs its hand-built Volkswagen container. Swapping it for the gleanvolt-cars build
+waits for the owner's word. Nothing is released: shipping is #476.
+
+**Files.** Deleted `plugins/Gleanvolt.Plugin.Volkswagen/`, `plugins/Gleanvolt.Plugin.VehicleSample/` and
+`tests/Gleanvolt.Hosting.Tests/VolkswagenPluginTests.cs`. Changed `Gleanvolt.slnx`,
+`tests/Gleanvolt.Hosting.Tests/{Gleanvolt.Hosting.Tests.csproj,ExternalVehicleHubTests.cs}` and
+`tests/Gleanvolt.Web.Screenshots/{ProviderPageScreenshot.cs,SettingsScreenshots.cs,Gleanvolt.Web.Screenshots.csproj}`.
+Regenerated `docs/manual/src/assets/screenshots/{car-external-page.png,fingerprints.json}`. Changed
+`docs/manual/src/content/docs/{en,cs}/setting-up/car.mdx`, `docs/{VEHICLE,SUPPORTED_EVS,PROVIDERS,DECISIONS}.md` and
+the plan.
+
+---
+
 ## 2026-11-28 — The car layer for car plugins, and a vehicle test hub (#473)
 
 **Why.** Step 2 of #478: every car feed is moving to `gleanvolt-cars`, and a car plugin should be as small as a

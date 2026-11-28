@@ -203,7 +203,7 @@ some other way than Route C, if MyŠkoda's API doesn't suit.
 | **Freshness** | Whatever the provider publishes; Gleanvolt doesn't poll it |
 | **Gives** | Whatever the provider sends: SOC, range, time to full, charge state, plug state |
 | **Owner action** | The provider reports an expired login as *needs owner*, and the Overview asks you to act |
-| **Write one** | `Gleanvolt.Providers.Client` (MIT) in .NET, or any SignalR client; start from [`plugins/Gleanvolt.Plugin.VehicleSample`](../plugins/Gleanvolt.Plugin.VehicleSample) |
+| **Write one** | `Gleanvolt.Cars.Hosting` (MIT) in .NET, or any SignalR client; start from the [sample in gleanvolt-cars](https://github.com/mpospisil/gleanvolt-cars/tree/main/sample) |
 
 Gleanvolt sends no commands to the car through it, and a provider that stops only lets the reading age.
 
